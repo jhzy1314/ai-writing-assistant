@@ -1,0 +1,21 @@
+# Binary
+server.exe
+server
+*.exe
+
+# Temp & external
+gopath/
+postgresql-*.exe
+*.docx
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Config with secrets
+configs/config.yaml
+
+# Ent generated (can regenerate)
+ent/*/
+ent/runtime/

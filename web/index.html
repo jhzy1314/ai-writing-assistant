@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Novel Studio</title>
+<style>
+:root {
+  --bg: #0f0f14;
+  --panel: #1a1a24;
+  --panel2: #222230;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --muted: #8888a0;
+  --accent: #7c5cfc;
+  --accent2: #5ce0c0;
+  --accent3: #fc6b8a;
+  --danger: #e04040;
+  --success: #40c080;
+  --radius: 8px;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; background:var(--bg); color:var(--text); font-family:var(--font); font-size:14px; line-height:1.6; }
+body { display:flex; overflow:hidden; }
+
+/* Sidebar */
+.sidebar {
+  width:260px; min-width:260px; background:var(--panel); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.sidebar-header {
+  padding:16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.sidebar-header h1 { font-size:15px; font-weight:600; white-space:nowrap; }
+.novel-list { flex:1; overflow-y:auto; padding:8px; }
+.novel-item {
+  padding:10px 12px; border-radius:var(--radius); cursor:pointer;
+  margin-bottom:4px; transition:all 0.15s; border:1px solid transparent;
+}
+.novel-item:hover { background:var(--panel2); }
+.novel-item.active { background:var(--panel2); border-color:var(--accent); }
+.novel-item .title { font-weight:500; font-size:13px; }
+.novel-item .meta { font-size:11px; color:var(--muted); margin-top:2px; }
+.sidebar-footer { padding:12px; border-top:1px solid var(--border); }
+.btn-new { width:100%; padding:10px; border-radius:var(--radius); background:var(--accent); color:#fff; border:none; cursor:pointer; font-size:13px; font-weight:500; }
+.btn-new:hover { opacity:0.9; }
+
+/* Main */
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.topbar {
+  padding:12px 20px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--panel); gap:12px;
+}
+.topbar h2 { font-size:15px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.topbar .actions { display:flex; gap:8px; align-items:center; }
+
+.content { flex:1; overflow:hidden; display:flex; }
+
+/* Buttons */
+.btn {
+  padding:8px 16px; border-radius:var(--radius); border:none; cursor:pointer;
+  font-size:13px; font-weight:500; transition:all 0.2s; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+}
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { opacity:0.9; }
+.btn-success { background:var(--accent2); color:#0f0f14; }
+.btn-success:hover { opacity:0.9; }
+.btn-secondary { background:var(--panel2); color:var(--text); border:1px solid var(--border); }
+.btn-secondary:hover { background:var(--border); }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-sm { padding:5px 10px; font-size:12px; }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* Writing layout */
+.write-layout { display:flex; width:100%; height:100%; }
+.chapter-panel {
+  width:280px; min-width:280px; background:var(--panel); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.chapter-panel-header {
+  padding:12px 16px; border-bottom:1px solid var(--border);
+  font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.chapter-list { flex:1; overflow-y:auto; padding:6px; }
+.chapter-item {
+  padding:8px 12px; border-radius:var(--radius); cursor:pointer;
+  display:flex; justify-content:space-between; align-items:center;
+  border:1px solid transparent; margin-bottom:2px; font-size:13px;
+}
+.chapter-item:hover { background:var(--panel2); }
+.chapter-item.active { background:var(--panel2); border-color:var(--accent); }
+.chapter-item.selected { background:rgba(124,92,252,0.12); border-color:var(--accent); }
+.chapter-item .ch-num { color:var(--muted); font-size:11px; margin-right:8px; }
+.chapter-item .ch-check { width:16px; height:16px; border:1.5px solid var(--border); border-radius:3px; margin-right:8px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; color:transparent; transition:all 0.15s; }
+.chapter-item.selected .ch-check { background:var(--accent); border-color:var(--accent); color:#fff; }
+.chapter-item .ch-info { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chapter-item .ch-status { font-size:10px; padding:2px 8px; border-radius:10px; background:var(--panel2); color:var(--muted); margin-left:6px; flex-shrink:0; }
+.chapter-item .ch-status.Generating { background:rgba(124,92,252,0.15); color:var(--accent); }
+.chapter-item .ch-status.Draft { background:rgba(64,192,128,0.15); color:var(--success); }
+.chapter-item .ch-del {
+  width:20px; height:20px; border-radius:50%; font-size:11px; color:var(--muted);
+  display:none; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; margin-left:4px;
+}
+.chapter-item .ch-del:hover { color:var(--danger); background:rgba(224,64,64,0.15); }
+.chapter-item:hover .ch-del { display:flex; }
+
+/* Selection bar */
+.sel-bar {
+  padding:8px 12px; background:var(--panel); border-top:1px solid var(--accent);
+  display:none; align-items:center; gap:8px; font-size:12px;
+}
+.sel-bar.show { display:flex; }
+.sel-bar .sel-count { color:var(--accent); font-weight:600; }
+.sel-bar .sel-actions { margin-left:auto; display:flex; gap:6px; }
+
+/* Right-click context menu */
+.ctx-menu {
+  position:fixed; z-index:300; background:var(--panel); border:1px solid var(--border);
+  border-radius:var(--radius); min-width:160px; padding:4px; box-shadow:0 4px 16px rgba(0,0,0,0.4);
+  animation:fadeIn 0.12s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+.ctx-menu-item {
+  padding:8px 12px; border-radius:4px; cursor:pointer; font-size:13px;
+  display:flex; align-items:center; gap:8px; color:var(--text);
+}
+.ctx-menu-item:hover { background:var(--panel2); }
+.ctx-menu-item.danger { color:var(--danger); }
+.ctx-menu-divider { height:1px; background:var(--border); margin:4px 0; }
+
+/* Character cards */
+.char-card {
+  background:var(--bg); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px; cursor:pointer; transition:all 0.15s;
+}
+.char-card:hover { border-color:var(--accent); background:var(--panel2); }
+.char-card .char-name { font-size:15px; font-weight:600; margin-bottom:6px; color:var(--text); }
+.char-card .char-meta { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+.char-card .char-tag { font-size:11px; padding:2px 8px; border-radius:10px; background:var(--panel); color:var(--muted); }
+.char-card .char-desc { font-size:12px; color:var(--muted); line-height:1.6; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+
+/* Reader / Writer area */
+.editor-area { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+/* Tabs */
+.editor-tabs { display:flex; border-bottom:1px solid var(--border); padding:0 20px; gap:0; background:var(--panel); }
+.editor-tab {
+  padding:12px 20px; cursor:pointer; font-size:14px; color:var(--muted);
+  border-bottom:2px solid transparent; transition:all 0.2s; position:relative;
+}
+.editor-tab:hover { color:var(--text); }
+.editor-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+.editor-content { flex:1; overflow-y:auto; padding:24px 32px; }
+
+/* Reader mode */
+.reader-text {
+  font-size:15px; line-height:2.2; white-space:pre-wrap; word-break:break-word;
+  max-width:800px; margin:0 auto;
+}
+
+/* Editor mode */
+.editor-textarea {
+  width:100%; height:100%; min-height:400px;
+  background:var(--bg); border:1px solid var(--border); border-radius:var(--radius);
+  color:var(--text); font-family:var(--font); font-size:15px; line-height:2;
+  padding:20px; resize:none; outline:none;
+}
+.editor-textarea:focus { border-color:var(--accent); }
+
+/* Generate settings bar */
+.gen-bar {
+  padding:10px 16px; background:var(--panel); border-top:1px solid var(--border);
+  display:flex; gap:8px; align-items:center;
+}
+.gen-bar input {
+  flex:1; padding:6px 10px; border-radius:var(--radius);
+  background:var(--bg); border:1px solid var(--border); color:var(--text);
+  font-size:12px;
+}
+.gen-bar input:focus { outline:none; border-color:var(--accent); }
+.gen-bar select:focus { outline:none; border-color:var(--accent); }
+.gen-bar input::placeholder { color:var(--muted); }
+
+/* Streaming output overlay */
+.stream-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,0.8); z-index:10;
+  display:flex; align-items:center; justify-content:center;
+}
+.stream-box {
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  width:90%; max-width:800px; max-height:80vh; display:flex; flex-direction:column;
+}
+.stream-header {
+  padding:10px 16px; border-bottom:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:13px;
+}
+.stream-body {
+  flex:1; overflow-y:auto; padding:20px; font-size:15px; line-height:2.2;
+  white-space:pre-wrap; word-break:break-word;
+}
+.stream-body .cursor {
+  display:inline-block; width:2px; height:1em; background:var(--accent);
+  animation:blink 0.8s infinite; vertical-align:text-bottom; margin-left:2px;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* Modal */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex;
+  align-items:center; justify-content:center; z-index:100;
+}
+.modal {
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  padding:24px; width:420px; max-width:90vw;
+}
+.modal h3 { font-size:15px; margin-bottom:16px; }
+.form-group { margin-bottom:12px; }
+.form-group label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; font-weight:500; }
+.form-group input, .form-group textarea, .form-group select {
+  width:100%; padding:8px 12px; border-radius:var(--radius);
+  background:var(--bg); border:1px solid var(--border); color:var(--text);
+  font-family:var(--font); font-size:13px; resize:vertical;
+}
+.form-group textarea { min-height:60px; }
+.form-group input:focus, .form-group textarea:focus { outline:none; border-color:var(--accent); }
+.form-row { display:flex; gap:12px; }
+.form-row .form-group { flex:1; }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:20px; right:20px; padding:12px 20px;
+  background:var(--panel2); border:1px solid var(--border); border-radius:var(--radius);
+  font-size:13px; z-index:200; animation:slideUp 0.3s ease;
+}
+.toast.error { border-color:var(--danger); }
+.toast.success { border-color:var(--success); }
+@keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+/* Welcome */
+.welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--muted); text-align:center; gap:12px; }
+.welcome h2 { color:var(--text); font-size:18px; }
+.welcome p { max-width:400px; font-size:13px; }
+
+/* Loading */
+.loading { color:var(--accent2); }
+.loading::after { content:'...'; animation:dots 1.5s infinite; }
+@keyframes dots { 0%,20%{content:'.'} 40%{content:'..'} 60%,100%{content:'...'} }
+
+/* Responsive */
+@media(max-width:768px) {
+  body { flex-direction:column; }
+  .sidebar { width:100%; min-width:unset; max-height:180px; }
+  .chapter-panel { width:100%; min-width:unset; max-height:200px; }
+  .write-layout { flex-direction:column; }
+}
+
+/* Context card in stream */
+.ctx-card {
+  background:var(--bg); border:1px solid var(--border); border-radius:var(--radius);
+  padding:12px; margin-bottom:12px;
+}
+.ctx-card h4 { font-size:11px; color:var(--accent2); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.ctx-card pre {
+  font-size:12px; line-height:1.7; white-space:pre-wrap; word-break:break-word;
+  max-height:150px; overflow-y:auto; color:var(--muted);
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <span>📖</span>
+    <h1>AI Novel Studio</h1>
+  </div>
+  <div class="novel-list" id="novelList">
+    <div style="color:var(--muted);text-align:center;padding:40px 20px;font-size:13px">暂无小说<br>点击下方按钮创建</div>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn-new" onclick="showCreateModal()">＋ 创建新小说</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="topbar">
+    <h2 id="pageTitle">选择或创建一部小说开始创作</h2>
+    <div class="actions" id="topActions">
+      <button class="btn btn-sm btn-secondary" onclick="showSettingsModal()">API设置</button>
+    </div>
+  </div>
+  <div class="content" id="mainContent">
+    <div class="welcome">
+      <div style="font-size:48px">✍️</div>
+      <h2>欢迎使用 AI Novel Studio</h2>
+      <p>基于多智能体协作的 AI 小说创作引擎。创建小说后，从左侧选择即可开始续写。</p>
+    </div>
+  </div>
+</main>
+
+<!-- Create Novel Modal -->
+<div class="modal-overlay" id="createModal" style="display:none">
+  <div class="modal">
+    <h3>创建新小说</h3>
+    <div class="form-group">
+      <label>书名 *</label>
+      <input type="text" id="newTitle" placeholder="给你的小说起个名字">
+    </div>
+    <div class="form-group">
+      <label>核心创意 / Idea *</label>
+      <textarea id="newIdea" placeholder="例如：一个普通的少年在山洞中捡到了一枚神秘的戒指，从此踏上了修仙之路" rows="3"></textarea>
+    </div>
+    <div class="form-group">
+      <label>简介（可选）</label>
+      <textarea id="newDesc" placeholder="简单描述一下故事背景" rows="2"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>类型</label>
+        <select id="newType">
+          <option value="">选择类型</option>
+          <option>玄幻</option><option>仙侠</option><option>都市</option>
+          <option>科幻</option><option>历史</option><option>游戏</option>
+          <option>悬疑</option><option>轻小说</option><option>奇幻</option>
+          <option>武侠</option><option>军事</option><option>体育</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>标签（逗号分隔）</label>
+        <input type="text" id="newTags" placeholder="如：穿越,系统流,热血">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-secondary" style="flex:1" onclick="hideCreateModal()">取消</button>
+      <button class="btn btn-primary" style="flex:1" onclick="createNovel()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="importModal" style="display:none">
+  <div class="modal" style="width:700px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
+    <h3>导入章节内容</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      粘贴或上传小说文本，自动识别分章。支持「第X章」「Chapter X」等章节标记。
+      <br>导入后 AI 将自动分析内容，续写时可引用已导入的剧情和角色。
+    </div>
+    <div class="form-group" style="flex:1;display:flex;flex-direction:column">
+      <label>文本内容</label>
+      <textarea id="importText" placeholder="在此粘贴小说内容..." rows="12" style="flex:1;min-height:250px;font-size:13px;line-height:1.8"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+      <label class="btn btn-sm btn-secondary" style="cursor:pointer;margin:0">
+        上传 TXT/DOCX（可多选）
+        <input type="file" id="importFile" accept=".txt,.md,.docx" multiple style="display:none" onchange="handleImportFile(this)">
+      </label>
+      <button class="btn btn-sm btn-secondary" onclick="splitPreview()">预览分章</button>
+      <span id="splitInfo" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+    </div>
+    <div id="splitPreview" style="display:none;max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:12px;font-size:12px;color:var(--muted)"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" style="flex:1" onclick="hideImportModal()">取消</button>
+      <button class="btn btn-primary" style="flex:1" id="btnImportDo" onclick="doImport()">导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- API Settings Modal -->
+<div class="modal-overlay" id="settingsModal" style="display:none">
+  <div class="modal" style="width:540px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <h3>API 设置</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      选择提供商后自动填入接口地址和可用模型。写作用来生成正文，审稿可接不同模型。
+    </p>
+    <!-- Writing API -->
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px">
+      <h4 style="font-size:13px;color:var(--accent);margin-bottom:8px">写作 API（续写、拟题）</h4>
+      <div class="form-group">
+        <label>提供商</label>
+        <select id="writeProvider" onchange="onWriteProviderChange()">
+          <option value="">自定义</option><option>DeepSeek</option><option>OpenAI</option><option>Claude (Anthropic)</option><option>Gemini (Google)</option><option>Kimi (月之暗面)</option><option>GLM (智谱)</option><option>通义千问 (阿里)</option><option>文心一言 (百度)</option><option>豆包 (字节)</option><option>SiliconFlow</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>API Key</label>
+        <input type="password" id="writeKey" placeholder="sk-...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Base URL</label>
+          <input type="text" id="writeUrl" placeholder="https://api.deepseek.com">
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="writeModel" onchange="onWriteModelCustom()"><option value=""></option></select>
+          <input type="text" id="writeModelCustom" placeholder="自定义模型名" style="display:none;margin-top:4px;width:100%;padding:6px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);font-size:12px">
+        </div>
+      </div>
+    </div>
+    <!-- Review API -->
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px">
+      <h4 style="font-size:13px;color:var(--accent3);margin-bottom:8px">审稿 API（审稿、批量审稿）</h4>
+      <div class="form-group">
+        <label>提供商</label>
+        <select id="reviewProvider" onchange="onReviewProviderChange()">
+          <option value="">自定义 / 复用写作</option><option>DeepSeek</option><option>OpenAI</option><option>Claude (Anthropic)</option><option>Gemini (Google)</option><option>Kimi (月之暗面)</option><option>GLM (智谱)</option><option>通义千问 (阿里)</option><option>文心一言 (百度)</option><option>豆包 (字节)</option><option>SiliconFlow</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>API Key</label>
+        <input type="password" id="reviewKey" placeholder="留空则复用写作 API">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Base URL</label>
+          <input type="text" id="reviewUrl" placeholder="留空则复用写作 API">
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="reviewModel" onchange="onReviewModelCustom()"><option value=""></option></select>
+          <input type="text" id="reviewModelCustom" placeholder="自定义模型名" style="display:none;margin-top:4px;width:100%;padding:6px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);font-size:12px">
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('settingsModal').style.display='none'">取消</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveAPISettings()">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8081';
+let currentNovel = null;
+let currentChapters = [];
+let activeChapter = null;
+let activeSSE = null;
+let isGenerating = false;
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', loadNovels);
+
+// ===== NOVEL LIST =====
+async function loadNovels() {
+  try {
+    const res = await fetch(`${API}/api/v1/novels`);
+    const data = await res.json();
+    const items = data.items || [];
+    const list = document.getElementById('novelList');
+    if (items.length === 0) {
+      list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px 20px;font-size:13px">暂无小说<br>点击下方按钮创建</div>';
+      return;
+    }
+    list.innerHTML = items.map(n => {
+      const id = n.id || n.ID;
+      return `
+      <div class="novel-item${currentNovel && currentNovel.id === id ? ' active' : ''}" onclick="selectNovel('${id}')">
+        <div class="title">${esc(n.title)}</div>
+        <div class="meta">${esc(n.status)} · ${n.tags ? n.tags.slice(0,3).join(' · ') : ''}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    toast('无法连接服务器: ' + e.message, 'error');
+  }
+}
+
+function selectNovel(id) {
+  currentNovel = { id };
+  activeChapter = null;
+  loadNovels();
+  loadNovelDetail(id);
+}
+
+async function loadNovelDetail(id) {
+  try {
+    const res = await fetch(`${API}/api/v1/novels/${id}`);
+    const data = await res.json();
+    currentNovel = data.item;
+    currentChapters = data.chapters || [];
+    document.getElementById('pageTitle').textContent = currentNovel.title || '未命名小说';
+    renderWritingLayout();
+  } catch(e) {
+    toast('加载小说详情失败', 'error');
+  }
+}
+
+// ===== MAIN LAYOUT =====
+function renderWritingLayout() {
+  const n = currentNovel;
+  if (!n) return;
+
+  const lastChapter = currentChapters.length > 0 ? currentChapters[currentChapters.length - 1] : null;
+  const nextIndex = currentChapters.length + 1;
+
+  const actions = document.getElementById('topActions');
+  actions.innerHTML = `
+    <span style="font-size:12px;color:var(--muted)">${currentChapters.length} 章</span>
+    <button class="btn btn-sm btn-secondary" onclick="showImportModal()">导入</button>
+    <button class="btn btn-sm btn-secondary" onclick="loadNovelDetail('${n.id}')">刷新</button>
+    <button class="btn btn-sm btn-secondary" onclick="showSettingsModal()">API设置</button>
+    <button class="btn btn-sm btn-secondary" onclick="showChapterSettings()">设定</button>
+    <button class="btn btn-sm btn-success" onclick="continueNovel()" id="btnContinue">
+      续写第${nextIndex}章
+    </button>
+  `;
+
+  const content = document.getElementById('mainContent');
+  content.innerHTML = `
+    <div class="write-layout">
+      <div class="chapter-panel">
+        <div class="chapter-panel-header">
+          <span>章节目录</span>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-sm btn-secondary" onclick="toggleSelectAll()" title="全选/取消" style="font-size:11px">全选</button>
+            <button class="btn btn-sm btn-secondary" onclick="continueNovel()" title="续写下一章">＋ 续写</button>
+          </div>
+        </div>
+        <div class="chapter-list" id="chapterList">
+          ${currentChapters.length === 0 ? '<div style="color:var(--muted);text-align:center;padding:30px;font-size:13px">暂无章节<br>点击上方"续写"开始</div>' :
+            currentChapters.map((c, i) => `
+              <div class="chapter-item${activeChapter && activeChapter.id === c.id ? ' active' : ''}" data-chapter-id="${c.id}" data-index="${i}"
+                   onclick="onChapterClick(event, '${c.id}', ${i})"
+                   oncontextmenu="return showCtxMenu(event, '${c.id}', ${i})">
+                <span class="ch-check" onclick="event.stopPropagation();toggleChapterSelect(event, '${c.id}', ${i})">✓</span>
+                <span class="ch-num">#${c.order || i+1}</span>
+                <span class="ch-info">${esc(c.title)}</span>
+                <span class="ch-status ${esc(c.status)}">${esc(c.status)}</span>
+                <span class="ch-del" onclick="event.stopPropagation();deleteChapter('${c.id}','${i}')" title="删除此章">x</span>
+              </div>
+            `).join('')
+          }
+        </div>
+        <div class="sel-bar" id="selBar">
+          <span class="sel-count" id="selCount">已选 0 章</span>
+          <div class="sel-actions">
+            <button class="btn btn-sm btn-secondary" onclick="batchGenerateTitle()">批量拟题</button>
+            <button class="btn btn-sm btn-secondary" onclick="batchReview()">批量审稿</button>
+            <button class="btn btn-sm btn-danger" onclick="batchDelete()">批量删除</button>
+            <button class="btn btn-sm btn-secondary" onclick="clearSelection()">取消选择</button>
+          </div>
+        </div>
+        <div class="gen-bar">
+          <select id="genLength" style="width:auto;padding:6px 8px;border-radius:var(--radius);background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px">
+            <option value="">字数不限</option>
+            <option value="500">短篇 ~500字</option>
+            <option value="1000">标准 ~1000字</option>
+            <option value="1500">中篇 ~1500字</option>
+            <option value="2000">中长 ~2000字</option>
+            <option value="3000">长篇 ~3000字</option>
+            <option value="5000">超长 ~5000字</option>
+            <option value="custom">自定义</option>
+          </select>
+          <input type="number" id="genLengthCustom" placeholder="自定义字数" style="width:100px;display:none" min="100" max="20000" onchange="document.getElementById('genLength').value='custom'">
+          <input type="text" id="genOutline" placeholder="续写大纲：下一章要写什么？" onkeydown="if(event.key==='Enter')continueNovel()">
+          <input type="text" id="genNotes" placeholder="风格指令（如：保持轻松语气）" onkeydown="if(event.key==='Enter')continueNovel()">
+        </div>
+      </div>
+      <div class="editor-area" id="editorArea">
+        <div class="editor-tabs">
+          <div class="editor-tab active" id="tabRead" onclick="switchTab('read')">阅读</div>
+          <div class="editor-tab" id="tabEdit" onclick="switchTab('edit')">编辑</div>
+          <div class="editor-tab" id="tabChar" onclick="switchTab('char')">人物</div>
+        </div>
+        <div class="editor-content" id="editorContent" style="position:relative">
+          ${lastChapter ?
+            `<div class="reader-text" id="readerView">${esc(lastChapter.content || '（空内容）')}</div>
+             <textarea class="editor-textarea" id="editorView" style="display:none"></textarea>` :
+            `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:14px;flex-direction:column;gap:16px" id="readerView">
+              <div>📝 还没有章节</div>
+              <button class="btn btn-success" onclick="continueNovel()">开始续写第1章</button>
+            </div>`
+          }
+          <!-- Character panel -->
+          <div id="charView" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+            <div style="display:flex;gap:8px;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px">
+              <button class="btn btn-sm btn-primary" onclick="analyzeCharacters()">AI 分析人物</button>
+              <button class="btn btn-sm btn-success" onclick="showCharModal()">添加人物</button>
+              <span style="font-size:12px;color:var(--muted);margin-left:auto" id="charCount"></span>
+            </div>
+            <div id="charList" style="flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;align-content:start">
+              <div style="color:var(--muted);text-align:center;padding:40px">加载中...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (lastChapter && !activeChapter) {
+    activeChapter = lastChapter;
+    document.getElementById('editorView').value = lastChapter.content || '';
+  }
+}
+
+// ===== TAB SWITCH =====
+function switchTab(tab) {
+  document.querySelectorAll('.editor-tab').forEach(t => t.classList.toggle('active', false));
+  document.getElementById('tabRead').classList.toggle('active', tab === 'read');
+  document.getElementById('tabEdit').classList.toggle('active', tab === 'edit');
+  document.getElementById('tabChar').classList.toggle('active', tab === 'char');
+  const rv = document.getElementById('readerView');
+  const ev = document.getElementById('editorView');
+  const cv = document.getElementById('charView');
+  if (rv) rv.style.display = tab === 'read' ? 'block' : 'none';
+  if (ev) ev.style.display = tab === 'edit' ? 'block' : 'none';
+  if (cv) cv.style.display = tab === 'char' ? 'flex' : 'none';
+  if (tab === 'char') loadCharacters();
+}
+
+// ===== OPEN CHAPTER =====
+async function openChapter(id, index) {
+  activeChapter = null;
+  // Highlight in list
+  document.querySelectorAll('.chapter-item').forEach(el => el.classList.remove('active'));
+  const items = document.querySelectorAll('.chapter-item');
+  if (items[index]) items[index].classList.add('active');
+
+  try {
+    const res = await fetch(`${API}/api/v1/chapters/${id}`);
+    const data = await res.json();
+    const c = data.item;
+    activeChapter = c;
+
+    const rv = document.getElementById('readerView');
+    const ev = document.getElementById('editorView');
+    if (rv) rv.innerHTML = esc(c.content || '（空内容）');
+    if (ev) ev.value = c.content || '';
+
+    document.getElementById('topActions').innerHTML = `
+      <span style="font-size:12px;color:var(--muted)">${currentChapters.length} 章</span>
+      <button class="btn btn-sm btn-secondary" onclick="showImportModal()">导入</button>
+      <button class="btn btn-sm btn-secondary" onclick="loadNovelDetail('${currentNovel.id}')">刷新</button>
+      <button class="btn btn-sm btn-secondary" onclick="showSettingsModal()">API设置</button>
+      <button class="btn btn-sm btn-primary" onclick="saveCurrentChapter()">保存修改</button>
+      <button class="btn btn-sm btn-secondary" onclick="generateTitle('${c.id}')">AI 拟题</button>
+      <button class="btn btn-sm btn-secondary" onclick="reviewChapter('${c.id}')">AI 审稿</button>
+      <button class="btn btn-sm btn-secondary" onclick="rewriteChapter('${c.id}')">AI 改写</button>
+      <button class="btn btn-sm btn-success" onclick="continueNovel()">续写下一章</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteChapter('${c.id}', '${index}')">删除此章</button>
+    `;
+  } catch(e) {
+    toast('加载章节失败', 'error');
+  }
+}
+
+async function saveCurrentChapter() {
+  if (!activeChapter) return;
+  const ev = document.getElementById('editorView');
+  if (!ev) return;
+  const content = ev.value;
+
+  try {
+    const res = await fetch(`${API}/api/v1/chapters/${activeChapter.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    if (res.ok) {
+      const rv = document.getElementById('readerView');
+      if (rv) rv.innerHTML = esc(content);
+      toast('保存成功', 'success');
+      loadNovelDetail(currentNovel.id);
+    } else {
+      toast('保存失败', 'error');
+    }
+  } catch(e) {
+    toast('保存失败: ' + e.message, 'error');
+  }
+}
+
+// ===== MULTI-SELECT & RIGHT-CLICK =====
+let selectedChapters = new Set();
+let lastClickedIndex = -1;
+
+function onChapterClick(e, id, idx) {
+  closeCtxMenu();
+  if (e.ctrlKey || e.metaKey) {
+    toggleChapterSelect(e, id, idx);
+  } else if (e.shiftKey && lastClickedIndex >= 0) {
+    e.preventDefault();
+    const s = Math.min(lastClickedIndex, idx), en = Math.max(lastClickedIndex, idx);
+    selectedChapters.clear();
+    const items = document.querySelectorAll('.chapter-item');
+    for (let i = s; i <= en; i++) {
+      const cid = items[i]?.dataset?.chapterId;
+      if (cid) selectedChapters.add(cid);
+    }
+    updateChapterUI();
+  } else {
+    if (selectedChapters.size > 0) { selectedChapters.clear(); updateChapterUI(); }
+    openChapter(id, idx);
+  }
+}
+
+function toggleChapterSelect(e, id, idx) {
+  e.stopPropagation();
+  selectedChapters.has(id) ? selectedChapters.delete(id) : selectedChapters.add(id);
+  lastClickedIndex = idx;
+  updateChapterUI();
+}
+
+function toggleSelectAll() {
+  if (selectedChapters.size === currentChapters.length) selectedChapters.clear();
+  else selectedChapters = new Set(currentChapters.map(c => c.id));
+  updateChapterUI();
+}
+
+function clearSelection() { selectedChapters.clear(); updateChapterUI(); }
+
+function updateChapterUI() {
+  document.querySelectorAll('.chapter-item').forEach(el => {
+    el.classList.toggle('selected', selectedChapters.has(el.dataset.chapterId));
+  });
+  const bar = document.getElementById('selBar');
+  const count = document.getElementById('selCount');
+  if (bar) bar.classList.toggle('show', selectedChapters.size > 0);
+  if (count) count.textContent = '已选 ' + selectedChapters.size + ' 章';
+}
+
+async function batchDelete() {
+  const ids = Array.from(selectedChapters);
+  if (!ids.length || !confirm('确认删除选中的 ' + ids.length + ' 个章节？')) return;
+  for (const id of ids) {
+    try { await fetch(API + '/api/v1/chapters/' + id, { method: 'DELETE' }); } catch(e) {}
+  }
+  toast('已删除 ' + ids.length + ' 章', 'success');
+  selectedChapters.clear(); activeChapter = null;
+  loadNovelDetail(currentNovel.id);
+}
+
+async function batchGenerateTitle() {
+  const ids = Array.from(selectedChapters);
+  if (!ids.length) return;
+  toast('正在为 ' + ids.length + ' 章生成标题...', 'success');
+  for (const id of ids) {
+    try { await fetch(API + '/api/v1/chapters/' + id + '/generate-title', { method: 'POST' }); } catch(e) {}
+  }
+  toast('批量拟题完成', 'success');
+  selectedChapters.clear(); loadNovelDetail(currentNovel.id);
+}
+
+async function batchReview() {
+  const ids = Array.from(selectedChapters);
+  if (!ids.length) return;
+  toast('正在审稿...', 'success');
+  let r = '';
+  for (let i = 0; i < ids.length; i++) {
+    try {
+      const res = await fetch(API + '/api/v1/chapters/' + ids[i] + '/review', { method: 'POST' });
+      const d = await res.json();
+      if (d.review) r += '\n=== ' + (d.title || '') + ' ===\n' + d.review + '\n';
+    } catch(e) {}
+  }
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:700px;max-width:95vw;max-height:85vh;overflow-y:auto"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3>批量审稿</h3><button class="btn btn-sm btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">关闭</button></div><div style="white-space:pre-wrap;line-height:1.9;font-size:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px">' + esc(r || '无结果') + '</div></div>';
+  document.body.appendChild(ov);
+  selectedChapters.clear(); updateChapterUI();
+}
+
+function showCtxMenu(e, id, idx) {
+  e.preventDefault(); closeCtxMenu();
+  const ch = currentChapters[idx];
+  if (!ch) return false;
+  const m = document.createElement('div');
+  m.className = 'ctx-menu'; m.id = 'ctxMenu';
+  m.style.left = e.clientX + 'px'; m.style.top = e.clientY + 'px';
+  m.innerHTML = '<div class="ctx-menu-item" onclick="openChapter(\'' + id + '\',' + idx + ');closeCtxMenu()">📖 打开阅读</div>' +
+    '<div class="ctx-menu-item" onclick="generateTitle(\'' + id + '\');closeCtxMenu()">✏️ AI 拟题</div>' +
+    '<div class="ctx-menu-item" onclick="reviewChapter(\'' + id + '\');closeCtxMenu()">🔍 AI 审稿</div>' +
+    '<div class="ctx-menu-item" onclick="navigator.clipboard.writeText(document.querySelector(\'.chapter-item.active .ch-info\')?.textContent||\'\');closeCtxMenu();toast(\'已复制\',\'success\')">📋 复制标题</div>' +
+    '<div class="ctx-menu-divider"></div>' +
+    '<div class="ctx-menu-item" onclick="toggleSelectAll();closeCtxMenu()">☑️ 全选/取消</div>' +
+    '<div class="ctx-menu-divider"></div>' +
+    '<div class="ctx-menu-item danger" onclick="deleteChapter(\'' + id + '\',' + idx + ');closeCtxMenu()">🗑 删除此章</div>';
+  if (e.clientX + 170 > window.innerWidth) m.style.left = (e.clientX - 170) + 'px';
+  if (e.clientY + 280 > window.innerHeight) m.style.top = (e.clientY - 280) + 'px';
+  document.body.appendChild(m);
+  return false;
+}
+
+function closeCtxMenu() { const m = document.getElementById('ctxMenu'); if (m) m.remove(); }
+document.addEventListener('click', closeCtxMenu);
+document.addEventListener('scroll', closeCtxMenu, true);
+
+async function deleteChapter(id, index) {
+  if (!confirm(`确认删除「${esc(currentChapters[index]?.title || '此章节')}」？此操作不可恢复。`)) return;
+  try {
+    const res = await fetch(`${API}/api/v1/chapters/${id}`, { method: 'DELETE' });
+    if (res.status === 204 || res.ok) {
+      toast('章节已删除', 'success');
+      activeChapter = null;
+      loadNovelDetail(currentNovel.id);
+    } else {
+      const data = await res.json();
+      toast('删除失败: ' + JSON.stringify(data), 'error');
+    }
+  } catch(e) {
+    toast('删除失败: ' + e.message, 'error');
+  }
+}
+
+async function generateTitle(id) {
+  toast('AI 正在生成标题...', 'success');
+  try {
+    const res = await fetch(`${API}/api/v1/chapters/${id}/generate-title`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok && data.title) {
+      document.getElementById('pageTitle').textContent = currentNovel.title || '';
+      toast(`AI 标题: ${data.title}`, 'success');
+      loadNovelDetail(currentNovel.id);
+      activeChapter = null; // force reload
+    } else {
+      toast('生成标题失败: ' + JSON.stringify(data), 'error');
+    }
+  } catch(e) {
+    toast('生成标题失败: ' + e.message, 'error');
+  }
+}
+
+async function reviewChapter(id) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'reviewModal';
+  overlay.innerHTML = `<div class="modal" style="width:640px;max-width:95vw;max-height:85vh;overflow-y:auto">
+    <h3>AI 审稿中...</h3>
+    <div style="text-align:center;padding:40px;color:var(--accent2)">
+      <div class="loading">AI 正在仔细审阅本章</div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  try {
+    const res = await fetch(`${API}/api/v1/chapters/${id}/review`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok && data.review) {
+      overlay.querySelector('.modal').innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3>审稿意见 — ${esc(data.title)}</h3>
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('reviewModal').remove()">关闭</button>
+        </div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:12px">${data.word_count} 字</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px;white-space:pre-wrap;line-height:1.9;font-size:14px">${esc(data.review)}</div>
+        <div style="margin-top:12px">
+          <button class="btn btn-secondary" style="width:100%" onclick="document.getElementById('reviewModal').remove()">关闭</button>
+        </div>`;
+    } else {
+      overlay.querySelector('.modal').innerHTML = `<h3>审稿失败</h3><p style="color:var(--danger)">${esc(JSON.stringify(data))}</p><button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="document.getElementById('reviewModal').remove()">关闭</button>`;
+    }
+  } catch(e) {
+    overlay.querySelector('.modal').innerHTML = `<h3>审稿失败</h3><p style="color:var(--danger)">${esc(e.message)}</p><button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="document.getElementById('reviewModal').remove()">关闭</button>`;
+  }
+}
+
+// ===== WORD COUNT TOGGLE =====
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'genLength') {
+    document.getElementById('genLengthCustom').style.display = e.target.value === 'custom' ? '' : 'none';
+  }
+});
+
+// ===== AI REWRITE =====
+async function rewriteChapter(id) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay'; overlay.id = 'rewriteModal';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = '<div class="modal" style="width:520px;max-width:95vw"><h3>AI 改写章节</h3><div class="form-group"><label>修改指令（告诉 AI 要怎么改）</label><textarea id="rewriteInst" rows="3" placeholder="如：增加心理描写，让场景更加悬疑"></textarea></div><div style="display:flex;gap:8px"><button class="btn btn-secondary" style="flex:1" onclick="this.closest(\'.modal-overlay\').remove()">取消</button><button class="btn btn-primary" style="flex:1" onclick="doRewrite(\'' + id + '\')">开始改写</button></div></div>';
+  document.body.appendChild(overlay);
+}
+
+async function doRewrite(id) {
+  const inst = document.getElementById('rewriteInst').value.trim();
+  if (!inst) { toast('请输入修改指令', 'error'); return; }
+  document.getElementById('rewriteModal').remove();
+  toast('AI 正在改写...', 'success');
+  try {
+    const res = await fetch(API + '/api/v1/chapters/' + id + '/rewrite', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instruction: inst })
+    });
+    const data = await res.json();
+    if (res.ok && data.content) {
+      toast('改写完成！', 'success');
+      loadNovelDetail(currentNovel.id);
+      openChapter(id, currentChapters.findIndex(c => c.id === id));
+      switchTab('read');
+    } else { toast('改写失败: ' + JSON.stringify(data), 'error'); }
+  } catch(e) { toast('改写失败: ' + e.message, 'error'); }
+}
+
+// ===== CONTINUE NOVEL (续写) =====
+async function continueNovel() {
+  if (isGenerating) return;
+  const n = currentNovel;
+  if (!n) { toast('请先选择一部小说', 'error'); return; }
+
+  const nextIndex = currentChapters.length + 1;
+  const notes = document.getElementById('genNotes') ? document.getElementById('genNotes').value.trim() : '';
+  const chapterOutline = document.getElementById('genOutline') ? document.getElementById('genOutline').value.trim() : '';
+  const lengthSel = document.getElementById('genLength');
+  let wordLimit = lengthSel ? lengthSel.value : '';
+  if (wordLimit === 'custom') {
+    wordLimit = document.getElementById('genLengthCustom').value.trim();
+  }
+  // Build combined notes with word count instruction
+  let combinedNotes = notes;
+  if (wordLimit && wordLimit !== '') {
+    const wcNote = '本章字数控制在' + wordLimit + '字左右';
+    combinedNotes = combinedNotes ? combinedNotes + '；' + wcNote : wcNote;
+  }
+
+  isGenerating = true;
+  const btnContinue = document.getElementById('btnContinue');
+  if (btnContinue) btnContinue.disabled = true;
+
+  // Show stream overlay
+  const editorContent = document.getElementById('editorContent');
+  if (!editorContent) return;
+
+  const streamOverlay = document.createElement('div');
+  streamOverlay.className = 'stream-overlay';
+  streamOverlay.id = 'streamOverlay';
+  streamOverlay.innerHTML = `
+    <div class="stream-box">
+      <div class="stream-header">
+        <span>⏳ 正在生成第${nextIndex}章...</span>
+        <button class="btn btn-sm btn-danger" onclick="stopGenerate()">停止</button>
+      </div>
+      <div class="stream-body" id="streamBody">
+        <div style="color:var(--accent2);text-align:center;padding:40px">
+          <div class="loading">AI 正在准备创作上下文</div>
+        </div>
+      </div>
+    </div>`;
+  editorContent.appendChild(streamOverlay);
+
+  let fullText = '';
+  let tokenCount = 0;
+  let started = false;
+
+  const params = new URLSearchParams({
+    novel_id: n.id,
+    chapter_index: String(nextIndex),
+    persist: 'true'
+  });
+  if (combinedNotes) params.set('editor_notes', combinedNotes);
+  if (chapterOutline) params.set('manual_context', chapterOutline);
+  // Pass saved idea/outline so AI has context
+  if (n.idea) params.set('idea', n.idea);
+  if (n.outline) params.set('outline', n.outline);
+  if (n.existing_outline) params.set('existing_outline', n.existing_outline);
+
+  const url = `${API}/api/v1/novel/generate?${params.toString()}`;
+
+  try {
+    const response = await fetch(url);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    activeSSE = reader;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const json = line.slice(6);
+          try {
+            const d = JSON.parse(json);
+            if (d.token) {
+              if (!started) {
+                document.getElementById('streamBody').innerHTML = '';
+                started = true;
+              }
+              fullText += d.token;
+              tokenCount++;
+              const sb = document.getElementById('streamBody');
+              if (sb) {
+                sb.innerHTML = `<div style="line-height:2.2">${fullText.replace(/\n/g, '<br>')}</div><span class="cursor"></span>`;
+                sb.scrollTop = sb.scrollHeight;
+              }
+            } else if (d.type === 'context_meta') {
+              const sb = document.getElementById('streamBody');
+              if (sb) {
+                sb.innerHTML = `
+                  <div class="ctx-card"><h4>大纲预览</h4><pre>${esc(d.outline_preview || d.full_outline_preview || '—')}</pre></div>
+                  <div class="ctx-card"><h4>场景卡</h4><pre>${esc(d.scene_card_preview || '—')}</pre></div>
+                  <div class="ctx-card"><h4>检索上下文</h4><pre>${esc(d.context_preview || '—')}</pre></div>
+                  <div style="color:var(--accent2);text-align:center;padding:20px">
+                    <div class="loading">AI 正在构思和写作</div>
+                  </div>`;
+              }
+            }
+          } catch(e) {}
+        }
+      }
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      const sb = document.getElementById('streamBody');
+      if (sb) sb.innerHTML += `<div style="color:var(--danger);margin-top:12px">生成出错: ${esc(e.message)}</div>`;
+    }
+  }
+
+  isGenerating = false;
+  activeSSE = null;
+  if (btnContinue) btnContinue.disabled = false;
+
+  // Remove overlay after a short delay
+  setTimeout(() => {
+    const overlay = document.getElementById('streamOverlay');
+    if (overlay) overlay.remove();
+  }, 1500);
+
+  // Refresh
+  if (currentNovel) {
+    await loadNovelDetail(currentNovel.id);
+    // Auto-open the last (new) chapter
+    if (currentChapters.length > 0) {
+      const last = currentChapters[currentChapters.length - 1];
+      const idx = currentChapters.length - 1;
+      openChapter(last.id, idx);
+    }
+  }
+}
+
+function stopGenerate() {
+  if (activeSSE) { activeSSE.cancel(); activeSSE = null; }
+  isGenerating = false;
+  const btnContinue = document.getElementById('btnContinue');
+  if (btnContinue) btnContinue.disabled = false;
+  const overlay = document.getElementById('streamOverlay');
+  if (overlay) overlay.remove();
+}
+
+// ===== CHAPTER SETTINGS MODAL =====
+function showChapterSettings() {
+  const n = currentNovel;
+  if (!n) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'chSettingsModal';
+  overlay.innerHTML = `
+    <div class="modal" style="width:500px">
+      <h3>创作设定</h3>
+      <div class="form-group">
+        <label>核心创意 / Idea</label>
+        <textarea id="setIdea" rows="2">${esc(n.idea || '')}</textarea>
+      </div>
+      <div class="form-group">
+        <label>全书大纲（可选，留空则自动生成）</label>
+        <textarea id="setOutline" rows="3">${esc(n.outline || '')}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('chSettingsModal').remove()">取消</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveSettings()">保存</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function saveSettings() {
+  const idea = document.getElementById('setIdea').value.trim();
+  const outline = document.getElementById('setOutline').value.trim();
+  const n = currentNovel;
+  if (!n) return;
+
+  try {
+    const res = await fetch(`${API}/api/v1/novels/${n.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idea: idea || null, outline: outline || null })
+    });
+    if (res.ok) {
+      document.getElementById('chSettingsModal').remove();
+      toast('设定已保存', 'success');
+      loadNovelDetail(n.id);
+    } else {
+      toast('保存失败', 'error');
+    }
+  } catch(e) {
+    toast('保存失败: ' + e.message, 'error');
+  }
+}
+
+// ===== CREATE NOVEL =====
+function showCreateModal() { document.getElementById('createModal').style.display = 'flex'; }
+function hideCreateModal() { document.getElementById('createModal').style.display = 'none'; }
+
+async function createNovel() {
+  const title = document.getElementById('newTitle').value.trim();
+  const idea = document.getElementById('newIdea').value.trim();
+  if (!title) { toast('请输入书名', 'error'); return; }
+  if (!idea) { toast('请输入核心创意 / Idea', 'error'); return; }
+
+  const desc = document.getElementById('newDesc').value.trim();
+  const type = document.getElementById('newType').value;
+  const tagsStr = document.getElementById('newTags').value;
+  const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  try {
+    const res = await fetch(`${API}/api/v1/novels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description: desc, type: type || undefined, tags })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      const novelId = data.item.id;
+      // Save idea separately
+      await fetch(`${API}/api/v1/novels/${novelId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idea })
+      });
+
+      hideCreateModal();
+      document.getElementById('newTitle').value = '';
+      document.getElementById('newIdea').value = '';
+      document.getElementById('newDesc').value = '';
+      selectNovel(novelId);
+      toast('小说创建成功！点击"续写"开始生成第一章', 'success');
+    } else {
+      toast('创建失败: ' + JSON.stringify(data), 'error');
+    }
+  } catch(e) {
+    toast('创建失败: ' + e.message, 'error');
+  }
+}
+
+// ===== IMPORT =====
+function showImportModal() {
+  if (!currentNovel) { toast('请先选择一部小说', 'error'); return; }
+  document.getElementById('importModal').style.display = 'flex';
+  document.getElementById('importText').value = '';
+  document.getElementById('importText').focus();
+  document.getElementById('splitPreview').style.display = 'none';
+  document.getElementById('splitInfo').textContent = '';
+}
+
+function hideImportModal() {
+  document.getElementById('importModal').style.display = 'none';
+}
+
+async function handleImportFile(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  input.value = '';
+  
+  let allText = '';
+  let processed = 0;
+  
+  for (const file of files) {
+    processed++;
+    const label = `[${processed}/${files.length}]`;
+    
+    if (file.name.endsWith('.docx')) {
+      toast(`${label} 解析 ${file.name}...`, 'success');
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch(`${API}/api/v1/novels/${currentNovel.id}/extract-docx`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (res.ok && data.text) {
+          allText += (allText ? '\n\n' : '') + data.text;
+        } else {
+          toast(`${label} 解析失败: ${JSON.stringify(data)}`, 'error');
+        }
+      } catch(e) {
+        toast(`${label} 解析失败: ${e.message}`, 'error');
+      }
+    } else {
+      const text = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => resolve('');
+        reader.readAsText(file, 'UTF-8');
+      });
+      if (text) allText += (allText ? '\n\n' : '') + text;
+    }
+  }
+  
+  if (allText) {
+    document.getElementById('importText').value = allText;
+    toast(`成功读取 ${files.length} 个文件，请预览分章后导入`, 'success');
+  }
+  input.value = '';
+}
+
+function parseChapterNumber(title) {
+  // Extract chapter number from title like "第七章" or "第7章"
+  const chineseNums = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,
+    '十一':11,'十二':12,'十三':13,'十四':14,'十五':15,'十六':16,'十七':17,'十八':18,'十九':19,'二十':20,
+    '二十一':21,'二十二':22,'二十三':23,'二十四':24,'二十五':25,'二十六':26,'二十七':27,'二十八':28,'二十九':29,'三十':30,
+    '零':0, '百':100 };
+  
+  // Try arabic number: "第7章", "Chapter 7"
+  let m = title.match(/第\s*(\d+)\s*[章节回]/);
+  if (m) return parseInt(m[1]);
+  m = title.match(/Chapter\s+(\d+)/i);
+  if (m) return parseInt(m[1]);
+  
+  // Try Chinese number: "第七章"
+  m = title.match(/第\s*([一二三四五六七八九十百千]+)\s*[章节回]/);
+  if (m) {
+    let cn = m[1];
+    if (chineseNums[cn]) return chineseNums[cn];
+    // Try compound like "二十一"
+    let val = 0;
+    for (let i = 0; i < cn.length; i++) {
+      let c = cn[i];
+      if (c === '十') {
+        val = val === 0 ? 10 : val * 10;
+      } else if (c === '百') {
+        val = val * 100;
+      } else if (chineseNums[c]) {
+        val += chineseNums[c];
+      }
+    }
+    if (val > 0) return val;
+  }
+  
+  return 0; // unknown
+}
+
+function splitIntoChapters(text) {
+  if (!text || !text.trim()) return [];
+  const cleaned = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  
+  const patterns = [
+    /第[一二三四五六七八九十百千\d]+章\s*[^\n]*/g,
+    /第[一二三四五六七八九十百千\d]+节\s*[^\n]*/g,
+    /Chapter\s+\d+[^\n]*/gi,
+    /^\s*第\s*[一二三四五六七八九十百千\d]+\s*[章节回]/gm,
+  ];
+  
+  for (const pat of patterns) {
+    const matches = cleaned.match(pat);
+    if (matches && matches.length >= 2) {
+      const parts = cleaned.split(pat);
+      const chapters = [];
+      for (let i = 0; i < matches.length; i++) {
+        const title = matches[i].trim();
+        const content = (parts[i + 1] || '').trim();
+        if (content || title) {
+          chapters.push({ title, content });
+        }
+      }
+      if (chapters.length >= 2) {
+        // Sort by chapter number
+        chapters.sort((a, b) => parseChapterNumber(a.title) - parseChapterNumber(b.title));
+        // Re-assign order
+        chapters.forEach((ch, i) => { ch.order = i + 1; });
+        return chapters;
+      }
+    }
+  }
+  
+  // Fallback: try splitting by triple newline
+  const blocks = cleaned.split(/\n{3,}/).filter(b => b.trim());
+  if (blocks.length >= 2) {
+    return blocks.map((b, i) => ({
+      title: `第${i + 1}章`,
+      content: b.trim(),
+      order: i + 1
+    }));
+  }
+  
+  return [{ title: '第1章', content: cleaned.trim(), order: 1 }];
+}
+
+let importChapters = [];
+
+function splitPreview() {
+  const text = document.getElementById('importText').value;
+  importChapters = splitIntoChapters(text);
+  const info = document.getElementById('splitInfo');
+  const preview = document.getElementById('splitPreview');
+  
+  if (importChapters.length === 0) {
+    info.textContent = '未检测到内容';
+    preview.style.display = 'none';
+    return;
+  }
+  
+  info.textContent = `检测到 ${importChapters.length} 章`;
+  preview.style.display = 'block';
+  preview.innerHTML = importChapters.map((ch, i) => `
+    <div style="padding:6px 8px;border-bottom:1px solid var(--border);display:flex;gap:8px">
+      <span style="color:var(--accent);white-space:nowrap">${esc(ch.title)}</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ch.content.slice(0, 60))}${ch.content.length > 60 ? '...' : ''}</span>
+      <span style="margin-left:auto;white-space:nowrap">${[...ch.content].length} 字</span>
+    </div>
+  `).join('');
+}
+
+async function doImport() {
+  if (importChapters.length === 0) {
+    splitPreview();
+    if (importChapters.length === 0) {
+      toast('没有可导入的内容', 'error');
+      return;
+    }
+  }
+  
+  const btn = document.getElementById('btnImportDo');
+  btn.disabled = true;
+  btn.textContent = '导入中...';
+  
+  try {
+    const res = await fetch(`${API}/api/v1/novels/${currentNovel.id}/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chapters: importChapters })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      hideImportModal();
+      toast(`成功导入 ${data.count} 章！AI 正在分析内容...`, 'success');
+      loadNovelDetail(currentNovel.id);
+    } else {
+      toast('导入失败: ' + JSON.stringify(data), 'error');
+    }
+  } catch(e) {
+    toast('导入失败: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = '导入';
+}
+
+// ===== CHARACTERS =====
+async function loadCharacters() {
+  if (!currentNovel) return;
+  const list = document.getElementById('charList');
+  if (!list) return;
+  try {
+    const res = await fetch(`${API}/api/v1/novels/${currentNovel.id}/characters`);
+    const data = await res.json();
+    const chars = data.items || [];
+    document.getElementById('charCount').textContent = `${chars.length} 人`;
+    if (chars.length === 0) {
+      list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;grid-column:1/-1">暂无人物，点击「AI 分析人物」自动提取</div>';
+      return;
+    }
+    list.innerHTML = chars.map(c => `
+      <div class="char-card" onclick="showCharModal('${c.id}')">
+        <div class="char-name">${esc(c.name)}</div>
+        <div class="char-meta">
+          ${c.gender ? '<span class="char-tag">'+esc(c.gender)+'</span>' : ''}
+          ${c.age>0 ? '<span class="char-tag">'+c.age+'岁</span>' : ''}
+        </div>
+        <div class="char-desc">${esc(c.personality || c.appearance || c.current_status || '暂无描述')}</div>
+      </div>
+    `).join('');
+  } catch(e) {}
+}
+
+function showCharModal(charId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `<div class="modal" style="width:500px;max-width:95vw;max-height:85vh;overflow-y:auto"><h3>${charId?'编辑人物':'添加人物'}</h3>
+    <div class="form-group"><label>姓名 *</label><input type="text" id="charName"></div>
+    <div class="form-row">
+      <div class="form-group"><label>性别</label><select id="charGender"><option value="">未知</option><option>男</option><option>女</option></select></div>
+      <div class="form-group"><label>年龄</label><input type="number" id="charAge" min="0" max="999"></div>
+    </div>
+    <div class="form-group"><label>外貌特征</label><textarea id="charAppearance" rows="2"></textarea></div>
+    <div class="form-group"><label>性格特点</label><textarea id="charPersonality" rows="2"></textarea></div>
+    <div class="form-group"><label>背景经历</label><textarea id="charBackground" rows="2"></textarea></div>
+    <div class="form-group"><label>当前状态</label><input type="text" id="charStatus"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" style="flex:1" onclick="this.closest('.modal-overlay').remove()">取消</button>
+      ${charId?'<button class="btn btn-danger" style="flex:1" onclick="deleteCharacter(\''+charId+'\');this.closest(\'.modal-overlay\').remove()">删除</button>':''}
+      <button class="btn btn-primary" style="flex:1" onclick="saveCharacter('${charId||''}')">保存</button>
+    </div></div>`;
+  document.body.appendChild(overlay);
+  if (charId) {
+    fetch(`${API}/api/v1/novels/${currentNovel.id}/characters`).then(r=>r.json()).then(d=>{
+      const c = (d.items||[]).find(x=>x.id===charId);
+      if(c){ document.getElementById('charName').value=c.name||''; document.getElementById('charGender').value=c.gender||''; document.getElementById('charAge').value=c.age||''; document.getElementById('charAppearance').value=c.appearance||''; document.getElementById('charPersonality').value=c.personality||''; document.getElementById('charBackground').value=c.background||''; document.getElementById('charStatus').value=c.current_status||''; }
+    });
+  }
+}
+
+async function saveCharacter(charId) {
+  const data = {
+    name: document.getElementById('charName').value.trim(),
+    gender: document.getElementById('charGender').value,
+    age: parseInt(document.getElementById('charAge').value)||0,
+    appearance: document.getElementById('charAppearance').value.trim(),
+    personality: document.getElementById('charPersonality').value.trim(),
+    background: document.getElementById('charBackground').value.trim(),
+    current_status: document.getElementById('charStatus').value.trim()
+  };
+  if (!data.name) { toast('请输入姓名', 'error'); return; }
+  try {
+    let res;
+    if (charId) {
+      res = await fetch(`${API}/api/v1/characters/${charId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+    } else {
+      res = await fetch(`${API}/api/v1/novels/${currentNovel.id}/characters`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+    }
+    if (res.ok) {
+      document.querySelectorAll('.modal-overlay').forEach(m=>m.remove());
+      toast(charId?'人物已更新':'人物已添加', 'success');
+      loadCharacters();
+    } else { toast('保存失败', 'error'); }
+  } catch(e) { toast('保存失败: '+e.message, 'error'); }
+}
+
+async function deleteCharacter(id) {
+  await fetch(`${API}/api/v1/characters/${id}`, { method:'DELETE' });
+  toast('已删除', 'success');
+  loadCharacters();
+}
+
+async function analyzeCharacters() {
+  toast('AI 正在分析人物并提取设定...', 'success');
+  try {
+    const res = await fetch(`${API}/api/v1/novels/${currentNovel.id}/analyze-characters`, { method:'POST' });
+    const d = await res.json();
+    if (d.total > 0) {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.onclick = e => { if (e.target===overlay) overlay.remove(); };
+      overlay.innerHTML = `<div class="modal" style="width:580px;max-width:95vw;max-height:85vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3>人物分析完成</h3>
+          <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">关闭</button>
+        </div>
+        <div style="color:var(--success);margin-bottom:12px">✅ 新创建 ${d.created} 人，共识别 ${d.total} 人</div>
+        <div style="white-space:pre-wrap;line-height:1.9;font-size:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px">${esc(d.analysis||'')}</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)">💡 人物信息已自动同步到「设定」大纲中</div>
+      </div>`;
+      document.body.appendChild(overlay);
+      loadCharacters();
+      if (currentNovel) loadNovelDetail(currentNovel.id);
+    } else {
+      toast('未识别到人物', 'error');
+    }
+  } catch(e) { toast('分析失败: '+e.message, 'error'); }
+}
+const API_PROVIDERS = {
+  'DeepSeek': { url:'https://api.deepseek.com', models:['deepseek-v4-pro','deepseek-v4-flash'] },
+  'OpenAI':   { url:'https://api.openai.com/v1', models:['gpt-5.6-sol','gpt-5.6-sol-pro','gpt-5.5','gpt-5-thinking-mini','gpt-4.1'] },
+  'Claude (Anthropic)': { url:'https://api.anthropic.com/v1', models:['claude-sonnet-4-20250514','claude-opus-4-20250514','claude-3.5-haiku'] },
+  'Gemini (Google)': { url:'https://generativelanguage.googleapis.com/v1beta/openai', models:['gemini-2.5-pro','gemini-2.5-flash','gemini-2.0-flash-lite'] },
+  'Kimi (月之暗面)': { url:'https://api.moonshot.cn/v1', models:['kimi-k3','kimi-k2.7-code','kimi-k2.6','moonshot-v1-128k'] },
+  'GLM (智谱)': { url:'https://open.bigmodel.cn/api/paas/v4', models:['glm-4.5-flash','glm-4-plus','glm-4-air','glm-4'] },
+  '通义千问 (阿里)': { url:'https://dashscope.aliyuncs.com/compatible-mode/v1', models:['qwen3-max','qwen3-plus','qwen-plus','qwen-max'] },
+  '文心一言 (百度)': { url:'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat', models:['ernie-4.5-turbo','ernie-4.0-turbo','ernie-3.5'] },
+  '豆包 (字节)': { url:'https://ark.cn-beijing.volces.com/api/v3', models:['doubao-seed-1.6','doubao-pro-128k','doubao-lite-32k'] },
+  'SiliconFlow': { url:'https://api.siliconflow.cn/v1', models:['deepseek-ai/DeepSeek-V3','deepseek-ai/DeepSeek-R1','Pro/Qwen3-235B-A22B','Qwen/Qwen3-32B'] },
+};
+
+function fillModelSelect(prefix, providerName, currentModel) {
+  const sel = document.getElementById(prefix + 'Model');
+  const cust = document.getElementById(prefix + 'ModelCustom');
+  sel.innerHTML = '';
+  const prov = API_PROVIDERS[providerName];
+  if (prov && prov.models.length) {
+    prov.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = m;
+      sel.appendChild(opt);
+    });
+    const opt = document.createElement('option');
+    opt.value = '__custom__'; opt.textContent = '自定义模型...';
+    sel.appendChild(opt);
+  }
+  sel.value = currentModel || (prov ? prov.models[0] : '');
+  if (sel.value === '') sel.value = '__custom__';
+  cust.style.display = (sel.value === '__custom__') ? '' : 'none';
+  if (sel.value === '__custom__') cust.value = currentModel || '';
+}
+
+function onWriteProviderChange() {
+  const p = document.getElementById('writeProvider').value;
+  const prov = API_PROVIDERS[p];
+  if (prov) {
+    document.getElementById('writeUrl').value = prov.url;
+    fillModelSelect('write', p, '');
+  } else {
+    document.getElementById('writeUrl').value = '';
+    document.getElementById('writeModel').innerHTML = '';
+    document.getElementById('writeModelCustom').style.display = '';
+  }
+}
+
+function onReviewProviderChange() {
+  const p = document.getElementById('reviewProvider').value;
+  const prov = API_PROVIDERS[p];
+  if (prov) {
+    document.getElementById('reviewUrl').value = prov.url;
+    fillModelSelect('review', p, '');
+  } else {
+    document.getElementById('reviewUrl').value = '';
+    document.getElementById('reviewModel').innerHTML = '';
+    document.getElementById('reviewModelCustom').style.display = '';
+  }
+}
+
+function onWriteModelCustom() {
+  const s = document.getElementById('writeModel');
+  document.getElementById('writeModelCustom').style.display = (s.value === '__custom__') ? '' : 'none';
+}
+function onReviewModelCustom() {
+  const s = document.getElementById('reviewModel');
+  document.getElementById('reviewModelCustom').style.display = (s.value === '__custom__') ? '' : 'none';
+}
+
+function getModelValue(prefix) {
+  const sel = document.getElementById(prefix + 'Model');
+  if (sel.value === '__custom__') {
+    return document.getElementById(prefix + 'ModelCustom').value.trim();
+  }
+  return sel.value;
+}
+
+async function showSettingsModal() {
+  document.getElementById('settingsModal').style.display = 'flex';
+  try {
+    const res = await fetch(`${API}/api/v1/settings`);
+    const s = await res.json();
+    if (s.writing) {
+      document.getElementById('writeKey').value = s.writing.api_key || '';
+      document.getElementById('writeUrl').value = s.writing.base_url || '';
+      setProviderByUrl('write', s.writing.base_url, s.writing.model);
+    }
+    if (s.review) {
+      document.getElementById('reviewKey').value = s.review.api_key || '';
+      document.getElementById('reviewUrl').value = s.review.base_url || '';
+      setProviderByUrl('review', s.review.base_url, s.review.model);
+    }
+  } catch(e) {}
+}
+
+function setProviderByUrl(prefix, url, model) {
+  const providerSel = document.getElementById(prefix + 'Provider');
+  providerSel.value = '';
+  for (const [name, info] of Object.entries(API_PROVIDERS)) {
+    if (info.url === url) {
+      providerSel.value = name;
+      document.getElementById(prefix + 'Url').value = url;
+      fillModelSelect(prefix, name, model);
+      return;
+    }
+  }
+  document.getElementById(prefix + 'Url').value = url || '';
+  document.getElementById(prefix + 'Model').innerHTML = '';
+  document.getElementById(prefix + 'ModelCustom').style.display = '';
+  document.getElementById(prefix + 'ModelCustom').value = model || '';
+}
+
+async function saveAPISettings() {
+  const settings = {
+    writing: {
+      api_key: document.getElementById('writeKey').value.trim(),
+      base_url: document.getElementById('writeUrl').value.trim(),
+      model: getModelValue('write')
+    },
+    review: {
+      api_key: document.getElementById('reviewKey').value.trim(),
+      base_url: document.getElementById('reviewUrl').value.trim(),
+      model: getModelValue('review')
+    }
+  };
+  try {
+    const res = await fetch(`${API}/api/v1/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    if (res.ok) {
+      document.getElementById('settingsModal').style.display = 'none';
+      toast('设置已保存！审稿API已热更新生效', 'success');
+    } else {
+      toast('保存失败', 'error');
+    }
+  } catch(e) {
+    toast('保存失败: ' + e.message, 'error');
+  }
+}
+
+// ===== UTILS =====
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function toast(msg, type) {
+  const el = document.createElement('div');
+  el.className = `toast ${type || ''}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Novel Studio</title>
+<style>
+:root {
+  --bg: #0f0f14;
+  --panel: #1a1a24;
+  --panel2: #222230;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --muted: #8888a0;
+  --accent: #7c5cfc;
+  --accent2: #5ce0c0;
+  --accent3: #fc6b8a;
+  --danger: #e04040;
+  --success: #40c080;
+  --radius: 8px;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; background:var(--bg); color:var(--text); font-family:var(--font); font-size:14px; line-height:1.6; }
+body { display:flex; overflow:hidden; }
+
+/* Sidebar */
+.sidebar {
+  width:260px; min-width:260px; background:var(--panel); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.sidebar-header {
+  padding:16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.sidebar-header .logo { font-size:20px; }
+.sidebar-header h1 { font-size:15px; font-weight:600; white-space:nowrap; }
+.novel-list { flex:1; overflow-y:auto; padding:8px; }
+.novel-item {
+  padding:10px 12px; border-radius:var(--radius); cursor:pointer;
+  margin-bottom:4px; transition:all 0.15s; border:1px solid transparent;
+}
+.novel-item:hover { background:var(--panel2); }
+.novel-item.active { background:var(--panel2); border-color:var(--accent); }
+.novel-item .title { font-weight:500; font-size:13px; }
+.novel-item .meta { font-size:11px; color:var(--muted); margin-top:2px; }
+.sidebar-footer { padding:12px; border-top:1px solid var(--border); }
+.btn-new { width:100%; padding:10px; border-radius:var(--radius); background:var(--accent); color:#fff; border:none; cursor:pointer; font-size:13px; font-weight:500; transition:opacity 0.2s; }
+.btn-new:hover { opacity:0.9; }
+
+/* Main */
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.topbar {
+  padding:12px 20px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--panel);
+}
+.topbar h2 { font-size:15px; font-weight:500; }
+.topbar .actions { display:flex; gap:8px; }
+
+/* Content area */
+.content { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
+
+/* Panels */
+.panel {
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  overflow:hidden;
+}
+.panel-header {
+  padding:10px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted);
+}
+.panel-body { padding:16px; }
+
+/* Form */
+.form-group { margin-bottom:12px; }
+.form-group label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; font-weight:500; }
+.form-group input, .form-group textarea, .form-group select {
+  width:100%; padding:8px 12px; border-radius:var(--radius);
+  background:var(--bg); border:1px solid var(--border); color:var(--text);
+  font-family:var(--font); font-size:13px; resize:vertical;
+}
+.form-group textarea { min-height:60px; }
+.form-group input:focus, .form-group textarea:focus { outline:none; border-color:var(--accent); }
+.form-row { display:flex; gap:12px; }
+.form-row .form-group { flex:1; }
+
+/* Buttons */
+.btn {
+  padding:8px 16px; border-radius:var(--radius); border:none; cursor:pointer;
+  font-size:13px; font-weight:500; transition:all 0.2s; display:inline-flex; align-items:center; gap:6px;
+}
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { opacity:0.9; }
+.btn-secondary { background:var(--panel2); color:var(--text); border:1px solid var(--border); }
+.btn-secondary:hover { background:var(--border); }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-sm { padding:5px 10px; font-size:12px; }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* Output area */
+.output-area {
+  background:var(--bg); border-radius:var(--radius); padding:20px;
+  min-height:200px; max-height:calc(100vh - 500px); overflow-y:auto;
+  font-size:14px; line-height:2; white-space:pre-wrap; word-break:break-word;
+  border:1px solid var(--border);
+}
+.output-area p { margin-bottom:1em; }
+.output-area .loading { color:var(--accent2); animation:pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.output-area .cursor {
+  display:inline-block; width:2px; height:1em; background:var(--accent);
+  animation:blink 0.8s infinite; vertical-align:text-bottom; margin-left:2px;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* Chapter list */
+.chapter-list { max-height:300px; overflow-y:auto; }
+.chapter-item {
+  padding:8px 12px; border-radius:var(--radius); cursor:pointer;
+  display:flex; justify-content:space-between; align-items:center;
+  border:1px solid transparent; margin-bottom:2px; font-size:13px;
+}
+.chapter-item:hover { background:var(--panel2); }
+.chapter-item .status {
+  font-size:10px; padding:2px 8px; border-radius:10px;
+  background:var(--panel2); color:var(--muted);
+}
+.chapter-item .status.Generating { background:rgba(124,92,252,0.15); color:var(--accent); }
+.chapter-item .status.Draft { background:rgba(64,192,128,0.15); color:var(--success); }
+
+/* Context preview */
+.context-card {
+  display:grid; grid-template-columns:1fr 1fr; gap:12px;
+}
+.context-card .card {
+  background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:12px;
+}
+.context-card .card h4 { font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.context-card .card pre {
+  font-size:12px; line-height:1.7; white-space:pre-wrap; word-break:break-word;
+  max-height:200px; overflow-y:auto; color:var(--text);
+}
+
+/* Modal */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex;
+  align-items:center; justify-content:center; z-index:100;
+}
+.modal {
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  padding:24px; width:420px; max-width:90vw;
+}
+.modal h3 { font-size:15px; margin-bottom:16px; }
+.modal .btn { width:100%; }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:20px; right:20px; padding:12px 20px;
+  background:var(--panel2); border:1px solid var(--border); border-radius:var(--radius);
+  font-size:13px; z-index:200; animation:slideUp 0.3s ease;
+}
+.toast.error { border-color:var(--danger); }
+.toast.success { border-color:var(--success); }
+@keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+/* Welcome */
+.welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--muted); text-align:center; gap:12px; }
+.welcome .icon { font-size:48px; }
+.welcome h2 { color:var(--text); font-size:18px; }
+.welcome p { max-width:400px; font-size:13px; }
+
+/* Responsive */
+@media(max-width:768px) {
+  body { flex-direction:column; }
+  .sidebar { width:100%; min-width:unset; max-height:200px; }
+  .context-card { grid-template-columns:1fr; }
+}
+
+/* generation split layout */
+.gen-layout { display:flex; gap:16px; flex:1; min-height:0; }
+.gen-left { flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; }
+.gen-right { width:340px; display:flex; flex-direction:column; gap:12px; }
+.output-wrapper { flex:1; min-height:0; display:flex; flex-direction:column; }
+.output-wrapper .panel { flex:1; display:flex; flex-direction:column; }
+.output-wrapper .panel-body { flex:1; display:flex; flex-direction:column; }
+.output-wrapper .output-area { flex:1; }
+
+/* retro placeholder */
+.placeholder-text { color:var(--muted); font-style:italic; text-align:center; padding:40px; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <span class="logo">📖</span>
+    <h1>AI Novel Studio</h1>
+  </div>
+  <div class="novel-list" id="novelList">
+    <div class="placeholder-text">暂无小说<br>点击下方按钮创建</div>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn-new" onclick="showCreateModal()">＋ 创建新小说</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="topbar">
+    <h2 id="pageTitle">选择或创建一部小说开始创作</h2>
+    <div class="actions" id="topActions"></div>
+  </div>
+  <div class="content" id="mainContent">
+    <div class="welcome">
+      <div class="icon">✍️</div>
+      <h2>欢迎使用 AI Novel Studio</h2>
+      <p>基于多智能体协作的 AI 小说创作引擎。创建一部小说，设定世界观，让 AI 帮你写出逻辑严密、行文优美的长篇故事。</p>
+    </div>
+  </div>
+</main>
+
+<!-- Create Novel Modal -->
+<div class="modal-overlay" id="createModal" style="display:none">
+  <div class="modal">
+    <h3>📖 创建新小说</h3>
+    <div class="form-group">
+      <label>书名 *</label>
+      <input type="text" id="newTitle" placeholder="给你的小说起个名字">
+    </div>
+    <div class="form-group">
+      <label>简介</label>
+      <textarea id="newDesc" placeholder="简单描述一下故事背景" rows="2"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>类型</label>
+        <select id="newType">
+          <option value="">选择类型（可选）</option>
+          <option>玄幻</option><option>仙侠</option><option>都市</option>
+          <option>科幻</option><option>历史</option><option>游戏</option>
+          <option>悬疑</option><option>轻小说</option><option>奇幻</option>
+          <option>武侠</option><option>军事</option><option>体育</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>标签（逗号分隔）</label>
+        <input type="text" id="newTags" placeholder="如：穿越,系统流,热血">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-secondary" style="flex:1" onclick="hideCreateModal()">取消</button>
+      <button class="btn btn-primary" style="flex:1" onclick="createNovel()">创建</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8081';
+let currentNovel = null;
+let currentChapters = [];
+let activeSSE = null;
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', loadNovels);
+
+// ===== NOVEL LIST =====
+async function loadNovels() {
+  try {
+    const res = await fetch(`${API}/api/v1/novels`);
+    const data = await res.json();
+    const items = data.items || [];
+    const list = document.getElementById('novelList');
+    if (items.length === 0) {
+      list.innerHTML = '<div class="placeholder-text">暂无小说<br>点击下方按钮创建</div>';
+      return;
+    }
+    list.innerHTML = items.map(n => `
+      <div class="novel-item${currentNovel && currentNovel.id === n.id ? ' active' : ''}" onclick="selectNovel('${n.id}')">
+        <div class="title">${esc(n.title)}</div>
+        <div class="meta">${esc(n.status)} · ${n.tags ? n.tags.slice(0,3).map(esc).join(' · ') : ''}</div>
+      </div>
+    `).join('');
+  } catch(e) {
+    toast('无法连接服务器: ' + e.message, 'error');
+  }
+}
+
+function selectNovel(id) {
+  currentNovel = { id };
+  loadNovels();
+  loadNovelDetail(id);
+}
+
+async function loadNovelDetail(id) {
+  try {
+    const res = await fetch(`${API}/api/v1/novels/${id}`);
+    const data = await res.json();
+    currentNovel = data.item;
+    currentChapters = data.chapters || [];
+    document.getElementById('pageTitle').textContent = currentNovel.title || '未命名小说';
+    renderMain();
+  } catch(e) {
+    toast('加载小说详情失败', 'error');
+  }
+}
+
+// ===== MAIN RENDER =====
+function renderMain() {
+  const n = currentNovel;
+  if (!n) return;
+
+  const actions = document.getElementById('topActions');
+  actions.innerHTML = `
+    <button class="btn btn-sm btn-secondary" onclick="loadNovelDetail('${n.id}')">🔄 刷新</button>
+  `;
+
+  const content = document.getElementById('mainContent');
+  content.innerHTML = `
+    <div class="gen-layout">
+      <div class="gen-left">
+        <!-- Gen Settings -->
+        <div class="panel">
+          <div class="panel-header">⚙️ 创作参数</div>
+          <div class="panel-body">
+            <div class="form-group">
+              <label>核心创意 / Idea</label>
+              <textarea id="genIdea" placeholder="例如：一个普通的少年在山洞中捡到了一枚神秘的戒指，从此踏上了修仙之路" rows="2">${esc(n.idea || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>全书大纲（可选，留空则自动生成）</label>
+              <textarea id="genOutline" placeholder="逐章大纲，或让 AI 根据 Idea 自动生成" rows="2">${esc(n.outline || '')}</textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>章节序号</label>
+                <input type="number" id="genChapter" value="${currentChapters.length + 1}" min="1">
+              </div>
+              <div class="form-group">
+                <label>编辑指令（可选）</label>
+                <input type="text" id="genNotes" placeholder="如：保持轻松幽默的语气">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>手动注入资料（可选）</label>
+              <input type="text" id="genContext" placeholder="如：青阳镇位于群山脚下，镇北有一条小河">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <button class="btn btn-secondary btn-sm" onclick="saveNovelSettings()">💾 保存设定</button>
+              <button class="btn btn-secondary btn-sm" onclick="previewContext()">🔍 预览上下文</button>
+              <button class="btn btn-primary btn-sm" id="btnGenerate" onclick="generateChapter()">▶ 开始生成</button>
+              <button class="btn btn-danger btn-sm" id="btnStop" onclick="stopGenerate()" style="display:none">⏹ 停止</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Output -->
+        <div class="output-wrapper">
+          <div class="panel" style="flex:1">
+            <div class="panel-header">
+              <span>📝 生成输出</span>
+              <span id="outputStats" style="font-weight:normal;color:var(--muted);font-size:11px"></span>
+            </div>
+            <div class="panel-body" style="flex:1">
+              <div class="output-area" id="outputArea">
+                <span class="placeholder-text">点击「开始生成」或「预览上下文」</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gen-right">
+        <!-- Context Preview -->
+        <div class="panel" id="contextPanel" style="display:none">
+          <div class="panel-header">📋 上下文预览</div>
+          <div class="panel-body context-card" id="contextContent"></div>
+        </div>
+
+        <!-- Chapter List -->
+        <div class="panel">
+          <div class="panel-header">📑 章节列表 (${currentChapters.length})</div>
+          <div class="panel-body chapter-list" id="chapterList">
+            ${currentChapters.length === 0 ? '<span class="placeholder-text" style="display:block;text-align:center;padding:20px">暂无章节</span>' :
+              currentChapters.map(c => `
+                <div class="chapter-item" onclick="viewChapter('${c.id}')">
+                  <span>${esc(c.title)}</span>
+                  <span class="status ${esc(c.status)}">${esc(c.status)}</span>
+                </div>
+              `).join('')
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== GENERATE =====
+async function generateChapter() {
+  const idea = document.getElementById('genIdea').value.trim();
+  const outline = document.getElementById('genOutline').value.trim();
+  const chapterIndex = parseInt(document.getElementById('genChapter').value) || 1;
+  const notes = document.getElementById('genNotes').value.trim();
+  const context = document.getElementById('genContext').value.trim();
+  const n = currentNovel;
+
+  if (!idea && !outline) { toast('请至少填写 Idea 或大纲', 'error'); return; }
+
+  // Stop any existing SSE
+  stopGenerate();
+
+  document.getElementById('btnGenerate').style.display = 'none';
+  document.getElementById('btnStop').style.display = 'inline-flex';
+
+  const output = document.getElementById('outputArea');
+  output.innerHTML = '<span class="loading">⏳ 正在准备生成上下文...</span>';
+  const stats = document.getElementById('outputStats');
+  let tokenCount = 0;
+  let fullText = '';
+
+  const params = new URLSearchParams({
+    novel_id: n.id,
+    chapter_index: String(chapterIndex),
+    persist: 'true'
+  });
+  if (idea) params.set('idea', idea);
+  if (outline) params.set('outline', outline);
+  if (notes) params.set('editor_notes', notes);
+  if (context) params.set('manual_context', context);
+
+  const url = `${API}/api/v1/novel/generate?${params.toString()}`;
+
+  try {
+    const response = await fetch(url);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let started = false;
+
+    activeSSE = reader;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          const evt = line.slice(7).trim();
+          if (evt === 'context_meta') continue; // handled in data
+          if (evt === 'end') {
+            stats.textContent = `生成完成 · ${tokenCount} tokens · ${fullText.length} 字`;
+          }
+        }
+        if (line.startsWith('data: ')) {
+          const json = line.slice(6);
+          try {
+            const d = JSON.parse(json);
+            if (d.token) {
+              if (!started) { output.innerHTML = ''; started = true; }
+              fullText += d.token;
+              tokenCount++;
+              output.innerHTML = '<p>' + fullText.replace(/\n/g, '<br>') + '</p><span class="cursor"></span>';
+              output.scrollTop = output.scrollHeight;
+              stats.textContent = `生成中 · ${tokenCount} tokens · ${fullText.length} 字`;
+            } else if (d.type === 'context_meta') {
+              // Show context preview
+              const cp = document.getElementById('contextPanel');
+              const cc = document.getElementById('contextContent');
+              cp.style.display = 'block';
+              cc.innerHTML = renderContextMeta(d);
+              output.innerHTML = '<span class="loading">⏳ AI 正在构思和写作...</span>';
+            }
+          } catch(e) {}
+        }
+        if (line.startsWith('event: retry')) {
+          const dataLine = lines.find(l => l.startsWith('data: '));
+          if (dataLine) {
+            try {
+              const d = JSON.parse(dataLine.slice(6));
+              output.innerHTML += `\n\n<div style="color:var(--accent3);font-size:12px">📝 审校反馈 (第${d.retry_count}次修改): ${esc(d.critique || '')}</div>\n`;
+            } catch(e) {}
+          }
+        }
+      }
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      output.innerHTML += `\n\n<span style="color:var(--danger)">❌ 生成出错: ${esc(e.message)}</span>`;
+    }
+  }
+
+  document.getElementById('btnGenerate').style.display = 'inline-flex';
+  document.getElementById('btnStop').style.display = 'none';
+  activeSSE = null;
+
+  // Refresh chapters
+  if (currentNovel) loadNovelDetail(currentNovel.id);
+}
+
+function stopGenerate() {
+  if (activeSSE) { activeSSE.cancel(); activeSSE = null; }
+  document.getElementById('btnGenerate').style.display = 'inline-flex';
+  document.getElementById('btnStop').style.display = 'none';
+}
+
+function renderContextMeta(d) {
+  return `
+    <div class="card"><h4>📋 大纲</h4><pre>${esc(d.outline_preview || d.full_outline_preview || '—')}</pre></div>
+    <div class="card"><h4>🎬 场景卡</h4><pre>${esc(d.scene_card_preview || '—')}</pre></div>
+    <div class="card"><h4>📚 检索上下文</h4><pre>${esc(d.context_preview || '—')}</pre></div>
+    <div class="card"><h4>✏️ 编辑指令</h4><pre>${esc(d.editor_notes || '—')}</pre></div>
+  `;
+}
+
+// ===== PREVIEW =====
+async function previewContext() {
+  const idea = document.getElementById('genIdea').value.trim();
+  const outline = document.getElementById('genOutline').value.trim();
+  const chapterIndex = parseInt(document.getElementById('genChapter').value) || 1;
+  const notes = document.getElementById('genNotes').value.trim();
+  const context = document.getElementById('genContext').value.trim();
+  const n = currentNovel;
+
+  if (!idea && !outline) { toast('请先填写 Idea 或大纲', 'error'); return; }
+
+  const output = document.getElementById('outputArea');
+  output.innerHTML = '<span class="loading">⏳ 正在预览上下文...</span>';
+
+  const params = new URLSearchParams({ novel_id: n.id, chapter_index: String(chapterIndex) });
+  if (idea) params.set('idea', idea);
+  if (outline) params.set('outline', outline);
+  if (notes) params.set('editor_notes', notes);
+  if (context) params.set('manual_context', context);
+
+  try {
+    const res = await fetch(`${API}/api/v1/novel/preview-context?${params.toString()}`);
+    const data = await res.json();
+    if (res.ok) {
+      output.innerHTML = `<h4 style="color:var(--accent2);margin-bottom:12px">📋 上下文预览结果</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><strong style="color:var(--muted);font-size:12px">大纲</strong><pre style="font-size:12px;margin-top:4px;white-space:pre-wrap;background:var(--panel);padding:8px;border-radius:4px">${esc(data.full_outline || data.outline || '无')}</pre></div>
+          <div><strong style="color:var(--muted);font-size:12px">场景卡</strong><pre style="font-size:12px;margin-top:4px;white-space:pre-wrap;background:var(--panel);padding:8px;border-radius:4px">${esc(data.scene_card || '无')}</pre></div>
+          <div><strong style="color:var(--muted);font-size:12px">检索上下文</strong><pre style="font-size:12px;margin-top:4px;white-space:pre-wrap;background:var(--panel);padding:8px;border-radius:4px">${esc(data.context || '无')}</pre></div>
+          <div><strong style="color:var(--muted);font-size:12px">编辑指令</strong><pre style="font-size:12px;margin-top:4px;white-space:pre-wrap;background:var(--panel);padding:8px;border-radius:4px">${esc(data.editor_notes || '无')}</pre></div>
+        </div>`;
+    } else {
+      output.innerHTML = `<span style="color:var(--danger)">❌ ${esc(JSON.stringify(data))}</span>`;
+    }
+  } catch(e) {
+    output.innerHTML = `<span style="color:var(--danger)">❌ ${esc(e.message)}</span>`;
+  }
+}
+
+// ===== SAVE SETTINGS =====
+async function saveNovelSettings() {
+  const idea = document.getElementById('genIdea').value.trim();
+  const outline = document.getElementById('genOutline').value.trim();
+  const n = currentNovel;
+  if (!n) return;
+
+  try {
+    const res = await fetch(`${API}/api/v1/novels/${n.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idea: idea || null, outline: outline || null })
+    });
+    if (res.ok) toast('设置已保存', 'success');
+    else toast('保存失败', 'error');
+  } catch(e) {
+    toast('保存失败: ' + e.message, 'error');
+  }
+}
+
+// ===== VIEW CHAPTER =====
+async function viewChapter(id) {
+  try {
+    const res = await fetch(`${API}/api/v1/chapters/${id}`);
+    const data = await res.json();
+    const c = data.item;
+    const output = document.getElementById('outputArea');
+    output.innerHTML = `<h3 style="margin-bottom:8px">${esc(c.title)}</h3>
+      <div style="color:var(--muted);font-size:12px;margin-bottom:12px">${c.word_count} 字 · ${esc(c.status)} · ${new Date(c.created_at).toLocaleString('zh-CN')}</div>
+      <div style="line-height:2;white-space:pre-wrap">${esc(c.content)}</div>`;
+  } catch(e) {
+    toast('加载章节失败', 'error');
+  }
+}
+
+// ===== CREATE NOVEL =====
+function showCreateModal() { document.getElementById('createModal').style.display = 'flex'; }
+function hideCreateModal() { document.getElementById('createModal').style.display = 'none'; }
+
+async function createNovel() {
+  const title = document.getElementById('newTitle').value.trim();
+  if (!title) { toast('请输入书名', 'error'); return; }
+  const desc = document.getElementById('newDesc').value.trim();
+  const type = document.getElementById('newType').value;
+  const tagsStr = document.getElementById('newTags').value;
+  const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  try {
+    const res = await fetch(`${API}/api/v1/novels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description: desc, type: type || undefined, tags })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      hideCreateModal();
+      document.getElementById('newTitle').value = '';
+      document.getElementById('newDesc').value = '';
+      selectNovel(data.item.id);
+      toast('小说创建成功！', 'success');
+    } else {
+      toast('创建失败: ' + JSON.stringify(data), 'error');
+    }
+  } catch(e) {
+    toast('创建失败: ' + e.message, 'error');
+  }
+}
+
+// ===== UTILS =====
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function toast(msg, type) {
+  const el = document.createElement('div');
+  el.className = `toast ${type || ''}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+</script>
+</body>
+</html>
