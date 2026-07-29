@@ -5,8 +5,8 @@
     "model": "deepseek-v4-pro"
   },
   "review": {
-    "api_key": "sk-oRJNE8QAgeEHl5pgPXpxFoyWhCvHXKhLm8PbQmhAZzCwW6xU",
-    "base_url": "https://api.moonshot.cn/v1",
-    "model": "kimi-k3"
+    "api_key": "sk-94dd207f1b5a43d3b69bb153014ee744",
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-v4-pro"
   }
 }

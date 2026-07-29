@@ -1,0 +1,326 @@
+/* ============ composer.js：创作模式 / 生成 / 终止 ============ */
+var Composer = {
+  init: function () {
+    var mode = Store.state.composer.runMode;
+    document.getElementById('modeSelect').value = mode;
+    var twm = document.getElementById('targetWordMini');
+    if (twm) twm.value = Store.state.composer.targetWord;
+    var slider = document.getElementById('targetWordSlider');
+    if (slider) slider.value = Store.state.composer.targetWord;
+    this.onModeChange(mode, true);
+    var tw = document.getElementById('targetWord');
+    var twSlider = document.getElementById('targetWordSlider');
+    if (tw) {
+      tw.addEventListener('change', function () {
+        Store.state.composer.targetWord = parseInt(tw.value) || 1000;
+        if (twm) twm.value = Store.state.composer.targetWord;
+        if (twSlider) twSlider.value = Store.state.composer.targetWord;
+        Store.savePrefs();
+      });
+      tw.addEventListener('input', function () { if (twSlider) twSlider.value = parseInt(tw.value) || 1000; });
+    }
+    if (twm) {
+      twm.addEventListener('change', function () {
+        Store.state.composer.targetWord = parseInt(twm.value) || 1000;
+        if (tw) tw.value = Store.state.composer.targetWord;
+        if (twSlider) twSlider.value = Store.state.composer.targetWord;
+        Store.savePrefs();
+      });
+      twm.addEventListener('input', function () { if (twSlider) twSlider.value = parseInt(twm.value) || 1000; });
+    }
+    // 上下文范围
+    var scopeEl = document.getElementById('contextScope');
+    if (scopeEl) scopeEl.value = Store.state.composer.contextScope || 'current';
+    Store.state.composer.contextScope = Store.state.composer.contextScope || 'current';
+    // 禁改写
+    var nrToggle = document.getElementById('noRewriteToggle');
+    if (nrToggle) nrToggle.checked = Store.state.composer.noRewrite || false;
+    Store.state.composer.noRewrite = Store.state.composer.noRewrite || false;
+    // 跳过字数校验
+    var swToggle = document.getElementById('skipWordCheck');
+    if (swToggle) swToggle.checked = Store.state.composer.skipWordCheck || false;
+    Store.state.composer.skipWordCheck = Store.state.composer.skipWordCheck || false;
+    // 自动追加
+    var aaToggle = document.getElementById('autoAppendToggle');
+    if (aaToggle) aaToggle.checked = Store.state.composer.autoAppend !== false;
+    Store.state.composer.autoAppend = Store.state.composer.autoAppend !== false;
+  },
+  onSliderChange: function () {
+    var val = parseInt(document.getElementById('targetWordSlider').value) || 1000;
+    Store.state.composer.targetWord = val;
+    document.getElementById('targetWord').value = val;
+    document.getElementById('targetWordMini').value = val;
+    Store.savePrefs();
+  },
+  onScopeChange: function () {
+    Store.state.composer.contextScope = document.getElementById('contextScope').value;
+    Store.savePrefs();
+  },
+  onNoRewriteChange: function () {
+    Store.state.composer.noRewrite = document.getElementById('noRewriteToggle').checked;
+    Store.savePrefs();
+  },
+  onSkipWordCheck: function (checked) {
+    Store.state.composer.skipWordCheck = checked;
+    Store.savePrefs();
+  },
+  onModeChange: function (mode, skipPersist) {
+    Store.state.composer.runMode = mode;
+    document.getElementById('modeSelect').value = mode;
+    var hints = {
+      auto: '智能协同：自动判定任务并匹配流水线',
+      draft: '快速草稿：跳过 Thinker+Verifier，Worker 直出初稿（可后续深度优化）',
+      strict: '严谨模式：Thinker 初稿 → Worker 润色 → Verifier 严校',
+      art: '文艺创作：极简框架 → Worker 高度自由创作 → 宽松审查',
+      light: '轻量化快速：直接调用 Helper（选中文本超 500 字请切换模式）',
+      manual: '手动自选模型：跳过流水线，直接调用指定模型'
+    };
+    document.getElementById('modeHint').textContent = hints[mode] || '';
+    var modelSel = document.getElementById('modelSelect');
+    if (mode === 'manual') {
+      modelSel.style.display = '';
+      this.refreshModels();
+    } else {
+      modelSel.style.display = 'none';
+    }
+    if (!skipPersist) Store.savePrefs();
+  },
+  refreshModels: async function () {
+    try {
+      var models = await API.listModels();
+      Store.state.models = models;
+      var sel = document.getElementById('modelSelect');
+      var cur = Store.state.composer.modelName;
+      var active = models.filter(function (m) { return m.status === 'active'; });
+      var html = active.map(function (m) {
+        return '<option value="' + esc(m.name) + '" data-id="' + esc(m.id) + '"' + (m.name === cur ? ' selected' : '') + '>' + esc(m.name) + (m.vendor ? ' · ' + esc(m.vendor) : '') + (m.is_default === 1 ? ' ⭐' : '') + '</option>';
+      }).join('');
+      if (!html) html = '<option value="">未配置自定义 API 模型</option>';
+      sel.innerHTML = html;
+      sel.onchange = function () {
+        Store.state.composer.modelName = sel.value;
+        var opt = sel.options[sel.selectedIndex];
+        Store.state.composer.modelConfigId = opt ? (opt.getAttribute('data-id') || '') : '';
+        Store.savePrefs();
+      };
+      if (!Store.state.composer.modelName && active.length) {
+        Store.state.composer.modelName = active[0].name;
+        sel.value = active[0].name;
+        Store.state.composer.modelConfigId = active[0].id;
+        Store.savePrefs();
+      }
+    } catch (e) { UI.toast('模型列表加载失败', 'error'); }
+  },
+  setGenerating: function (g) {
+    var btn = document.getElementById('btnGenerate');
+    btn.disabled = g;
+    btn.textContent = g ? '⏳ 生成中…' : '✨ 生成';
+    document.getElementById('genStatus').classList.toggle('show', g);
+    document.getElementById('instructionInput').readOnly = g;
+  },
+  buildPayload: function () {
+    var p = Store.state.currentProject;
+    var ch = Store.state.currentChapter;
+    var instr = document.getElementById('instructionInput').value.trim();
+    var sel = Editor.getSelectedText() || '';
+    var tw = Store.state.composer.targetWord;
+    var scope = Store.state.composer.contextScope || 'current';
+    var cursorPos = Store.state.composer.cursorPosition || 0;
+    var noRewrite = Store.state.composer.noRewrite || false;
+    // context_scope: 如果选择含前面章节摘要，拼接摘要
+    var summaries = '';
+    if (scope === 'withSummary' && Store.state.chapterSummaries) {
+      summaries = Store.state.chapterSummaries;
+    }
+    // 如果选中了文字，以选中文字为上下文
+    var history = '';
+    if (cursorPos > 0 && !sel) {
+      history = (ch ? ch.content : Editor.getText()).substring(0, cursorPos);
+    } else {
+      history = ch ? ch.content : Editor.getText();
+    }
+    // 文风参考：选定章节内容注入 material_text
+    var material = Context.materials();
+    var styleChId = Store.state.composer.styleChapterId;
+    if (styleChId) {
+      var intensity = Store.state.composer.styleIntensity || 'medium';
+      var intensityLabel = {light:'弱：仅参考语感', medium:'中：对齐句式节奏', strong:'强：严格模仿所有细节'}[intensity] || '中';
+      var styleCh = Store.state.chapters.find(function (c) { return c.id === styleChId; });
+      if (styleCh && styleCh.content) {
+        material = '【文风参考样本（强度：' + intensityLabel + '）】\n' + styleCh.content + '\n\n' + material;
+      }
+    }
+    return {
+      project_id: p ? p.id : '',
+      chapter_id: ch ? ch.id : '',
+      user_demand: instr,
+      selected_text: sel,
+      world_setting: Context.worldSetting(),
+      character_setting: Context.characters(),
+      history_content: history,
+      material_text: material,
+      target_word: tw,
+      run_mode: Store.state.composer.runMode,
+      model_name: Store.state.composer.runMode === 'manual' ? Store.state.composer.modelName : '',
+      model_config_id: Store.state.composer.runMode === 'manual' ? Store.state.composer.modelConfigId : '',
+      cursor_position: cursorPos,
+      no_rewrite: noRewrite,
+      context_scope: scope,
+      previous_summaries: summaries,
+      skip_word_check: Store.state.composer.skipWordCheck
+    };
+  },
+  validate: function (payload) {
+    if (!Store.state.currentProject) { UI.toast('请先选择或创建项目', 'warn'); return false; }
+    if (!payload.user_demand && !payload.selected_text) { UI.toast('请输入创作需求或选中文字', 'warn'); return false; }
+    if (Store.state.composer.runMode === 'manual' && !payload.model_name) { UI.toast('手动模式请选择模型', 'warn'); return false; }
+    if (Store.state.composer.runMode === 'light' && payload.selected_text && Array.from(payload.selected_text).length > 500) {
+      UI.toast('选中文本超过 500 字，轻量模式可能不适合，建议切换为「智能协同」', 'warn');
+    }
+    if (!Usage.canGenerate()) {
+      UI.toast('今日额度已用完，请明日再试或联系管理员调整限额', 'error');
+      return false;
+    }
+    return true;
+  },
+  generate: async function () {
+    var payload = this.buildPayload();
+    if (!this.validate(payload)) return;
+    // 自动创建章节
+    var ch = Store.state.currentChapter;
+    if (!ch) {
+      var p = Store.state.currentProject;
+      if (!p) return;
+      try {
+        var chapNum = (Store.state.chapters || []).length + 1;
+        var title = '第' + chapNum + '章';
+        ch = await API.createChapter({ project_id: p.id, volume_id: '', title: title, content: '' });
+        Store.state.currentChapter = ch;
+        Store.state.chapters = Store.state.chapters || [];
+        Store.state.chapters.push(ch);
+        ChapterUI.renderTree();
+        payload.chapter_id = ch.id;
+        payload.history_content = '';
+      } catch (e) { UI.toast('创建章节失败：' + e.message, 'error'); return; }
+    }
+    // 第一层预检：需求-字数匹配（除非用户关闭）
+    if (!Store.state.composer.skipWordCheck && payload.target_word > 0 && payload.user_demand) {
+      try {
+        var pre = await API.post('/api/precheck', {
+          user_demand: payload.user_demand,
+          target_word: payload.target_word,
+          world_setting: payload.world_setting,
+          character_setting: payload.character_setting,
+          history_content: payload.history_content
+        });
+        if (pre && pre.mismatch) {
+          this.showPrecheckDialog(pre, payload);
+          return;
+        }
+      } catch (e) { /* precheck 失败不阻塞，直接继续 */ }
+    }
+    this.doGenerate(payload);
+  },
+
+  showPrecheckDialog: function (pre, payload) {
+    var mismatchLabel = pre.mismatch_type === 'too_low' ? '（预估参考）需求体量较大，当前目标字数偏低' : '（预估参考）需求体量较小，当前目标字数偏高';
+    var body = '<div class="precheck-result">' +
+      '<div class="precheck-banner ' + (pre.mismatch_type === 'too_low' ? 'warn-lo' : 'warn-hi') + '">' +
+      '<span>' + mismatchLabel + '</span></div>' +
+      '<div class="precheck-grid">' +
+      '<div><span>预估场景</span><b>' + (pre.scene_count || '-') + '</b></div>' +
+      '<div><span>登场人物</span><b>' + (pre.character_count || '-') + '</b></div>' +
+      '<div><span>推荐字数区间</span><b>' + (pre.recommended_min || '?') + ' - ' + (pre.recommended_max || '?') + ' 字</b></div>' +
+      '<div><span>设定目标</span><b class="' + (pre.mismatch ? 'mismatch' : '') + '">' + payload.target_word + ' 字</b></div>' +
+      '</div>';
+    if (pre.suggestion) body += '<div class="precheck-sug">💡 ' + esc(pre.suggestion) + '</div>';
+    body += '<div class="precheck-foot"><span>模型: ' + esc(pre.model || '') + '</span><span>此为预估参考，可继续生成</span></div></div>';
+    var self = this;
+    UI.modal({
+      title: '需求-字数匹配预检',
+      sub: 'Helper 轻量分析：' + esc((pre.analysis || '').slice(0, 120)),
+      body: body, wide: '500px',
+      actions: [
+        { id: 'adjust', label: '调整需求/字数', onClick: function (m, ov) { ov.remove(); } },
+        { id: 'go', label: '仍然坚持生成', cls: 'btn-primary', onClick: function (m, ov) { ov.remove(); self.doGenerate(payload); } }
+      ]
+    });
+  },
+
+  doGenerate: function (payload) {
+    var estInput = (payload.user_demand + payload.world_setting + payload.character_setting + payload.history_content + payload.material_text + payload.selected_text).length;
+    var estTokens = Math.ceil(estInput / 1.5) + Math.ceil(payload.target_word * 1.3);
+    var self = this;
+    if (estTokens > 4000 || payload.target_word > 2000) {
+      UI.confirm('长文本生成确认',
+        '预估 Token 约 <b style="color:var(--accent)">' + estTokens.toLocaleString() + '</b>，目标字数 ' + payload.target_word + '。<br>生成可能耗时较长，是否继续？',
+        function () { SSE.start(payload); });
+    } else {
+      SSE.start(payload);
+    }
+  },
+  continueFromCursor: function () {
+    var ch = Store.state.currentChapter;
+    if (!ch) { UI.toast('请先选择章节', 'warn'); return; }
+    var cursorPos = Editor.getCursorPosition();
+    if (cursorPos < 0) { UI.toast('请将光标放在章节正文中', 'warn'); return; }
+    Store.state.composer.cursorPosition = cursorPos;
+    document.getElementById('instructionInput').value = '续写';
+    this.generate();
+  },
+  refreshStyleChapters: function () {
+    var sel = document.getElementById('styleChapter');
+    if (!sel) return;
+    var chs = Store.state.chapters || [];
+    var curStyleId = Store.state.composer.styleChapterId || '';
+    sel.innerHTML = '<option value="">文风参考：无</option>' + chs.map(function (c) {
+      return '<option value="' + c.id + '"' + (c.id === curStyleId ? ' selected' : '') + '>' + esc(c.title) + '</option>';
+    }).join('');
+  },
+  onStyleChapterChange: function () {
+    var sel = document.getElementById('styleChapter');
+    var chId = sel ? sel.value : '';
+    Store.state.composer.styleChapterId = chId;
+    Store.savePrefs();
+    if (chId) UI.toast('已选定风格参考章节', 'success');
+  },
+  onStyleIntensityChange: function () {
+    var sel = document.getElementById('styleIntensity');
+    Store.state.composer.styleIntensity = sel ? sel.value : 'medium';
+    Store.savePrefs();
+  },
+  onAutoAppendChange: function () {
+    var cb = document.getElementById('autoAppendToggle');
+    Store.state.composer.autoAppend = cb ? cb.checked : true;
+    Store.savePrefs();
+  },
+  autoTitle: function () {
+    var ch = Store.state.currentChapter;
+    if (!ch) { UI.toast('请先选择章节', 'warn'); return; }
+    var text = Editor.getText();
+    if (!text || text.length < 30) { UI.toast('章节内容太少（至少30字）', 'warn'); return; }
+    if (SSE.active) { UI.toast('请先完成当前生成', 'warn'); return; }
+    // 取前3000字作分析
+    var sample = text.substring(0, 3000);
+    Store.state.composer._titleMode = true;
+    var payload = {
+      project_id: (Store.state.currentProject || {}).id || '',
+      chapter_id: ch.id,
+      user_demand: '为以下小说章节生成一个简短精炼的标题（5-10个汉字，不含引号和标点），只输出标题，不要任何解释',
+      history_content: sample,
+      target_word: 10,
+      run_mode: 'light',
+      model_name: '',
+      model_config_id: '',
+      selected_text: '',
+      world_setting: '',
+      character_setting: '',
+      material_text: '',
+      cursor_position: 0,
+      no_rewrite: false,
+      context_scope: 'current',
+      previous_summaries: ''
+    };
+    SSE.start(payload);
+  }
+};
