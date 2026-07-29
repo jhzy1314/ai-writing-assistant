@@ -50,15 +50,17 @@ window.initTiptap = async function () {
     <span>今日调用</span><b id="qCalls">0</b><span>/</span><span id="qCallsLimit">500</span>
     <div class="quota-meter" id="qCallsMeter"><i style="width:0%"></i></div>
   </div>
-  <div class="quota-usage" id="quotaTokens">
+  <div class="quota-usage" id="quotaTokens" title="悬停查看各角色Token消耗明细">
     <span>Token</span><b id="qTokens">0</b><span>/</span><span id="qTokensLimit">2,000,000</span>
     <div class="quota-meter" id="qTokensMeter"><i style="width:0%"></i></div>
+    <div class="quota-role-breakdown" id="quotaRoleBreakdown" style="display:none;position:absolute;top:100%;right:0;background:var(--panel2);border-radius:6px;padding:6px 10px;font-size:10px;white-space:nowrap;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
   </div>
   <div class="spacer"></div>
   <span class="tool" id="usageHint"></span>
+  <span class="tool" onclick="ModelSettings.showQuickKey()" title="配置 API 密钥和模型" style="color:var(--accent);font-weight:600">🔑 API</span>
   <span class="tool" onclick="UI.showToastHistory()" title="通知历史">🔔</span>
   <div class="tool" id="themeToggle" title="切换主题" onclick="UI.toggleTheme()">🌙 深色</div>
-  <div class="tool" id="cleanToggle" title="纯净模式：隐藏装饰图" onclick="UI.toggleClean()">🧼 纯净</div>
+  <div class="tool" id="cleanToggle" title="纯净模式" onclick="UI.toggleClean()">🧼 纯净</div>
 </div>
 
 <div class="app">
@@ -106,6 +108,8 @@ window.initTiptap = async function () {
       <div class="grp">
         <select id="modeSelect" title="创作模式" onchange="Composer.onModeChange(this.value)">
           <option value="auto">智能协同</option>
+          <option value="orchestrated">指派Agent模型</option>
+          <option value="collab">协同闭环</option>
           <option value="draft">快速草稿</option>
           <option value="strict">严谨模式</option>
           <option value="art">文艺创作</option>
@@ -113,6 +117,7 @@ window.initTiptap = async function () {
           <option value="manual">手动自选模型</option>
         </select>
         <select id="modelSelect" style="display:none" title="选择模型"></select>
+        <div id="orchestratedModels" style="display:none;background:var(--panel2);border-radius:6px;padding:6px 10px;margin-left:8px"></div>
       </div>
       <span class="tool-divider"></span>
       <div class="grp">
@@ -131,12 +136,27 @@ window.initTiptap = async function () {
       </div>
       <span class="tool-divider"></span>
       <div class="grp">
-        <button class="tool-btn on" id="modeRichBtn" onclick="Editor.setMode('rich')" title="富文本">📝</button>
-        <button class="tool-btn" id="modeMdBtn" onclick="Editor.setMode('markdown')" title="Markdown">⇥</button>
-        <button class="tool-btn" id="previewBtn" onclick="Editor.togglePreview()" title="阅读预览">📖</button>
-        <button class="tool-btn" id="focusBtn" onclick="Editor.toggleFocus()" title="专注模式">🎯</button>
+        <button class="tool-btn on" id="modeRichBtn" onclick="Editor.setMode('rich')" title="富文本模式">📝</button>
+        <button class="tool-btn" id="modeMdBtn" onclick="Editor.setMode('markdown')" title="Markdown 模式">⇥</button>
+        <button class="tool-btn" id="previewBtn" onclick="Editor.togglePreview()" title="阅读预览（原生排版）">📖</button>
+        <button class="tool-btn" id="focusBtn" onclick="Editor.toggleFocus()" title="专注模式（折叠侧栏，全屏创作）">🎯</button>
       </div>
     </header>
+
+    <!-- 【移动端专属】章节控制栏 -->
+    <div class="mobile-chapter-bar mobile-only" id="mobileChapterBar">
+      <span class="mcb-nav" onclick="ChapterUI.prevChapter()" title="上一章">◀</span>
+      <div class="mcb-chapter" onclick="MobileUI.showChapterPicker()">
+        <span class="mcb-name" id="mcbName">未选择章节</span>
+        <span class="mcb-arrow">▾</span>
+      </div>
+      <span class="mcb-nav" onclick="ChapterUI.nextChapter()" title="下一章">▶</span>
+      <div class="mcb-acts">
+        <span class="link-btn" onclick="ChapterUI.addChapter()" title="新建章节">＋</span>
+        <span class="link-btn" onclick="ChapterUI.renameChapter(Store.state.currentChapter?Store.state.currentChapter.id:'')" title="重命名">✏</span>
+        <span class="link-btn" onclick="ChapterUI.delChapter(Store.state.currentChapter?Store.state.currentChapter.id:'')" title="删除">✕</span>
+      </div>
+    </div>
 
     <div class="editor-wrap">
       <div class="editor-toolbar">
@@ -158,6 +178,7 @@ window.initTiptap = async function () {
         <span class="tool-right">
           <button class="tool-btn" onclick="Editor.importFile()" title="导入文档">📥 导入</button>
           <button class="tool-btn" onclick="Editor.exportFile()" title="导出文档">📤 导出</button>
+          <button class="tool-btn" onclick="ResourceUI.summarizeSettings()" title="AI 从正文提取人物卡和世界观">🤖 AI 总结</button>
           <button class="tool-btn" onclick="Editor.cleanAIFiller()" title="清理 AI 多余话术">🧹 净化</button>
         </span>
         <div class="wc">
@@ -267,6 +288,7 @@ window.initTiptap = async function () {
             <div class="pct" id="pipePct">0%</div>
           </div>
           <div class="pipe-track"><i id="pipeBar" style="width:0%"></i></div>
+          <div class="pipe-snapshot" id="pipeSnapshotBadge" style="display:none;text-align:right;font-size:10px;color:var(--success);margin:2px 0">📸 快照已保存 <span id="pipeSnapshotCount">0</span> 次</div>
           <div class="pipe-steps" id="pipeSteps"></div>
           <div class="pipe-wc-progress" id="pipeWCProgress" style="display:none">
             <div class="wc-progress-label"><span>字数进度</span><span id="pipeWCCount">0 / 0</span></div>
@@ -343,7 +365,7 @@ window.initTiptap = async function () {
 
         <!-- ====== Helper 工具辅助 Agent 区域 ====== -->
         <div class="helper-section">
-          <div class="ghead">Helper 工具辅助 <span style="font-weight:400;font-size:10px;color:var(--faint)">· 由 deepseek-v4-flash 驱动</span></div>
+          <div class="ghead">Helper 工具辅助 <span style="font-weight:400;font-size:10px;color:var(--faint)">· deepseek-chat 驱动</span></div>
 
           <button class="btn btn-primary btn-block" id="btnRecord" onclick="Tools.startRecord()">🎤 开始录音</button>
 
@@ -410,10 +432,77 @@ window.initTiptap = async function () {
 <div class="toast-wrap" id="toastWrap"></div>
 <div id="modalRoot"></div>
 
+<!-- ============ 【移动端专属】顶部导航条 ============ -->
+<div class="mobile-topbar mobile-only">
+  <div class="mt-logo">✦</div>
+  <div class="mt-title" id="mtTitle">AI Novel Studio</div>
+  <span class="mt-btn" onclick="MobileUI.openDrawer()" title="菜单">☰</span>
+  <span class="mt-btn" onclick="ManualSave.saveDraft()" title="保存版本">💾</span>
+  <span class="mt-btn mt-api" onclick="MobileUI.openModelPanel()" title="API 密钥与模型">🔑</span>
+  <span class="mt-btn" onclick="MobileUI.toggleView()" title="切换电脑版">🖥</span>
+</div>
+
+<!-- ============ 【移动端专属】侧边栏抽屉 ============ -->
+<div class="mobile-drawer-overlay mobile-only" id="mobileDrawerOverlay" onclick="MobileUI.closeDrawer()"></div>
+<div class="mobile-drawer mobile-only" id="mobileDrawer">
+  <div class="md-head">
+    <div class="md-logo">✦</div>
+    <div class="md-title">AI Novel Studio</div>
+    <span class="md-close" onclick="MobileUI.closeDrawer()">✕</span>
+  </div>
+  <div class="md-body">
+    <div class="side-search">
+      <input type="text" id="mSearchInput" placeholder="🔍 搜索项目或资源…" oninput="MobileUI.filter(this.value)">
+    </div>
+    <div class="side-new">
+      <button class="btn btn-primary btn-block" onclick="MobileUI.closeDrawer();ProjectUI.showCreate()">＋ 新建项目</button>
+    </div>
+    <div class="side-section novels">
+      <div class="side-label"><span>项目列表</span></div>
+      <div class="novel-list" id="mNovelList">
+        <div class="side-empty">暂无项目<br>点击上方按钮创建</div>
+      </div>
+    </div>
+    <div class="side-section resources" id="mResourceSection">
+      <div class="side-label"><span id="mResProjName">当前项目资源</span></div>
+      <div id="mChapterTree" class="chapter-tree"></div>
+      <div class="res-list" id="mResList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 【移动端专属】右面板底部弹出 ============ -->
+<div class="mobile-right-overlay mobile-only" id="mobileRightOverlay" onclick="MobileUI.closeRightSheet()"></div>
+<div class="mobile-right-sheet mobile-only" id="mobileRightSheet">
+  <div class="mrs-handle"></div>
+  <div class="mrs-head">
+    <div class="mrs-tabs" id="mrsTabs"></div>
+    <span class="mrs-close" onclick="MobileUI.closeRightSheet()">✕</span>
+  </div>
+  <div class="mrs-body" id="mrsBody">
+    <div class="res-check-empty">选择一个面板</div>
+  </div>
+</div>
+
+<!-- ============ 【移动端专属】模型管理全屏面板 ============ -->
+<div class="mobile-model-panel mobile-only" id="mobileModelPanel">
+  <div class="mmp-head">
+    <span class="mmp-title">🔑 API 密钥与模型管理</span>
+    <span class="mmp-close" onclick="MobileUI.closeModelPanel()">✕</span>
+  </div>
+  <div class="mmp-body" id="mmpBody">
+    <div class="res-check-empty">加载中…</div>
+  </div>
+</div>
+
+<!-- ============ 【移动端专属】右下角 FAB ============ -->
+<button class="mobile-fab mobile-only" id="mobileFab" onclick="MobileUI.openRightSheet()" title="控制面板">⚙</button>
+
 <!-- ============ JS 模块（按依赖顺序加载） ============ -->
 <script src="/static/js/util.js"></script>
 <script src="/static/js/store.js"></script>
 <script src="/static/js/api.js"></script>
+<script src="/static/js/auth.js"></script>
 <script src="/static/js/ui.js"></script>
 <script src="/static/js/sse.js"></script>
 <script src="/static/js/pipeline.js"></script>
@@ -431,7 +520,9 @@ window.initTiptap = async function () {
 <script src="/static/js/usage.js"></script>
 <script src="/static/js/tools.js"></script>
 <script src="/static/js/app.js"></script>
+<script src="/static/js/mobile.js"></script>
 <script>// 兜底加载：确保项目列表一定出现在页面上
+if (typeof MobileUI !== 'undefined') MobileUI.init();
 (function load() {
   if (typeof ProjectUI !== 'undefined' && typeof ProjectUI.loadAll === 'function') {
     ProjectUI.loadAll().catch(function(){});
