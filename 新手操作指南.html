@@ -1,0 +1,172 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Novel Studio · 新手操作指南</title>
+<style>
+:root {
+  --bg: #f8f9fc;
+  --card: #fff;
+  --border: #e5e8f0;
+  --text: #1a1f2e;
+  --muted: #6b7280;
+  --accent: #6366f1;
+  --accent-soft: #eef0fe;
+  --radius: 12px;
+  --font: 'Segoe UI', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:15px; line-height:1.8; }
+header {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff; padding: 48px 24px 36px; text-align: center;
+}
+header h1 { font-size: 28px; margin-bottom: 8px; }
+header p { opacity:.85; font-size: 15px; }
+.container { max-width: 760px; margin: 0 auto; padding: 32px 20px 60px; }
+h2 { font-size: 20px; margin: 36px 0 14px; color: var(--accent); padding-bottom: 8px; border-bottom: 2px solid var(--accent-soft); }
+h3 { font-size: 16px; margin: 22px 0 8px; }
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px 22px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; }
+td, th { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+kbd {
+  display: inline-block; padding: 2px 7px; font-size: 12px; font-family: var(--font);
+  background: #f1f2f6; border: 1px solid #d3d7e4; border-radius: 5px; color: var(--text);
+}
+.step { display: flex; gap: 12px; align-items: flex-start; margin: 14px 0; }
+.step .n {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+  flex-shrink: 0; margin-top: 2px;
+}
+.step p { flex:1; }
+.tip { background: #fef9e7; border: 1px solid #f9e076; border-radius: 8px; padding: 10px 16px; margin: 14px 0; font-size: 14px; }
+.warn { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 16px; margin: 14px 0; font-size: 14px; }
+footer { text-align: center; padding: 24px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AI Novel Studio 新手操作指南</h1>
+  <p>多模型角色调度 AI 写作协作平台 · 5 分钟上手</p>
+</header>
+
+<div class="container">
+
+<h2>一、首次启动：配置 API Key</h2>
+
+<div class="step">
+  <div class="n">1</div>
+  <p><b>获取 API Key</b><br>
+  前往 <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 注册账号（推荐，性价比最高），
+  在「API Keys」页面创建一个新 Key，复制 <code>sk-</code> 开头的字符串。<br>
+  其他厂商同样适用：Kimi（moonshot.cn）、OpenAI 等。</p>
+</div>
+
+<div class="step">
+  <div class="n">2</div>
+  <p><b>运行配置向导</b><br>
+  双击 <code>setup.bat</code>（或首次运行 <code>run.bat</code> 时会自动弹出）。
+  按提示选择模型、填入 API Key，向导会自动生成配置文件。</p>
+</div>
+
+<div class="step">
+  <div class="n">3</div>
+  <p><b>启动应用</b><br>
+  双击 <code>run.bat</code>，浏览器会自动打开 <code>http://localhost:8081</code>。</p>
+</div>
+
+<div class="tip">
+  <b>💡 提示：</b>所有数据存储在本地 <code>data/</code> 目录，不会上传。API Key 可随时在应用内「模型设置」面板修改，或双击 <code>setup.bat</code> 重新配置。
+</div>
+
+<h2>二、界面速览</h2>
+
+<table>
+  <tr><th>区域</th><th>功能</th></tr>
+  <tr><td>顶部状态栏</td><td>今日用量（调用次数/Token）、主题切换</td></tr>
+  <tr><td>左侧栏</td><td>项目列表、当前项目的资源树（稿件版本/人物卡/世界观/素材）</td></tr>
+  <tr><td>中央编辑区</td><td>双模式编辑器（富文本/Markdown）+ 底部创作指令输入</td></tr>
+  <tr><td>右侧面板</td><td>流水线进度、模板库、设定资源勾选、工具集</td></tr>
+</table>
+
+<h2>三、四步开始写作</h2>
+
+<div class="step"><div class="n">1</div><p>点击「＋ 新建项目」，输入小说名称和类型</p></div>
+<div class="step"><div class="n">2</div><p>在底部输入框写下创作需求，例如：<br>"续写第 3 章：主角在拍卖会上拍到一把神秘古剑，散场后被人跟踪，展开追逐战"</p></div>
+<div class="step"><div class="n">3</div><p>设置目标字数（推荐 1000-2000 字），选择创作模式（默认「智能协同」即可），点击「✨ 生成」</p></div>
+<div class="step"><div class="n">4</div><p>等待流水线跑完，正文会自动追加到编辑器。不满意可选中文字用悬浮工具栏重新处理。</p></div>
+
+<div class="tip"><b>💡 你写一部分我再续写：</b>直接在编辑器里写好开头，选中文字 → 使用弹出的悬浮工具栏（续写/扩写等），AI 会基于你的内容继续。</div>
+
+<h2>四、创作模式说明</h2>
+
+<table>
+  <tr><th>模式</th><th>适用场景</th><th>流水线</th></tr>
+  <tr><td>智能协同</td><td>常规创作，自动判定</td><td>Thinker 大纲 → Worker 撰写 → Verifier 校验</td></tr>
+  <tr><td>严谨模式</td><td>学术/正式/逻辑严密</td><td>Thinker 初稿 → Worker 润色 → Verifier 严审</td></tr>
+  <tr><td>文艺创作</td><td>文笔优先、叙事自由</td><td>Thinker 极简框架 → Worker 自由写 → Verifier 宽松审</td></tr>
+  <tr><td>轻量快速</td><td>缩写/扩写/改写/摘要</td><td>直接调用 Helper，快速返回</td></tr>
+  <tr><td>手动自选</td><td>指定具体模型</td><td>跳过流水线，直调选定模型</td></tr>
+</table>
+
+<h2>五、选中文字快捷工具</h2>
+
+<p>在编辑器中选中一段文字后，会弹出悬浮工具栏：</p>
+<table>
+  <tr><th>按钮</th><th>功能</th></tr>
+  <tr><td>扩写</td><td>增加细节描写，保留核心剧情</td></tr>
+  <tr><td>缩写</td><td>精简冗余，保留全部关键信息</td></tr>
+  <tr><td>改写文风</td><td>弹出文风输入框，如"武侠古风"</td></tr>
+  <tr><td>润色</td><td>修正语病，优化语句通顺度</td></tr>
+  <tr><td>续写</td><td>承接选中文字继续向后写</td></tr>
+  <tr><td>摘要</td><td>生成选中文字的简短摘要</td></tr>
+  <tr><td>调整氛围</td><td>弹出氛围输入框，如"压抑沉重"</td></tr>
+</table>
+
+<h2>六、设定系统使用技巧</h2>
+
+<div class="card">
+  <h3>先写再补设定（推荐新手）</h3>
+  <p>在编辑器里写几章内容 → 点击侧栏人物卡区域或编辑器工具栏的 <b>🤖 AI 总结</b> 按钮
+  → AI 自动从正文中提取所有人物和世界观 → 弹窗勾选需要的条目保存。</p>
+</div>
+
+<div class="card">
+  <h3>先建设定再写</h3>
+  <p>在左侧资源树中点击 ＋ 手动创建人物卡和世界观 → 在右侧面板勾选需要 AI 参考的资源
+  → 勾选的设定会自动注入生成请求，确保角色不 OOC、世界观统一。</p>
+</div>
+
+<h2>七、快捷键</h2>
+
+<table>
+  <tr><td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td><td>发送生成请求</td></tr>
+  <tr><td><kbd>Ctrl</kbd> + <kbd>S</kbd></td><td>保存当前稿件为版本</td></tr>
+  <tr><td><kbd>Escape</kbd></td><td>终止生成 / 关闭弹窗</td></tr>
+  <tr><td><kbd>?</kbd></td><td>弹出快捷键面板</td></tr>
+  <tr><td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd></td><td>进入专注模式</td></tr>
+</table>
+
+<h2>八、常见问题</h2>
+
+<div class="warn"><b>Q：生成按钮是灰色的？</b><br>A：检查顶部状态栏用量是否已满。每天默认 500 次调用/200 万 Token，足够使用。</div>
+
+<div class="tip"><b>Q：生成的文字不符合预期？</b><br>A：① 在右侧面板勾选相关人物卡和世界观，提供更多上下文；② 在指令框中写清楚具体要求（风格、长度、避免的内容）；③ 使用版本历史回退后重试。</div>
+
+<div class="warn"><b>Q：出现"模型调用失败"？</b><br>A：检查 API Key 是否有效、账户是否有余额。系统会自动切换备用模型，全部失败才会报错。</div>
+
+<div class="tip"><b>Q：如何备份数据？</b><br>A：整个项目数据存储在 <code>data/ai-novel.db</code>（SQLite），直接复制该文件即可备份。同时编辑器每 30 秒自动保存草稿到浏览器缓存。</div>
+
+</div>
+
+<footer>AI Novel Studio · 多模型角色调度创作台 · 本地数据，安全可靠</footer>
+
+</body>
+</html>

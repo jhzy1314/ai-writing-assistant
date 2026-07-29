@@ -175,3 +175,31 @@ func (s *Store) PeriodUsage(ctx context.Context, days int) ([]ModelUsageRow, err
 	}
 	return out, rows.Err()
 }
+
+// RoleUsageRow 当日各角色用量
+type RoleUsageRow struct {
+	Role   string `json:"role"`
+	Calls  int    `json:"calls"`
+	Tokens int    `json:"tokens"`
+}
+
+// DailyUsageByRole 查询当日 generation_logs 按角色聚合用量
+func (s *Store) DailyUsageByRole(ctx context.Context) ([]RoleUsageRow, error) {
+	today := time.Now().Format("2006-01-02")
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT role, COUNT(1), COALESCE(SUM(prompt_tokens+completion_tokens),0) FROM generation_logs WHERE created_at LIKE ? GROUP BY role ORDER BY SUM(prompt_tokens+completion_tokens) DESC`,
+		today+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []RoleUsageRow{}
+	for rows.Next() {
+		var r RoleUsageRow
+		if err := rows.Scan(&r.Role, &r.Calls, &r.Tokens); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}

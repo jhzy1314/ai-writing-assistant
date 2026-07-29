@@ -51,6 +51,78 @@ func (d *Dispatcher) runManual(ctx context.Context, req GenerateRequest, bundle 
 	return text, err
 }
 
+// runOrchestrated 完整流水线 + 用户手动指派每个Agent的模型
+// 与 manual 不同：manual 跳过流水线直调模型，orchestrated 跑完整 Thinker→Worker→Verifier 流程，但每个角色用 RoleModels 指定的模型
+func (d *Dispatcher) runOrchestrated(ctx context.Context, req GenerateRequest, bundle ContextBundle, maxIter int, emit func(ProgressEvent)) (string, error) {
+	thinkerModel := req.RoleModels["thinker"]
+	workerModel := req.RoleModels["worker"]
+	verifierModel := req.RoleModels["verifier"]
+	// 未指定模型时取角色绑定的主模型
+	if thinkerModel == "" {
+		if names, _ := d.store.RoleModelNames(ctx, "thinker"); len(names) > 0 { thinkerModel = names[0] }
+	}
+	if workerModel == "" {
+		if names, _ := d.store.RoleModelNames(ctx, "worker"); len(names) > 0 { workerModel = names[0] }
+	}
+	if verifierModel == "" {
+		if names, _ := d.store.RoleModelNames(ctx, "verifier"); len(names) > 0 { verifierModel = names[0] }
+	}
+
+	// 1. Thinker 规划（用指定模型）
+	emit(ProgressEvent{Type: EventStage, Stage: "正在为你的故事搭建框架…", Role: string(llm.RoleThinker)})
+	outline, _, tModel, tDegraded, err := d.callRoleWithModel(ctx, llm.RoleThinker, PipelineOrchestrated, req.ProjectID, thinkerModel, buildThinkerUserPrompt(req, bundle, PipelineOrchestrated))
+	if err != nil {
+		return "", err
+	}
+	emit(ProgressEvent{Type: EventStage, Stage: "框架搭建完成", Role: string(llm.RoleThinker), Model: tModel, Text: outline})
+	if tDegraded {
+		emit(ProgressEvent{Type: EventWarning, Text: "规划师模型异常", Degraded: true})
+	}
+
+	// 2. Worker 撰写（用指定模型，支持分段）
+	finalText := ""
+	var segErr error
+	if needsSegmentation(req) {
+		n := numSegments(req)
+		for i := 1; i <= n; i++ {
+			if ctx.Err() != nil { return finalText, ctx.Err() }
+			emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("创作者 撰写第 %d/%d 段", i, n), Role: string(llm.RoleWorker), Iteration: i})
+			seg, _, wModel, _, wErr := d.callRoleStreamWithModel(ctx, llm.RoleWorker, PipelineOrchestrated, req.ProjectID, workerModel, buildWorkerUserPrompt(req, bundle, outline, i, n), emitToken(emit, string(llm.RoleWorker)))
+			if wErr != nil { segErr = wErr; break }
+			emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("第 %d 段完成", i), Role: string(llm.RoleWorker), Model: wModel})
+			if finalText != "" { finalText += "\n\n" }
+			finalText += seg
+		}
+	} else {
+		emit(ProgressEvent{Type: EventStage, Stage: "创作者撰写正文中…", Role: string(llm.RoleWorker)})
+		finalText, _, _, _, segErr = d.callRoleStreamWithModel(ctx, llm.RoleWorker, PipelineOrchestrated, req.ProjectID, workerModel, buildWorkerUserPrompt(req, bundle, outline, 0, 1), emitToken(emit, string(llm.RoleWorker)))
+	}
+	if segErr != nil {
+		return finalText, segErr
+	}
+
+	// 3. Verifier 审查 + Worker 按 Verifier 审查意见微调
+	for iter := 1; iter <= maxIter; iter++ {
+		emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("审稿中 第 %d/%d 轮", iter, maxIter), Role: string(llm.RoleVerifier), Iteration: iter})
+		review, _, vModel, _, vErr := d.callRoleWithModel(ctx, llm.RoleVerifier, PipelineOrchestrated, req.ProjectID, verifierModel, buildVerifierUserPrompt(req, bundle, finalText, PipelineOrchestrated))
+		if vErr != nil {
+			emit(ProgressEvent{Type: EventWarning, Text: "审稿异常，已跳过", Degraded: true})
+			break
+		}
+		if strings.Contains(review, "校验通过") {
+			emit(ProgressEvent{Type: EventStage, Stage: "审查通过", Role: string(llm.RoleVerifier), Model: vModel, Iteration: iter})
+			break
+		}
+		issues := extractIssues(review)
+		emit(ProgressEvent{Type: EventWarning, Stage: fmt.Sprintf("发现 %d 处问题，回传创作者微调", len(issues)), Role: string(llm.RoleVerifier), Iteration: iter, Issues: issues})
+		emit(ProgressEvent{Type: EventToken, Reset: true, Text: "", Role: string(llm.RoleWorker)})
+		revisedText, _, _, _, rvErr := d.callRoleStreamWithModel(ctx, llm.RoleWorker, PipelineOrchestrated, req.ProjectID, workerModel, buildReviseUserPrompt(req, bundle, review, finalText), emitToken(emit, string(llm.RoleWorker)))
+		if rvErr != nil { break }
+		finalText = revisedText
+	}
+	return finalText, nil
+}
+
 // runLight 轻量化快速模式：直接调用 Helper，不启动多轮串联流水线
 func (d *Dispatcher) runLight(ctx context.Context, req GenerateRequest, bundle ContextBundle, lightLimit int, emit func(ProgressEvent)) (string, error) {
 	emit(ProgressEvent{Type: EventStage, Stage: "轻助手处理中", Role: string(llm.RoleHelper)})
@@ -149,7 +221,91 @@ func (d *Dispatcher) runArt(ctx context.Context, req GenerateRequest, bundle Con
 	return finalText, err
 }
 
-// workerWrite 创作者撰写正文（目标>4000字自动分段）
+// runCollab 多Agent协同闭环：Thinker→Worker→Verifier→Thinker重规划→Worker重写
+// Verifier 发现的问题回传 Thinker 重新规划大纲（而非仅回传 Worker 微调），形成真正的多 Agent 对话闭环
+func (d *Dispatcher) runCollab(ctx context.Context, req GenerateRequest, bundle ContextBundle, maxIter int, emit func(ProgressEvent)) (string, error) {
+	// 1. Thinker 初始规划
+	emit(ProgressEvent{Type: EventStage, Stage: "协同创作 — 正在搭建故事框架…", Role: string(llm.RoleThinker)})
+	outline, _, tModel, tDegraded, err := d.callRole(ctx, llm.RoleThinker, PipelineCollab, req.ProjectID, buildThinkerUserPrompt(req, bundle, PipelineCollab))
+	if err != nil {
+		return "", err
+	}
+	emit(ProgressEvent{Type: EventStage, Stage: "框架搭建完成", Role: string(llm.RoleThinker), Model: tModel, Text: outline})
+	if tDegraded {
+		emit(ProgressEvent{Type: EventWarning, Text: "规划师主模型异常，已降级到备用模型", Degraded: true})
+	}
+
+	// 2. Worker 首次撰写
+	finalText, err := d.workerWrite(ctx, req, bundle, outline, PipelineCollab, emit)
+	if err != nil {
+		return "", err
+	}
+
+	// 3. 协同闭环：Verifier审查 → Thinker重规划 → Worker重写（最多 maxIter 轮）
+	for iter := 1; iter <= maxIter; iter++ {
+		// Verifier 审查
+		emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("协同审查 — 第 %d/%d 轮", iter, maxIter), Role: string(llm.RoleVerifier), Iteration: iter})
+		review, _, vModel, vDegraded, vErr := d.callRole(ctx, llm.RoleVerifier, PipelineCollab, req.ProjectID, buildVerifierUserPrompt(req, bundle, finalText, PipelineCollab))
+		if vErr != nil {
+			emit(ProgressEvent{Type: EventWarning, Text: "审稿 Agent 异常，已跳过本轮审查", Degraded: true})
+			break
+		}
+		if vDegraded {
+			emit(ProgressEvent{Type: EventWarning, Text: "审稿主模型异常，已降级到备用模型", Degraded: true})
+		}
+		// 检查是否通过
+		if strings.Contains(review, "校验通过") {
+			emit(ProgressEvent{Type: EventStage, Stage: "审查通过，终稿已定", Role: string(llm.RoleVerifier), Model: vModel, Iteration: iter})
+			break
+		}
+		// 存在缺陷：提取 issues 回传给 Thinker
+		issues := extractIssues(review)
+		emit(ProgressEvent{Type: EventWarning, Stage: fmt.Sprintf("发现 %d 处问题，回传规划师重新规划（第 %d/%d 轮）", len(issues), iter, maxIter), Role: string(llm.RoleVerifier), Iteration: iter, Issues: issues, Text: review})
+		// Thinker 根据 Verifier 问题重新规划
+		emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("规划师根据审稿意见重新调整框架（第 %d/%d 轮）", iter, maxIter), Role: string(llm.RoleThinker), Iteration: iter})
+		revisionPrompt := buildCollaborativeRevisePrompt(req, bundle, finalText, review, outline)
+		newOutline, _, tModel2, tDegraded2, tErr := d.callRole(ctx, llm.RoleThinker, PipelineCollab, req.ProjectID, revisionPrompt)
+		if tErr != nil {
+			emit(ProgressEvent{Type: EventWarning, Text: "规划师异常，已跳过本轮重规划", Degraded: true})
+			break
+		}
+		if tDegraded2 {
+			emit(ProgressEvent{Type: EventWarning, Text: "规划师降级到备用模型", Degraded: true})
+		}
+		outline = newOutline
+		emit(ProgressEvent{Type: EventStage, Stage: "重规划完成", Role: string(llm.RoleThinker), Model: tModel2, Text: newOutline, Iteration: iter})
+		// Worker 按新大纲重写
+		emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("创作者根据新框架重写（第 %d/%d 轮）", iter, maxIter), Role: string(llm.RoleWorker), Iteration: iter})
+		emit(ProgressEvent{Type: EventToken, Reset: true, Text: "", Role: string(llm.RoleWorker)})
+		rewriteText, _, wModel, wDegraded2, wErr := d.callRoleStream(ctx, llm.RoleWorker, PipelineCollab, req.ProjectID, buildWorkerUserPrompt(req, bundle, newOutline, 0, 1), emitToken(emit, string(llm.RoleWorker)))
+		if wErr != nil {
+			return finalText, wErr
+		}
+		if wDegraded2 {
+			emit(ProgressEvent{Type: EventWarning, Text: "创作者降级到备用模型", Degraded: true})
+		}
+		finalText = rewriteText
+		emit(ProgressEvent{Type: EventStage, Stage: "重写完成", Role: string(llm.RoleWorker), Model: wModel, Iteration: iter})
+	}
+	return finalText, nil
+}
+
+// buildCollaborativeRevisePrompt 构建协同模式下的 Thinker 重规划用户提示词
+func buildCollaborativeRevisePrompt(req GenerateRequest, bundle ContextBundle, currentText, review, oldOutline string) string {
+	var b strings.Builder
+	b.WriteString("【用户原始需求】\n")
+	b.WriteString(req.UserDemand)
+	b.WriteString("\n\n【原始大纲】\n")
+	b.WriteString(oldOutline)
+	b.WriteString("\n\n【当前正文】\n")
+	b.WriteString(currentText)
+	b.WriteString("\n\n【审稿发现问题】\n")
+	b.WriteString(review)
+	b.WriteString("\n\n请根据审稿意见重新调整创作框架，输出修正后的完整大纲。仅调整问题涉及的部分，保留原框架中未受影响的规划内容。")
+	return b.String()
+}
+
+// extractIssues 从 Verifier 输出中提取问题列表
 func (d *Dispatcher) workerWrite(ctx context.Context, req GenerateRequest, bundle ContextBundle, outline string, pl PipelineName, emit func(ProgressEvent)) (string, error) {
 	if needsSegmentation(req) {
 		n := numSegments(req)

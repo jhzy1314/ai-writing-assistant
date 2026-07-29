@@ -219,13 +219,39 @@ var ChapterUI = {
     try { await API.copyChapter(id); await ChapterUI.loadAll(); ChapterUI.renderTree(); ProjectUI.updateMeta(); UI.toast('章节已复制', 'success'); } catch (e) { UI.toast('复制失败', 'error'); }
   },
   delChapter: function (id) {
-    UI.confirm('删除章节', '确认删除此章节？不可恢复。', async function () {
+    var c = Store.state.chapters.find(function (x) { return x.id === id; });
+    if (!c) return;
+    UI.confirm('删除章节', '确认删除「' + esc(c.title || '') + '」？', async function () {
       try {
+        var backup = { title: c.title, content: c.content, tags: c.tags, synopsis: c.synopsis, sort_order: c.sort_order, volume_id: c.volume_id };
         await API.deleteChapter(id);
         if (Store.state.currentChapter && Store.state.currentChapter.id === id) { Store.state.currentChapter = null; Editor.setContent(''); }
-        await ChapterUI.loadAll(); ChapterUI.renderTree(); ProjectUI.updateMeta(); UI.toast('已删除', 'success');
+        await ChapterUI.loadAll(); ChapterUI.renderTree(); ProjectUI.updateMeta();
+        var tm = UI.toast('已删除「' + esc(backup.title || '') + '」', 'success', { duration: 8000 });
+        var undoLink = document.createElement('span');
+        undoLink.innerHTML = ' <a href="#" style="color:var(--accent);text-decoration:underline">撤销</a>';
+        undoLink.querySelector('a').onclick = function (ev) {
+          ev.preventDefault();
+          ChapterUI.restoreChapter(backup);
+          if (tm && tm.parentNode) tm.remove();
+        };
+        tm.appendChild(undoLink);
       } catch (e) { UI.toast('删除失败', 'error'); }
     });
+  },
+  restoreChapter: async function (backup) {
+    var p = Store.state.currentProject;
+    if (!p) return;
+    try {
+      await API.createChapter({
+        project_id: p.id, volume_id: backup.volume_id || '',
+        title: backup.title || '已恢复章节', content: backup.content || '',
+        tags: backup.tags || '', synopsis: backup.synopsis || '',
+        sort_order: backup.sort_order || 0
+      });
+      await ChapterUI.loadAll(); ChapterUI.renderTree(); ProjectUI.updateMeta();
+      UI.toast('已撤销删除', 'success');
+    } catch (e) { UI.toast('撤销失败：' + e.message, 'error'); }
   },
   editTags: function (id) {
     var c = Store.state.chapters.find(function (x) { return x.id === id; });
@@ -377,90 +403,75 @@ var ChapterUI = {
   splitImport: function (content) {
     var p = Store.state.currentProject;
     if (!p) { UI.toast('请先选择项目', 'warn'); return; }
-    var idn = 'sp_' + uid();
-    UI.modal({
-      title: '分割导入预览',
-      body: '<div class="form-group"><label>分隔标记模式</label><select id="' + idn + '_mode" onchange="ChapterUI.splitModeChange(\'' + idn + '\')">' +
-          '<option value="auto">自动识别（## / 第X章 / ---）</option>' +
-          '<option value="ai">🤖 AI 智能识别（推荐，DeepSeek）</option>' +
-          '<option value="## ">Markdown ## 标题</option>' +
-          '<option value="### ">Markdown ### 标题</option>' +
-          '<option value="---">水平分割线 ---</option>' +
-          '<option value="custom">自定义分隔标记</option>' +
-        '</select></div>' +
-        '<div class="form-group" id="' + idn + '_custom" style="display:none"><label>自定义分隔标记</label><input id="' + idn + '_sep" placeholder="例如：--- 或 ##"></div>' +
-        '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:7px;padding:8px;font-size:11px;background:var(--panel2)" id="' + idn + '_preview"><span class="res-check-empty">点击预览查看分割结果</span></div>' +
-        '<div style="margin-top:4px"><button class="tool-btn" onclick="ChapterUI.previewSplit(\'' + idn + '\',\'' + p.id + '\')">🔍 预览分割结果</button></div>',
-      actions: [
-        { id: 'cancel', label: '取消' },
-        { id: 'ok', label: '确认分割', cls: 'btn-primary', onClick: async function (m, ov) {
-          var mode = document.getElementById(idn + '_mode').value;
-          var splitBy = mode === 'custom' ? document.getElementById(idn + '_sep').value.trim() : mode;
-          if (mode === 'custom' && !splitBy) { UI.toast('请输入自定义分隔标记', 'warn'); return; }
-          ov.remove();
-          if (mode === 'ai') { ChapterUI.splitImportAI(content); return; }
-          try {
-            var r = await API.splitChapters(p.id, content, splitBy);
-            await ChapterUI.loadAll(); ChapterUI.renderTree();
-            UI.toast('分割为 ' + (r.count || 0) + ' 个章节', 'success');
-          } catch (e) { UI.toast('分割失败：' + e.message, 'error'); }
-        }}
-      ]
+    if (!content) { UI.toast('内容为空', 'warn'); return; }
+    ChapterUI._splitContent = content;
+
+    UI.toast('AI 正在分析章节结构…', '');
+    API.splitChapters(p.id, content, 'auto').then(function (r) {
+      var chs = r.items || [];
+      Store.state.chapters = chs;
+      UI.toast('已分为 ' + chs.length + ' 章', 'success');
+      ChapterUI.renderTree();
+      ProjectUI.renderList();
+      Sidebar.renderResources();
+      // 自动打开第一章
+      if (chs.length > 0) {
+        ChapterUI.selectChapter(chs[0]);
+      }
+    }).catch(function (e) {
+      UI.toast('AI 分析失败，切换到手动模式', 'warn');
+      var idn = 'sp_' + uid();
+      UI.modal({
+        title: '手动分割章节',
+        body: '<div class="form-group"><label>分隔标记模式</label><select id="' + idn + '_mode" onchange="ChapterUI.splitModeChange(\'' + idn + '\')">' +
+            '<option value="auto">自动识别（第X章 / ## / ---）</option>' +
+            '<option value="## ">Markdown ## 标题</option>' +
+            '<option value="### ">Markdown ### 标题</option>' +
+            '<option value="---">水平分割线 ---</option>' +
+            '<option value="custom">自定义分隔标记</option>' +
+          '</select></div>' +
+          '<div class="form-group" id="' + idn + '_custom" style="display:none"><label>自定义分隔标记</label><input id="' + idn + '_sep" placeholder="例如：--- 或 ##"></div>' +
+          '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:7px;padding:8px;font-size:11px;background:var(--panel2)" id="' + idn + '_preview"><span class="res-check-empty">点击预览查看分割结果</span></div>' +
+          '<div style="margin-top:4px"><button class="tool-btn" onclick="ChapterUI.manualPreview(\'' + idn + '\')">🔍 预览结果</button></div>',
+        actions: [
+          { id: 'cancel', label: '取消' },
+          { id: 'ok', label: '确认导入', cls: 'btn-primary', onClick: async function (m, ov) {
+            var mode = document.getElementById(idn + '_mode').value;
+            var splitBy = mode === 'custom' ? document.getElementById(idn + '_sep').value.trim() : mode;
+            if (mode === 'custom' && !splitBy) { UI.toast('请输入自定义分隔标记', 'warn'); return; }
+            ov.remove();
+            try {
+              var r2 = await API.splitChapters(p.id, ChapterUI._splitContent, splitBy);
+              var chs = r2.items || [];
+              Store.state.chapters = chs;
+              ChapterUI.renderTree();
+              ProjectUI.renderList();
+              Sidebar.renderResources();
+              if (chs.length > 0) { ChapterUI.selectChapter(chs[0]); }
+              UI.toast('已分为 ' + chs.length + ' 章', 'success');
+            } catch (e2) { UI.toast('分割失败：' + e2.message, 'error'); }
+          }}
+        ]
+      });
     });
   },
-  previewSplit: async function (idn, pid) {
+  manualPreview: function (idn) {
     var mode = document.getElementById(idn + '_mode').value;
-    var splitBy = mode === 'custom' ? document.getElementById(idn + '_sep').value.trim() : mode;
-    if (mode === 'custom' && !splitBy) { UI.toast('请输入分隔标记', 'warn'); return; }
-    var content = Editor.getText();
-    try {
-      var r = await API.splitChapters(pid, content, splitBy);
-      var html = (r.items || []).map(function (c, i) {
+    var sb = mode === 'custom' ? document.getElementById(idn + '_sep').value.trim() : mode;
+    if (mode === 'custom' && !sb) { UI.toast('请输入分隔标记', 'warn'); return; }
+    var pp = Store.state.currentProject;
+    if (!pp) return;
+    var content = ChapterUI._splitContent;
+    if (!content) { UI.toast('内容为空', 'warn'); return; }
+    API.splitChapters(pp.id, content, sb).then(function (r) {
+      document.getElementById(idn + '_preview').innerHTML = (r.items || []).map(function (c, i) {
         return '<div style="padding:4px 0;border-bottom:1px solid var(--border)"><b>#' + (i + 1) + '</b> ' + esc(c.title || '') + ' <span style="color:var(--faint)">' + (c.word_count || 0) + '字</span></div>';
-      }).join('');
-      document.getElementById(idn + '_preview').innerHTML = html || '<span class="res-check-empty">未识别到章节</span>';
-    } catch (e) { UI.toast('预览失败', 'error'); }
+      }).join('') || '<span class="res-check-empty">未识别到章节</span>';
+    }).catch(function (e) { UI.toast('预览失败：' + e.message, 'error'); });
   },
   splitModeChange: function (idn) {
     var mode = document.getElementById(idn + '_mode').value;
     document.getElementById(idn + '_custom').style.display = mode === 'custom' ? '' : 'none';
-  },
-  splitImportAI: async function (content) {
-    var p = Store.state.currentProject;
-    if (!p || !content) return;
-    UI.toast('正在用 AI 智能分析章节结构…', 'info');
-    var prompt = '你是文本结构分析专家。请分析以下小说文本，识别所有章节边界。对于每个章节，输出其标题和内容。如果识别不到章节标记，则根据语义自然分段。输出格式为严格的JSON数组：[{"title":"章节标题","content":"完整正文..."}]。不要添加任何解释，只输出JSON。文本如下：\n\n' + content.substring(0, 24000);
-    try {
-      var jsonText = await Tools.generateOneSummary({ title: 'AI拆分', content: prompt });
-      var match = jsonText.match(/\[[\s\S]*\]/);
-      var chapters = JSON.parse(match ? match[0] : jsonText);
-      if (!Array.isArray(chapters) || !chapters.length) throw new Error('AI 未识别到章节');
-      // 用正则模式先预分割，保留 "auto" 作为 fallback
-      var splitBy = 'auto';
-      try {
-        var r = await API.splitChapters(p.id, content, 'ai');
-        // If ai mode is not supported server-side, fall back to auto
-        if (!r || !r.count) {
-          r = await API.splitChapters(p.id, content, 'auto');
-        }
-        await ChapterUI.loadAll();
-        ChapterUI.renderTree();
-        UI.toast('AI 已分割为 ' + (r.count || 0) + ' 个章节', 'success');
-      } catch (e2) {
-        // Fallback: use the AI-detected titles with auto-split content
-        var r2 = await API.splitChapters(p.id, content, 'auto');
-        await ChapterUI.loadAll();
-        ChapterUI.renderTree();
-        UI.toast('AI 分析完成，已分割为 ' + (r2.count || 0) + ' 个章节', 'success');
-      }
-    } catch (e) {
-      UI.toast('AI 分割失败：' + e.message + '，将使用自动模式', 'warn');
-      try {
-        var r = await API.splitChapters(p.id, content, 'auto');
-        await ChapterUI.loadAll(); ChapterUI.renderTree();
-        UI.toast('已分割为 ' + (r.count || 0) + ' 个章节', 'success');
-      } catch (e3) { UI.toast('分割失败', 'error'); }
-    }
   },
   continueNextChapter: async function () {
     var p = Store.state.currentProject;
@@ -515,6 +526,7 @@ var ChapterUI = {
   },
   showContextMenu: function (e, chapterId) {
     e.preventDefault();
+    e.stopPropagation();
     var c = Store.state.chapters.find(function (x) { return x.id === chapterId; });
     if (!c) return;
     var chs = Store.state.chapters;

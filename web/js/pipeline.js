@@ -19,6 +19,9 @@ var PipelineUI = {
       active: true, stage: '准备中…', role: '', progress: 0, roleKey: 'idle',
       log: [], warn: '', steps: [], outline: '', issues: [], models: {}, degraded: null
     };
+    var badge = document.getElementById('pipeSnapshotBadge');
+    if (badge) badge.style.display = 'none';
+    document.getElementById('pipeSnapshotCount').textContent = '0';
     this.render();
   },
   setActive: function (active, done) {

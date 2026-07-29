@@ -109,6 +109,7 @@ var Editor = {
   toggleFocus: function () {
     this.focusMode = !this.focusMode;
     document.getElementById('sidebar').classList.toggle('collapsed', this.focusMode);
+    document.body.classList.toggle('sidebar-hidden', this.focusMode);
     document.getElementById('rightPanel').classList.toggle('collapsed', this.focusMode);
     document.querySelector('.quota-bar').classList.toggle('focus-hidden', this.focusMode);
     document.querySelector('.composer').classList.toggle('focus-mini', this.focusMode);
@@ -491,7 +492,7 @@ var Editor = {
     var text = this.getText();
     UI.modal({
       title: '导出格式选择',
-      body: '<div class="form-group"><label>导出格式</label><select id="exportFmt"><option value="txt">纯文本 TXT</option><option value="md">Markdown</option><option value="html">HTML 网页</option><option value="epub">EPUB 电子书</option><option value="pdf">PDF 文档</option></select></div>',
+      body: '<div class="form-group"><label>导出格式</label><select id="exportFmt"><option value="txt">纯文本 TXT</option><option value="md">Markdown</option><option value="html">HTML 网页</option><option value="docx">Word 文档</option><option value="epub">EPUB 电子书</option><option value="pdf">PDF 文档</option></select></div>',
       actions: [
         { id: 'cancel', label: '取消' },
         { id: 'ok', label: '导出', cls: 'btn-primary', onClick: function (m, ov) {
@@ -499,6 +500,14 @@ var Editor = {
           if (fmt === 'epub') {
             ov.remove();
             Editor.exportEPUB();
+            return;
+          }
+          if (fmt === 'docx') {
+            // 纯 HTML 包装为 Word 可读的 .docx（浏览器原生支持打开）
+            var docxHTML = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><title>' + esc(p ? p.name : 'document') + '</title></head><body>' + Editor.mdToHtml(text) + '</body></html>';
+            var docxBlob = new Blob([docxHTML], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+            var dca = document.createElement('a'); dca.href = URL.createObjectURL(docxBlob); dca.download = (p ? p.name : 'output') + '.docx'; dca.click();
+            URL.revokeObjectURL(dca.href); ov.remove(); UI.toast('DOCX 已导出', 'success');
             return;
           }
           if (fmt === 'pdf') {

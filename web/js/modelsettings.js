@@ -328,5 +328,44 @@ var ModelSettings = {
         chks.forEach(function (c) { if (assignedIds.indexOf(c.value) >= 0) c.checked = true; });
       }, 100);
     });
+  },
+
+  showQuickKey: function () {
+    var models = Store.state.models || [];
+    var active = models.filter(function (m) { return m.status === 'active'; });
+    var dsModel = models.find(function (m) { return m.name === 'deepseek-v4-pro'; }) || {};
+    var maskedKey = dsModel.api_key ? (dsModel.api_key.substring(0, 5) + '…' + dsModel.api_key.slice(-4)) : '未设置';
+
+    var idn = 'qk_' + uid();
+    UI.modal({
+      title: '🔑 API 密钥与模型管理',
+      wide: '520px',
+      body: '<div style="margin-bottom:12px;font-size:12px;color:var(--muted)">当前所有 Agent 角色（构思、写作、审稿、助手）均使用 <b style="color:var(--accent)">deepseek-v4-pro</b>。</div>' +
+        '<div class="qp-section" style="background:var(--panel3);border-radius:8px;padding:12px;margin-bottom:10px">' +
+        '<div style="font-weight:600;margin-bottom:8px">DeepSeek API Key</div>' +
+        '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input id="' + idn + '_key" type="text" value="' + esc(dsModel.api_key || '') + '" placeholder="sk-..." style="flex:1;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">' +
+        '<button class="btn btn-primary" onclick="ModelSettings.saveQuickKey(\'' + idn + '\')" style="white-space:nowrap">💾 保存</button>' +
+        '</div>' +
+        '<div style="font-size:10px;color:var(--muted);margin-top:4px">当前：' + maskedKey + ' &nbsp;|&nbsp; <a href="#" onclick="RightPanel.switch(\'models\');this.closest(\'.modal-overlay\').remove()" style="color:var(--accent)">管理全部模型 →</a></div>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--muted)">' +
+        '<b>提示：</b>如需使用其他模型（Kimi、智谱、通义千问等），点击上方链接进入完整模型管理面板添加，再在 Agent 角色分配中绑定即可。' +
+        '</div>',
+      actions: [{ id: 'close', label: '关闭' }]
+    });
+  },
+
+  saveQuickKey: async function (idn) {
+    var key = document.getElementById(idn + '_key').value.trim();
+    if (!key) { UI.toast('请输入 API Key', 'warn'); return; }
+    var models = Store.state.models || [];
+    var dsModel = models.find(function (m) { return m.name === 'deepseek-v4-pro'; });
+    if (!dsModel) { UI.toast('未找到 deepseek-v4-pro 模型', 'error'); return; }
+    try {
+      await API.updateModel(dsModel.id, { api_key: key });
+      UI.toast('API Key 已保存', 'success');
+      document.querySelectorAll('.modal-overlay').forEach(function (m) { m.remove(); });
+    } catch (e) { UI.toast('保存失败：' + e.message, 'error'); }
   }
 };

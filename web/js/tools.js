@@ -672,7 +672,7 @@ var Tools = {
       '<div>全书总量：<b style="color:var(--accent)">'+totalWords.toLocaleString()+'</b> 字（'+chs.length+'章）</div>' +
       '<div style="margin-top:4px">' +
       '<button class="tool-btn" onclick="var v=parseInt(document.getElementById(\''+idn+'_goal\').value)||2000;Store.set(\'dailyGoal\',v);UI.toast(\'目标已保存\',\'success\')">💾 保存目标</button>' +
-      '<button class="tool-btn" onclick="ChapterUI.quickRecap()">📋 前情提要</button>' +
+      '<button class="tool-btn" onclick="Tools.quickRecap()">📋 前情提要</button>' +
       '</div></div>';
   },
 

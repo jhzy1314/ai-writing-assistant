@@ -16,7 +16,7 @@ var Store = {
     usage: null,
     selection: { characters: new Set(), worldSettings: new Set(), materials: new Set() },
     editor: { mode: 'rich', preview: false, selectedText: '' },
-    composer: { runMode: 'auto', targetWord: 1000, modelName: '', modelConfigId: '', cursorPosition: 0, contextScope: 'smart', noRewrite: false, autoAppend: true, styleChapterId: '', styleIntensity: 'medium', skipWordCheck: false },
+    composer: { runMode: 'auto', targetWord: 1000, modelName: '', modelConfigId: '', orchThinker: '', orchWorker: '', orchVerifier: '', cursorPosition: 0, contextScope: 'smart', noRewrite: false, autoAppend: true, styleChapterId: '', styleIntensity: 'medium', skipWordCheck: false },
     chapterSummaries: '',
     pipeline: { active: false, stage: '等待生成', role: '', progress: 0, roleKey: 'idle', log: [], warn: '',
       steps: [], outline: '', issues: [], models: {}, degraded: null },

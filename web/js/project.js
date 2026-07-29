@@ -29,7 +29,7 @@ var ProjectUI = {
       var wcText = pwc ? pwc.toLocaleString() + '字' : '';
       var coverUrl = '/covers/' + encodeURIComponent(p.name) + '.png';
       var coverHtml = '<div class="novel-cover" style="background:' + color + '">' +
-        '<img src="' + coverUrl + '" alt="" onerror="this.style.display=\'none\';this.parentElement.textContent=\'' + esc(p.name.charAt(0)) + '\'" loading="lazy">' +
+        '<img src="' + coverUrl + '" alt="" onerror="this.style.display=\'none\'" loading="lazy">' +
         '<span class="cover-fallback">' + esc(p.name.charAt(0)) + '</span></div>';
       return '<div class="novel-item' + (active ? ' active expanded' : '') + '" onclick="ProjectUI.select(\'' + p.id + '\')" oncontextmenu="return ProjectUI.ctxMenu(event,\'' + p.id + '\')">' +
         coverHtml +
@@ -118,7 +118,7 @@ var ProjectUI = {
       html += '<div class="ch-list">';
       chapters.forEach(function (c) {
         var checked = batchMode && ChapterUI.batchSelected && ChapterUI.batchSelected[c.id];
-        html += '<div class="ch-item" onclick="event.stopPropagation();' + (batchMode ? 'ChapterUI.batchToggle(\'' + c.id + '\')' : 'ChapterUI.selectChapter(Store.state.chapters.find(function(x){return x.id===\'' + c.id + '\'}))') + '">';
+        html += '<div class="ch-item" onclick="event.stopPropagation();' + (batchMode ? 'ChapterUI.batchToggle(\'' + c.id + '\')' : 'ChapterUI.selectChapter(Store.state.chapters.find(function(x){return x.id===\'' + c.id + '\'}))') + '" oncontextmenu="event.stopPropagation();return ChapterUI.showContextMenu(event,\'' + c.id + '\')">';
         if (batchMode) html += '<span class="ch-cb">' + (checked ? '☑' : '☐') + '</span>';
         html += '📄 ' + esc(c.title || '未命名');
         html += '<span class="wc">' + (c.word_count || 0).toLocaleString() + '字</span>';
@@ -189,9 +189,38 @@ var ProjectUI = {
     return UI.ctxMenu(e, [
       { id: 'open', label: '📖 打开', onClick: function () { ProjectUI.select(id); } },
       { id: 'rename', label: '✏️ 重命名', onClick: function () { ProjectUI.rename(id); } },
+      { id: 'duplicate', label: '📋 复制项目', onClick: function () { ProjectUI.duplicate(id); } },
+      { id: 'cover', label: '🎨 生成封面', onClick: function () { ProjectUI.generateCover(id); } },
       { divider: true },
       { id: 'del', label: '🗑 删除', danger: true, onClick: function () { ProjectUI.remove(id); } }
     ]);
+  },
+  generateCover: async function (id) {
+    var p = Store.state.projects.find(function (x) { return x.id === id; });
+    if (!p) return;
+    UI.toast('正在为「' + p.name + '」生成封面…', '');
+    try {
+      var r = await fetch('/api/projects/' + id + '/cover', { method: 'POST' });
+      var d = await r.json();
+      if (!r.ok) throw new Error(d.error || '生成失败');
+      // 刷新封面（加时间戳破坏缓存）
+      var imgs = document.querySelectorAll('.novel-item img[src*="' + encodeURIComponent(p.name).substring(0, 10) + '"]');
+      imgs.forEach(function (img) {
+        img.src = d.url + '?t=' + Date.now();
+        img.style.display = '';
+        img.onerror = function () { img.style.display = 'none'; };
+      });
+      ProjectUI.renderList();
+      UI.toast('封面已生成', 'success');
+    } catch (e) { UI.toast('封面生成失败：' + e.message, 'error'); }
+  },
+  duplicate: async function (id) {
+    UI.toast('正在复制项目…', '');
+    try {
+      await API.duplicateProject(id);
+      await ProjectUI.loadAll();
+      UI.toast('项目已复制', 'success');
+    } catch (e) { UI.toast('复制失败：' + e.message, 'error'); }
   },
   rename: function (id) {
     var p = Store.state.projects.find(function (x) { return x.id === id; });

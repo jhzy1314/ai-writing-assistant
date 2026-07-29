@@ -36,5 +36,12 @@ AI_Novel_Studio_*.html
 AI_Novel_Studio_*.md
 补充评测报告_*.md
 
+# Build artifacts
+server_*.txt
+*.zip
+
+# Logs
+log/
+
 # System
 .DS_Store

@@ -18,9 +18,11 @@ type Config struct {
 
 // ServerConfig 服务与数据库配置
 type ServerConfig struct {
-	ListenAddr string `mapstructure:"listen_addr"`
-	Port       int    `mapstructure:"port"`
-	SQLitePath string `mapstructure:"sqlite_path"`
+	ListenAddr   string `mapstructure:"listen_addr"`
+	Port         int    `mapstructure:"port"`
+	SQLitePath   string `mapstructure:"sqlite_path"`
+	LogDir       string `mapstructure:"log_dir"`
+	AuthPassword string `mapstructure:"auth_password"`
 }
 
 // QuotasConfig 调用限制与成本控制参数（同时种子入库 configs 表）

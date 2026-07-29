@@ -26,7 +26,8 @@ var Sidebar = {
     var chars = Store.state.characters.filter(function (c) { return match(c.name); });
     html += '<div class="res-group">' +
       '<div class="res-group-head" onclick="Sidebar.toggleGroup(this)"><span class="caret">▾</span>👥 人物卡<span class="count">' + Store.state.characters.length + '</span>' +
-      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.editCharacter()">＋</span></div>' +
+      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.editCharacter()">＋</span>' +
+      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.summarizeSettings()" title="AI 从正文自动提取人物和世界观">🤖</span></div>' +
       '<div class="res-group-body">';
     if (!Store.state.characters.length) html += '<div class="res-check-empty">暂无人物卡</div>';
     chars.forEach(function (c) {

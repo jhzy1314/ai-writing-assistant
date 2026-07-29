@@ -1,0 +1,8 @@
+yourdomain.com {
+    reverse_proxy 127.0.0.1:8081
+    encode gzip
+    @static {
+        path /static/* /covers/* /favicon.ico
+    }
+    header @static Cache-Control "public, max-age=3600"
+}

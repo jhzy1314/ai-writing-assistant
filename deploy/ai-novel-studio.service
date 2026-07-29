@@ -1,0 +1,19 @@
+[Unit]
+Description=AI Novel Studio Backend
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/ai-novel-studio
+ExecStart=/opt/ai-novel-studio/server
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+Environment="AI_NOVEL_SERVER_PORT=8081"
+Environment="AI_NOVEL_SERVER_LISTEN_ADDR=127.0.0.1"
+Environment="AI_NOVEL_SERVER_SQLITE_PATH=/opt/ai-novel-studio/data/ai-novel.db"
+Environment="AI_NOVEL_SERVER_LOG_DIR=/opt/ai-novel-studio/log"
+
+[Install]
+WantedBy=multi-user.target

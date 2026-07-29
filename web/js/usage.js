@@ -41,6 +41,22 @@ var Usage = {
     cm.classList.toggle('danger', cp >= 100);
     tm.classList.toggle('warn', tp >= 80 && tp < 100);
     tm.classList.toggle('danger', tp >= 100);
+    // 分角色 Token 消耗明细
+    var roleBD = document.getElementById('quotaRoleBreakdown');
+    var roles = u.today_by_role || [];
+    if (roleBD && roles.length) {
+      var ROLE_ICONS = { thinker: '🖊️', worker: '📝', verifier: '🔍', helper: '⚡' };
+      roleBD.innerHTML = '<div style="font-weight:600;margin-bottom:3px">各角色 Token 消耗</div>' +
+        roles.map(function (r) {
+          var pct = tokens > 0 ? Math.round(r.tokens / tokens * 100) : 0;
+          var barStyle = 'width:' + pct + '%;background:var(--accent);height:3px;border-radius:2px';
+          return '<div style="margin:2px 0">' + (ROLE_ICONS[r.role] || '') + ' ' + (r.role || '?') +
+            '：' + r.tokens.toLocaleString() + '（' + pct + '%）<div style="margin-top:1px;background:var(--border);border-radius:2px"><div style="' + barStyle + '"></div></div></div>';
+        }).join('');
+      roleBD.style.display = '';
+    } else if (roleBD) {
+      roleBD.style.display = 'none';
+    }
     var hint = document.getElementById('usageHint');
     if (!this.canGenerate()) {
       hint.textContent = '⚠ 今日额度已用完';

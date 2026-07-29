@@ -104,6 +104,10 @@ func resolvePipeline(req GenerateRequest, lightCharLimit int) PipelineName {
 	switch req.RunMode {
 	case ModeDraft:
 		return PipelineDraft
+	case ModeCollab:
+		return PipelineCollab
+	case ModeOrchestrated:
+		return PipelineOrchestrated
 	case ModeStrict:
 		return PipelineStrict
 	case ModeArt:

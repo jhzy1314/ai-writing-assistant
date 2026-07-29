@@ -48,10 +48,15 @@ func NewServer(store *database.Store, registry *llm.Registry, dispatcher *pipeli
 func (s *Server) routes() {
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
+	s.router.Use(authRequired)
 	s.router.Use(s.corsMiddleware)
 
 	// 预检
 	s.router.Options("/*", s.handleOptions)
+
+	// 0. 认证
+	s.router.Post("/api/auth/login", s.HandleAuthLogin)
+	s.router.Get("/api/auth/check", s.HandleAuthCheck)
 
 	// 1. 创作请求（SSE 流式）
 	s.router.Post("/api/generate", s.HandleGenerate)
@@ -71,6 +76,7 @@ func (s *Server) routes() {
 	s.router.Put("/api/projects/{id}", s.HandleUpdateProject)
 	s.router.Delete("/api/projects/{id}", s.HandleDeleteProject)
 	s.router.Post("/api/projects/{id}/duplicate", s.HandleDuplicateProject)
+	s.router.Post("/api/projects/{id}/cover", s.HandleGenerateCover)
 
 	// 3. 稿件版本
 	s.router.Get("/api/projects/{id}/versions", s.HandleListVersions)
@@ -84,7 +90,6 @@ func (s *Server) routes() {
 	s.router.Delete("/api/characters/{id}", s.HandleDeleteCharacter)
 
 	s.router.Get("/api/worldsettings", s.HandleListWorldSettings)
-	s.router.Get("/api/worldbuilding", s.HandleListWorldSettings)
 	s.router.Post("/api/worldsettings", s.HandleCreateWorldSetting)
 	s.router.Put("/api/worldsettings/{id}", s.HandleUpdateWorldSetting)
 	s.router.Delete("/api/worldsettings/{id}", s.HandleDeleteWorldSetting)
@@ -111,11 +116,6 @@ func (s *Server) routes() {
 
 	// 7. 章节层级管理
 	s.router.Get("/api/projects/{id}/volumes", s.HandleListVolumes)
-	s.router.Get("/api/volumes/count", func(w http.ResponseWriter, r *http.Request) {
-		pid := r.URL.Query().Get("project_id")
-		if pid == "" { writeError(w, 400, "缺少 project_id"); return }
-		writeOK(w, map[string]interface{}{"count": s.store.VolumeCount(r.Context(), pid)})
-	})
 	s.router.Post("/api/volumes", s.HandleCreateVolume)
 	s.router.Post("/api/volumes/reorder", s.HandleReorderVolumes)
 	s.router.Put("/api/volumes/{id}", s.HandleUpdateVolume)
@@ -218,6 +218,9 @@ func (s *Server) routes() {
 func (s *Server) Start(addr string) error {
 	return http.ListenAndServe(addr, s.router)
 }
+
+// Router 暴露路由给外部（用于测试或自定义中间件）
+func (s *Server) Router() http.Handler { return s.router }
 
 // ===== 通用响应助手 =====
 

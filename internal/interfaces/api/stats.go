@@ -20,27 +20,28 @@ func (s *Server) HandleListLogs(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]interface{}{"items": items})
 }
 
-// HandleUsage 当日用量统计 + 近 N 天各模型明细（规格第七章5/7）
+// HandleUsage 当日用量统计 + 近 N 天各模型明细 + 各角色消耗（规格第七章5/7）
 func (s *Server) HandleUsage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	calls, tokens, _ := s.store.DailyTotalUsage(ctx)
 	dailyByModel, _ := s.store.DailyUsageByModel(ctx)
 	periodByModel, _ := s.store.PeriodUsage(ctx, 7)
+	dailyByRole, _ := s.store.DailyUsageByRole(ctx)
 
-	// 附带限额阈值
 	limits := map[string]int{
-		"daily_call_limit":       s.store.GetConfigInt(ctx, "daily_call_limit", 500),
-		"daily_token_limit":      s.store.GetConfigInt(ctx, "daily_token_limit", 2000000),
+		"daily_call_limit":        s.store.GetConfigInt(ctx, "daily_call_limit", 500),
+		"daily_token_limit":       s.store.GetConfigInt(ctx, "daily_token_limit", 2000000),
 		"per_request_token_limit": s.store.GetConfigInt(ctx, "per_request_token_limit", 8000),
-		"rate_limit_per_minute":  s.store.GetConfigInt(ctx, "rate_limit_per_minute", 20),
-		"max_concurrent":         s.store.GetConfigInt(ctx, "max_concurrent", 5),
-		"max_iterations":         s.store.GetConfigInt(ctx, "max_iterations", 3),
+		"rate_limit_per_minute":   s.store.GetConfigInt(ctx, "rate_limit_per_minute", 20),
+		"max_concurrent":          s.store.GetConfigInt(ctx, "max_concurrent", 5),
+		"max_iterations":          s.store.GetConfigInt(ctx, "max_iterations", 3),
 	}
 	writeOK(w, map[string]interface{}{
-		"today": map[string]int{"calls": calls, "tokens": tokens},
-		"today_by_model":   dailyByModel,
-		"week_by_model":    periodByModel,
-		"limits":           limits,
+		"today":          map[string]int{"calls": calls, "tokens": tokens},
+		"today_by_model": dailyByModel,
+		"today_by_role":  dailyByRole,
+		"week_by_model":  periodByModel,
+		"limits":         limits,
 	})
 }
 

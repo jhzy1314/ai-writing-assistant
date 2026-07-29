@@ -78,6 +78,9 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 		lightLimit := d.store.GetConfigInt(ctx, "light_input_char_limit", 500)
 		pl := resolvePipeline(req, lightLimit)
 		maxIter := d.store.GetConfigInt(ctx, "max_iterations", 3)
+		if pl == PipelineStrict {
+			maxIter = maxIter + 2 // 严谨模式多迭代 2 轮
+		}
 
 		// 4. 输出执行计划
 		emit(ProgressEvent{Type: EventPlan, Pipeline: string(pl), Stage: pipelineTitle(pl)})
@@ -86,6 +89,10 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 		var finalText string
 		var execErr error
 		switch pl {
+		case PipelineOrchestrated:
+			finalText, execErr = d.runOrchestrated(ctx, req, bundle, maxIter, emit)
+		case PipelineCollab:
+			finalText, execErr = d.runCollab(ctx, req, bundle, maxIter, emit)
 		case PipelineDraft:
 			finalText, execErr = d.runDraft(ctx, req, bundle, emit)
 		case PipelineManual:
@@ -138,6 +145,10 @@ func pipelineTitle(pl PipelineName) string {
 	switch pl {
 	case PipelineStandard:
 		return "智能协同创作"
+	case PipelineCollab:
+		return "多Agent协同闭环创作"
+	case PipelineOrchestrated:
+		return "手动指派Agent模型·完整流水线"
 	case PipelineDraft:
 		return "快速草稿（直出初稿）"
 	case PipelineStrict:
@@ -294,4 +305,63 @@ func errStr(e error) string {
 		return ""
 	}
 	return e.Error()
+}
+
+// callRoleWithModel 使用指定模型名调用某角色（orchestrated 模式用，不走 registry 多级备用）
+func (d *Dispatcher) callRoleWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string) (string, llm.Usage, string, bool, error) {
+	ad, err := d.registry.AdapterByName(ctx, modelName)
+	if err != nil {
+		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」模型 %s 不可用：%w", roleLabel(role), modelName, err)
+	}
+	agent := roles.NewRoleAgent(role, string(pl))
+	timeout := 5 * time.Minute
+	if role == llm.RoleVerifier || role == llm.RoleHelper { timeout = 3 * time.Minute }
+	roleCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	start := time.Now()
+	text, usage, gErr := agent.Generate(roleCtx, ad, userPrompt)
+	dur := time.Since(start)
+	if gErr == nil {
+		d.logCall(ctx, projectID, role, modelName, usage, dur.Milliseconds(), "ok", "")
+		_ = d.store.IncrUsage(ctx, modelName, 1, usage.Total())
+		return text, usage, modelName, false, nil
+	}
+	d.logCall(ctx, projectID, role, modelName, usage, dur.Milliseconds(), "error", gErr.Error())
+	return "", llm.Usage{}, modelName, true, friendlyErr(role, gErr)
+}
+
+// callRoleStreamWithModel 使用指定模型名流式调用某角色
+func (d *Dispatcher) callRoleStreamWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string, textCB func(string)) (string, llm.Usage, string, bool, error) {
+	ad, err := d.registry.AdapterByName(ctx, modelName)
+	if err != nil {
+		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」模型 %s 不可用：%w", roleLabel(role), modelName, err)
+	}
+	agent := roles.NewRoleAgent(role, string(pl))
+	roleCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+	start := time.Now()
+	ch, sErr := agent.Stream(roleCtx, ad, userPrompt)
+	if sErr != nil {
+		d.logCall(ctx, projectID, role, modelName, llm.Usage{}, 0, "error", sErr.Error())
+		return "", llm.Usage{}, modelName, true, fmt.Errorf("流式启动失败: %w", sErr)
+	}
+	var buf []byte
+	var gotUsage *llm.Usage
+	for chunk := range ch {
+		if chunk.Err != nil { break }
+		if chunk.Text != "" {
+			buf = append(buf, chunk.Text...)
+			if textCB != nil { textCB(chunk.Text) }
+		}
+		if chunk.Usage != nil { gotUsage = chunk.Usage }
+	}
+	dur := time.Since(start)
+	text := string(buf)
+	var u llm.Usage
+	if gotUsage != nil { u = *gotUsage }
+	if u.CompletionTokens == 0 { u.CompletionTokens = llm.EstimateTokens(text) }
+	if u.PromptTokens == 0 { u.PromptTokens = llm.EstimateTokens(agent.SystemPrompt + userPrompt) }
+	d.logCall(ctx, projectID, role, modelName, u, dur.Milliseconds(), "ok", "")
+	_ = d.store.IncrUsage(ctx, modelName, 1, u.Total())
+	return text, u, modelName, false, nil
 }

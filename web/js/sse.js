@@ -8,6 +8,7 @@ var SSE = {
     this.active = true;
     this.streamText = '';
     this._tokenCount = 0;
+    this._snapshotCount = 0;
     // 快照绑定：防止生成中切换项目/章节导致串文
     this._bindChapterId = (Store.state.currentChapter || {}).id || '';
     this._bindProjectId = (Store.state.currentProject || {}).id || '';
@@ -17,9 +18,19 @@ var SSE = {
     this.controller = new AbortController();
     Composer.setGenerating(true);
     PipelineUI.reset();
-    // 锁定侧边栏，防止生成中切换项目
-    var sidebar = document.getElementById('sidebar');
-    if (sidebar) sidebar.style.pointerEvents = 'none';
+    // 自动快照：每 90 秒保存一次当前进度
+    this._snapshotTimer = setInterval(function () {
+      if (!SSE.active || !SSE._bindChapterId || !SSE.streamText) return;
+      var ch = Store.state.chapters.find(function (c) { return c.id === SSE._bindChapterId; });
+      if (!ch) return;
+      var snapTitle = (ch.title || '未命名') + ' · 自动快照 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      API.saveChapterVersion(ch.id, { title: snapTitle, content: SSE.streamText }).then(function () {
+        SSE._snapshotCount++;
+        PipelineUI.log('📸 快照 #' + SSE._snapshotCount + ' 已保存（' + Array.from(SSE.streamText || '').length.toLocaleString() + ' 字）');
+        document.getElementById('pipeSnapshotCount').textContent = SSE._snapshotCount;
+        document.getElementById('pipeSnapshotBadge').style.display = '';
+      }).catch(function () { /* 静默失败 */ });
+    }, 90000);
     var resp;
     try {
       resp = await fetch('/api/generate', {
@@ -213,6 +224,7 @@ var SSE = {
     // 补写按钮
     var actsEl = document.getElementById('genActions');
     var oldFill = actsEl.querySelector('.fillup-btn'); if (oldFill) oldFill.remove();
+    var oldRetry = actsEl.querySelector('.retry-strategy-btn'); if (oldRetry) oldRetry.remove();
     if (Store.state.composer.targetWord > 0 && finalLen < Store.state.composer.targetWord * 0.7) {
       var fillUpBtn = document.createElement('button');
       fillUpBtn.className = 'tool-btn fillup-btn';
@@ -220,6 +232,38 @@ var SSE = {
       fillUpBtn.onclick = function () { ChapterUI.fillUpToTarget(); };
       actsEl.appendChild(fillUpBtn);
     }
+    // 换策略重试按钮
+    var retryBtn = document.createElement('button');
+    retryBtn.className = 'tool-btn retry-strategy-btn';
+    retryBtn.textContent = '🔄 换策略重试';
+    retryBtn.title = '使用不同创作模式重新生成';
+    retryBtn.onclick = function () {
+      var savedPayload = SSE._lastPayload;
+      if (!savedPayload) return;
+      // 弹出模式选择
+      UI.modal({
+        title: '换策略重试',
+        body: '<div class="form-group"><label>选择新创作模式</label>' +
+          '<select id="retryMode"><option value="collab">协同闭环（更高质量）</option><option value="strict"' + (savedPayload.run_mode === 'strict' ? ' selected' : '') + '>严谨模式</option><option value="art">文艺创作</option>' +
+          '<option value="orchestrated">指派Agent模型</option><option value="draft">快速草稿</option></select></div>' +
+          '<div class="form-group"><label>可修改创作需求</label><textarea id="retryDemand" rows="3">' + esc(savedPayload.user_demand || '') + '</textarea></div>',
+        actions: [
+          { id: 'cancel', label: '取消' },
+          { id: 'ok', label: '开始重试', cls: 'btn-primary', onClick: function (m, ov) {
+            var newMode = document.getElementById('retryMode').value;
+            var newDemand = document.getElementById('retryDemand').value.trim();
+            ov.remove();
+            Store.state.composer.runMode = newMode;
+            if (newDemand) savedPayload.user_demand = newDemand;
+            savedPayload.run_mode = newMode;
+            Composer.onModeChange(newMode);
+            document.getElementById('instructionInput').value = savedPayload.user_demand;
+            setTimeout(function () { Composer.generate(); }, 300);
+          }}
+        ]
+      });
+    };
+    actsEl.appendChild(retryBtn);
     document.getElementById('genStatus').classList.remove('show');
     // 自动滚动 + 标题模式
     Editor.scrollToEnd();
@@ -253,6 +297,7 @@ var SSE = {
   finish: function () {
     this.active = false;
     this.controller = null;
+    if (this._snapshotTimer) { clearInterval(this._snapshotTimer); this._snapshotTimer = null; }
     Composer.setGenerating(false);
     Editor.endStream();
     Usage.refresh();

@@ -1,19 +1,20 @@
 /* ============ ui.js：通用 UI（toast / modal / 主题 / 折叠 / 右键菜单） ============ */
 var UI = {
-  toast: function (msg, type) {
+  toast: function (msg, type, opts) {
     var wrap = document.getElementById('toastWrap');
     var el = document.createElement('div');
     el.className = 'toast ' + (type || '');
     el.textContent = msg;
     wrap.appendChild(el);
-    // 存入历史（最多 50 条）
     if (!this._toasts) this._toasts = [];
     this._toasts.unshift({ msg: msg, type: type || '', time: new Date() });
     if (this._toasts.length > 50) this._toasts.length = 50;
+    var duration = (opts && opts.duration) || 3200;
     setTimeout(function () {
       el.style.opacity = '0'; el.style.transition = 'opacity .3s';
       setTimeout(function () { el.remove(); }, 300);
-    }, 3200);
+    }, duration);
+    return el;
   },
   showToastHistory: function () {
     var toasts = this._toasts || [];
@@ -83,6 +84,7 @@ var UI = {
   toggleSidebar: function () {
     var sidebar = document.getElementById('sidebar');
     sidebar.classList.toggle('collapsed');
+    document.body.classList.toggle('sidebar-hidden', sidebar.classList.contains('collapsed'));
     Store.set('sidebarCollapsed', sidebar.classList.contains('collapsed'));
   },
   toggleRight: function () {
@@ -136,10 +138,14 @@ var UI = {
   showOnboarding: function () {
     if (Store.get('onboarded', false)) return;
     var steps = [
-      {el:'#searchInput', tip:'🔍 在这里搜索项目和资源', pos:'bottom'},
       {el:'.side-new button', tip:'📁 从这里创建你的第一本小说', pos:'bottom'},
-      {el:'#instructionInput', tip:'💡 输入创作需求，Ctrl+Enter 即可生成', pos:'top'},
-      {el:'#modeSelect', tip:'⚙️ 选择创作模式：智能协同适合95%的场景', pos:'bottom'}
+      {el:'#searchInput', tip:'🔍 在这里搜索项目、章节和资源', pos:'bottom'},
+      {el:'#instructionInput', tip:'💡 输入创作需求，Ctrl+Enter 即可启动 AI 生成', pos:'top'},
+      {el:'#modeSelect', tip:'⚙️ 选择创作模式：智能协同适合95%的场景', pos:'bottom'},
+      {el:'#page-pipeline .pipe-intro', tip:'📊 右侧面板实时展示AI流水线进度、大纲和审核结果', pos:'left'},
+      {el:'#contextScope', tip:'📖 调整上下文范围：当前章/最近内容/含摘要', pos:'bottom'},
+      {el:'#quotaTokens', tip:'📈 悬停查看各角色（构思/写作/审稿）的 Token 消耗明细', pos:'bottom'},
+      {el:'button[title~="专注模式"]', tip:'🎯 专注模式：折叠侧边栏，全屏沉浸创作', pos:'bottom'}
     ];
     var idx = 0;
     var self = this;
@@ -158,6 +164,23 @@ var UI = {
       document.body.appendChild(tip);
     }
     setTimeout(showStep, 800);
+  },
+  showKeyboardRef: function () {
+    UI.modal({
+      title: '⌨️ 快捷键参考',
+      wide: '480px',
+      body: '<table style="width:100%;font-size:11px;line-height:2"><tr><td style="width:40%"><kbd>Ctrl+Enter</kbd></td><td>从当前光标位置续写</td></tr>' +
+        '<tr><td><kbd>Ctrl+Shift+Enter</kbd></td><td>重新生成全文</td></tr>' +
+        '<tr><td><kbd>Ctrl+Shift+P</kbd></td><td>专注模式（全屏创作）</td></tr>' +
+        '<tr><td><kbd>Ctrl+S</kbd></td><td>保存当前章节</td></tr>' +
+        '<tr><td><kbd>Ctrl+Shift+S</kbd></td><td>另存为版本快照</td></tr>' +
+        '<tr><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td><td>撤销 / 重做</td></tr>' +
+        '<tr><td><kbd>Ctrl+B</kbd> / <kbd>Ctrl+I</kbd> / <kbd>Ctrl+U</kbd></td><td>粗体 / 斜体 / 下划线</td></tr>' +
+        '<tr><td><kbd>Ctrl+Shift+F</kbd></td><td>选中文字一键润色</td></tr>' +
+        '<tr><td><kbd>?</kbd></td><td>显示此快捷键参考</td></tr>' +
+        '<tr><td><kbd>Esc</kbd></td><td>关闭弹窗 / 取消选中</td></tr></table>',
+      actions: [{ id: 'close', label: '关闭' }]
+    });
   }
 };
 document.addEventListener('click', function () { UI.closeCtx(); });

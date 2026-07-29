@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -323,14 +324,18 @@ func (s *Server) HandleSplitChapters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// AI 智能分章：让 AI 通读全文后标注章节边界，再传给正则精确切分
+	// AI 分章：先正则快速切分，失败则调专用 Agent 识别标题后精确切割原文
 	if req.SplitBy == "" || req.SplitBy == "auto" {
-		aiContent, err := s.aiSmartSplit(r.Context(), req.Content)
-		if err == nil && aiContent != "" {
-			req.Content = aiContent
-			req.SplitBy = "## " // 已由 AI 添加 ## 标题，正则可以精确切分
+		if s.store.CountSegments(req.Content, "auto") < 2 {
+			titles, err := s.splitTitlesFromAI(r.Context(), req.Content)
+			if err == nil && len(titles) >= 2 {
+				chapters, splitErr := s.store.SplitByTitles(r.Context(), &req, titles)
+				if splitErr == nil {
+					writeOK(w, map[string]interface{}{"items": chapters, "count": len(chapters)})
+					return
+				}
+			}
 		}
-		// AI 失败时静默回退到纯正则模式（不影响用户操作）
 	}
 
 	chapters, err := s.store.SplitChapters(r.Context(), &req)
@@ -339,6 +344,61 @@ func (s *Server) HandleSplitChapters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, map[string]interface{}{"items": chapters, "count": len(chapters)})
+}
+
+// splitTitlesFromAI 专用 Agent：只识别章目标题列表，不重写正文（省 Token、保原文）
+func (s *Server) splitTitlesFromAI(ctx context.Context, content string) ([]string, error) {
+	adapters, err := s.registry.AdaptersForRole(ctx, llm.RoleHelper)
+	if err != nil || len(adapters) == 0 {
+		return nil, fmt.Errorf("no model available")
+	}
+	adapter := adapters[0]
+
+	// 取文本首尾各 3000 字做采样，覆盖开头+结尾章节标题
+	runes := []rune(content)
+	sample := string(runes[:min(3000, len(runes))])
+	if len(runes) > 6000 {
+		sample += "\n\n…[中间略]…\n\n" + string(runes[len(runes)-min(2000, len(runes)-3000):])
+	}
+
+	sysPrompt := `你是小说章节分割专家。你的唯一任务：分析文本，列出所有真实的章节标题。
+
+规则：
+1. 真正的章节标题模式："第X章"、"Chapter X"、"第X节"、单独成行的短标题（<25字）
+2. 排除口语化时间状语："第一天"、"第二天"、"几小时后"等不是标题
+3. 排除书中提及但不在章节开头的标题
+4. 按原文出现顺序输出
+
+输出格式：纯 JSON 字符串数组。不输出任何其他内容。
+示例：["第一章 雨夜","第二章 初遇","第三章 离别"]`
+
+	subCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	aiText, _, err := adapter.Generate(subCtx, sysPrompt, sample)
+	if err != nil {
+		return nil, err
+	}
+
+	// 提取 JSON 数组
+	start := strings.Index(aiText, "[")
+	end := strings.LastIndex(aiText, "]")
+	if start < 0 || end <= start {
+		return nil, fmt.Errorf("AI 返回格式无效")
+	}
+	jsonStr := aiText[start : end+1]
+
+	var titles []string
+	if err := json.Unmarshal([]byte(jsonStr), &titles); err != nil {
+		return nil, fmt.Errorf("JSON 解析失败: %w", err)
+	}
+	return titles, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // ===== 统计 =====
@@ -402,59 +462,4 @@ func (s *Server) HandleSplitChapter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeCreated(w, map[string]interface{}{"items": chapters})
-}
-
-// aiSmartSplit 调用 deepseek-v4-flash 通读全文后智能识别章节边界
-func (s *Server) aiSmartSplit(ctx context.Context, content string) (string, error) {
-	adapter, err := s.registry.AdapterByName(ctx, "deepseek-v4-flash")
-	if err != nil {
-		adapters, err2 := s.registry.AdaptersForRole(ctx, llm.RoleThinker)
-		if err2 != nil || len(adapters) == 0 {
-			return "", fmt.Errorf("no model available for AI split")
-		}
-		adapter = adapters[0]
-	}
-
-	var result strings.Builder
-	chunkSize := 12000
-	runes := []rune(content)
-
-	for i := 0; i < len(runes); i += chunkSize {
-		end := i + chunkSize
-		if end > len(runes) {
-			end = len(runes)
-		}
-		chunk := string(runes[i:end])
-
-		subCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-
-		sysPrompt := `你是一个专业的小说编辑。请仔细阅读以下小说文本，找出其中所有真实的章节分界点。
-规则：
-1. 只识别真正的章节开始位置，不要把文中叙述中提到的"第一天""第二天""回来"等词语误判为章节标题
-2. 真正的章节标题通常包含"第X章"或"第X卷"等明确标记
-3. 如果文本开头有卷首页、前言等不属于章节的内容，单独标注为"前言"
-4. 用 ## 号标记每个识别出的章节标题
-5. 不要在叙述性文字中间插入章节标记
-6. 如果文本中没有明确的章节边界，就不要强行分割
-
-请输出处理后的完整文本。格式示例：
-前言内容...
-
-## 第一章 标题
-
-章节正文...
-
-## 第二章 标题
-
-章节正文...`
-
-		aiText, _, err := adapter.Generate(subCtx, sysPrompt, chunk)
-		cancel()
-		if err != nil {
-			return "", fmt.Errorf("AI split failed: %v", err)
-		}
-		result.WriteString(aiText)
-	}
-
-	return result.String(), nil
 }

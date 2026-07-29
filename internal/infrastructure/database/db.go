@@ -243,18 +243,6 @@ CREATE TABLE IF NOT EXISTS usage_daily (
     PRIMARY KEY (day, model_name)
 );
 
-CREATE TABLE IF NOT EXISTS timeline (
-    id          TEXT PRIMARY KEY,
-    project_id  TEXT NOT NULL,
-    chapter_id  TEXT NOT NULL DEFAULT '',
-    event       TEXT NOT NULL DEFAULT '',
-    event_time  TEXT NOT NULL DEFAULT '',
-    characters  TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_timeline_project ON timeline(project_id, created_at);
-
 CREATE TABLE IF NOT EXISTS volumes (
     id          TEXT PRIMARY KEY,
     project_id  TEXT NOT NULL,

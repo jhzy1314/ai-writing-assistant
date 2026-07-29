@@ -69,6 +69,8 @@ var Composer = {
     document.getElementById('modeSelect').value = mode;
     var hints = {
       auto: '智能协同：自动判定任务并匹配流水线',
+      collab: '协同闭环：Thinker规划→Worker写作→Verifier审查→Thinker重规划→Worker重写',
+      orchestrated: '完整流水线·自选Agent模型：为每个角色手动指定模型，跑完整 Thinker→Worker→Verifier 流程',
       draft: '快速草稿：跳过 Thinker+Verifier，Worker 直出初稿（可后续深度优化）',
       strict: '严谨模式：Thinker 初稿 → Worker 润色 → Verifier 严校',
       art: '文艺创作：极简框架 → Worker 高度自由创作 → 宽松审查',
@@ -77,11 +79,17 @@ var Composer = {
     };
     document.getElementById('modeHint').textContent = hints[mode] || '';
     var modelSel = document.getElementById('modelSelect');
-    if (mode === 'manual') {
+    var orchPanel = document.getElementById('orchestratedModels');
+    if (mode === 'orchestrated') {
+      modelSel.style.display = 'none';
+      if (orchPanel) orchPanel.style.display = '';
+      this.refreshOrchestratedModels();
+    } else if (mode === 'manual') {
       modelSel.style.display = '';
       this.refreshModels();
     } else {
       modelSel.style.display = 'none';
+      if (orchPanel) orchPanel.style.display = 'none';
     }
     if (!skipPersist) Store.savePrefs();
   },
@@ -110,6 +118,42 @@ var Composer = {
         Store.savePrefs();
       }
     } catch (e) { UI.toast('模型列表加载失败', 'error'); }
+  },
+  refreshOrchestratedModels: async function () {
+    try {
+      var models = await API.listModels();
+      Store.state.models = models;
+      var active = models.filter(function (m) { return m.status === 'active'; });
+      var roles = [
+        { key: 'thinker',  label: '🖊️ 构思大纲',  storeKey: 'orchThinker'  },
+        { key: 'worker',   label: '📝 动笔写作',  storeKey: 'orchWorker'   },
+        { key: 'verifier', label: '🔍 品质审稿',  storeKey: 'orchVerifier' }
+      ];
+      var panel = document.getElementById('orchestratedModels');
+      panel.innerHTML = roles.map(function (r) {
+        var cur = Store.state.composer[r.storeKey] || '';
+        var opts = active.map(function (m) {
+          return '<option value="' + esc(m.name) + '"' + (m.name === cur ? ' selected' : '') + '>' + esc(m.name) + '</option>';
+        }).join('');
+        if (!opts) opts = '<option value="">无可用模型</option>';
+        return '<div style="display:flex;align-items:center;gap:6px;margin:4px 0;font-size:11px">' +
+          '<span style="width:80px;color:var(--muted)">' + r.label + '</span>' +
+          '<select id="orch-' + r.key + '" style="flex:1;font-size:11px;padding:3px 5px" onchange="Composer.onOrchModelChange()">' + opts + '</select></div>';
+      }).join('');
+      // auto-select defaults
+      if (active.length) {
+        if (!Store.state.composer.orchThinker) { Store.state.composer.orchThinker = active[0].name; }
+        if (!Store.state.composer.orchWorker) { Store.state.composer.orchWorker = active[0].name; }
+        if (!Store.state.composer.orchVerifier) { Store.state.composer.orchVerifier = active.length > 1 ? active[1].name : active[0].name; }
+        this.refreshOrchestratedModels();
+      }
+    } catch (e) { /* silent */ }
+  },
+  onOrchModelChange: function () {
+    Store.state.composer.orchThinker = document.getElementById('orch-thinker')?.value || '';
+    Store.state.composer.orchWorker = document.getElementById('orch-worker')?.value || '';
+    Store.state.composer.orchVerifier = document.getElementById('orch-verifier')?.value || '';
+    Store.savePrefs();
   },
   setGenerating: function (g) {
     var btn = document.getElementById('btnGenerate');
@@ -163,6 +207,11 @@ var Composer = {
       run_mode: Store.state.composer.runMode,
       model_name: Store.state.composer.runMode === 'manual' ? Store.state.composer.modelName : '',
       model_config_id: Store.state.composer.runMode === 'manual' ? Store.state.composer.modelConfigId : '',
+      role_models: Store.state.composer.runMode === 'orchestrated' ? {
+        thinker: Store.state.composer.orchThinker || '',
+        worker: Store.state.composer.orchWorker || '',
+        verifier: Store.state.composer.orchVerifier || ''
+      } : null,
       cursor_position: cursorPos,
       no_rewrite: noRewrite,
       context_scope: scope,

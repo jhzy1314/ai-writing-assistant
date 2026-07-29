@@ -8,21 +8,25 @@ import (
 type RunMode string
 
 const (
-	ModeAuto   RunMode = "auto"   // 自动判定
-	ModeDraft  RunMode = "draft"  // 快速草稿（跳过Thinker+Verifier）
-	ModeStrict RunMode = "strict" // 严谨模式
-	ModeArt    RunMode = "art"    // 文艺创作模式
-	ModeLight  RunMode = "light"  // 轻量化快速模式
-	ModeManual RunMode = "manual" // 手动模式，直接调用指定模型
+	ModeAuto         RunMode = "auto"         // 自动判定
+	ModeDraft        RunMode = "draft"        // 快速草稿（跳过Thinker+Verifier）
+	ModeCollab       RunMode = "collab"       // 多Agent协同闭环创作
+	ModeOrchestrated RunMode = "orchestrated" // 手动指派每个Agent的模型+跑完整流水线
+	ModeStrict       RunMode = "strict"       // 严谨模式
+	ModeArt          RunMode = "art"          // 文艺创作模式
+	ModeLight        RunMode = "light"        // 轻量化快速模式
+	ModeManual       RunMode = "manual"       // 手动模式，直接调用指定模型
 )
 
 // PipelineName 流水线名称
 type PipelineName string
 
 const (
-	PipelineStandard PipelineName = "standard" // 标准通用创作
-	PipelineDraft    PipelineName = "draft"    // 快速草稿（Worker直出）
-	PipelineStrict   PipelineName = "strict"   // 严谨模式
+    PipelineStandard    PipelineName = "standard"    // 标准通用创作
+    PipelineDraft       PipelineName = "draft"       // 快速草稿（Worker直出）
+    PipelineCollab      PipelineName = "collab"      // 多Agent协同闭环
+    PipelineOrchestrated PipelineName = "orchestrated" // 手动指派Agent模型+完整流水线
+    PipelineStrict      PipelineName = "strict"      // 严谨模式
 	PipelineArt      PipelineName = "art"      // 文艺创作模式
 	PipelineLight    PipelineName = "light"    // 轻量化快速模式
 	PipelineManual   PipelineName = "manual"   // 手动直调
@@ -46,7 +50,8 @@ type GenerateRequest struct {
 	NoRewrite         bool    `json:"no_rewrite"`
 	ContextScope      string  `json:"context_scope"`
 	PreviousSummaries string  `json:"previous_summaries"`
-	SkipWordCheck     bool    `json:"skip_word_check"` // 用户临时关闭字数校验
+	SkipWordCheck     bool              `json:"skip_word_check"`     // 用户临时关闭字数校验
+	RoleModels        map[string]string `json:"role_models"`         // orchestrated模式：手动指派每个Agent的模型（key:thinker/worker/verifier/helper, value:model_name）
 }
 
 // ContextBundle 注入到所有子任务的共享上下文（世界观/人物卡/前文/素材）

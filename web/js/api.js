@@ -19,6 +19,11 @@ var API = {
     try { data = await resp.json(); } catch (e) { }
     if (!resp.ok) {
       var msg = (data && data.error) || ('请求失败(' + resp.status + ')');
+      // 认证过期
+      if (resp.status === 401 && data && data.code === 'auth_required') {
+        if (typeof Auth !== 'undefined') Auth.showLogin();
+        throw new Error('登录已过期，请重新登录');
+      }
       // 人性化错误映射
       if (msg.indexOf('429') >= 0 || msg.indexOf('rate limit') >= 0 || msg.indexOf('TPD') >= 0) {
         msg = 'API 请求过于频繁，请稍后重试（约 30 秒）';

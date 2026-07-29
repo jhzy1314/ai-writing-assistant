@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+
+	"github.com/google/uuid"
 )
 
 // Volume volumes 表一行
@@ -493,6 +495,185 @@ func (s *Store) SplitChapters(ctx context.Context, req *SplitChaptersRequest) ([
 	}
 	_, _ = s.db.ExecContext(ctx, `UPDATE projects SET updated_at=? WHERE id=?`, now(), req.ProjectID)
 	return result, nil
+}
+
+// SplitByTitles 使用 AI 识别的标题列表，在原始文本中精确定位并分割章节
+// 相比 SplitChapters 仅依赖正则，该方法先用 AI 拿到标题，再在原文中 match 位置切分
+func (s *Store) SplitByTitles(ctx context.Context, req *SplitChaptersRequest, titles []string) ([]Chapter, error) {
+	if len(titles) < 2 || strings.TrimSpace(req.Content) == "" {
+		return nil, fmt.Errorf("至少需要2个标题")
+	}
+
+	content := req.Content
+	var segments []chapterSeg
+	prevEnd := 0
+
+	for _, title := range titles {
+		// 在剩余文本中搜索标题
+		idx := strings.Index(content[prevEnd:], title)
+		if idx < 0 {
+			// 尝试模糊匹配：去掉前导空白
+			trimmed := strings.TrimSpace(title)
+			idx = strings.Index(content[prevEnd:], trimmed)
+		}
+		if idx < 0 {
+			// 标题未在原文中找到，尝试第一个非标点字符开始的子串
+			for i, r := range []rune(title) {
+				if r > 32 && r != '#' && r != ' ' {
+					sub := string([]rune(title)[i:])
+					idx = strings.Index(content[prevEnd:], sub)
+					break
+				}
+			}
+		}
+		if idx < 0 {
+			continue // 找不到就跳过
+		}
+
+		start := prevEnd + idx
+		if segments != nil {
+			// 上一段从 prevEnd 到 start（不含新标题）
+			segContent := strings.TrimSpace(content[prevEnd:start])
+			if segContent != "" {
+				// 分离标题行和正文
+				bodyStart := strings.Index(segContent, "\n")
+				if bodyStart < 0 {
+					bodyStart = len(segContent)
+				}
+				segTitle := strings.TrimSpace(segContent[:bodyStart])
+				segBody := strings.TrimSpace(segContent[bodyStart:])
+				if segBody == "" && bodyStart < len(segContent) {
+					segBody = strings.TrimSpace(segContent[bodyStart:])
+				}
+				segments = append(segments, chapterSeg{title: segTitle, content: segBody})
+			}
+		}
+
+		// 跳到标题之后继续
+		prevEnd = start
+		if len(segments) == 0 {
+			// 第一个标题：正文从标题行之后开始
+			bodyStart := strings.Index(content[prevEnd:], "\n")
+			if bodyStart >= 0 {
+				prevEnd = start + bodyStart + 1
+			}
+		}
+		segments = append(segments) // placeholder, will be filled below
+		segments = segments[:len(segments)-1]
+	}
+
+	// 最后一段：从 prevEnd 到文末
+	if prevEnd < len(content) {
+		lastContent := strings.TrimSpace(content[prevEnd:])
+		bodyStart := strings.Index(lastContent, "\n")
+		segTitle := "后续章节"
+		segBody := lastContent
+		if bodyStart >= 0 && bodyStart < 40 {
+			segTitle = strings.TrimSpace(lastContent[:bodyStart])
+			segBody = strings.TrimSpace(lastContent[bodyStart:])
+		}
+		if segBody != "" {
+			segments = append(segments, chapterSeg{title: segTitle, content: segBody})
+		}
+	}
+
+	// 重新构建：为每个标题匹配其后的正文段落
+	segments = nil
+	prevEnd = 0
+	for i, title := range titles {
+		idx := strings.Index(content[prevEnd:], title)
+		if idx < 0 {
+			idx = strings.Index(content[prevEnd:], strings.TrimSpace(title))
+		}
+		if idx < 0 {
+			continue
+		}
+		start := prevEnd + idx
+		titleEnd := start + len(title)
+
+		if i > 0 {
+			segContent := strings.TrimSpace(content[prevEnd:start])
+			if len(segments) > 0 && segContent != "" {
+				segments[len(segments)-1].content = segContent
+			}
+		}
+
+		// 下一段的内容边界
+		end := len(content)
+		if i < len(titles)-1 {
+			nextTitle := titles[i+1]
+			rest := content[titleEnd:]
+			nextIdx := strings.Index(rest, nextTitle)
+			if nextIdx < 0 {
+				nextIdx = strings.Index(rest, strings.TrimSpace(nextTitle))
+			}
+			if nextIdx >= 0 {
+				end = titleEnd + nextIdx
+			}
+		}
+
+		segments = append(segments, chapterSeg{
+			title:   title,
+			content: strings.TrimSpace(content[titleEnd:end]),
+		})
+		prevEnd = titleEnd
+	}
+
+	if len(segments) < 2 {
+		return nil, fmt.Errorf("未能从标题列表中分割出足够章节")
+	}
+
+	return s.commitSegments(ctx, req.ProjectID, segments)
+}
+
+// commitSegments 将分割后的段落在事务中写入数据库
+func (s *Store) commitSegments(ctx context.Context, projectID string, segments []chapterSeg) ([]Chapter, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM chapter_versions WHERE chapter_id IN (SELECT id FROM chapters WHERE project_id=?)`, projectID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM chapters WHERE project_id=?`, projectID); err != nil {
+		return nil, err
+	}
+
+	var result []Chapter
+	for i, seg := range segments {
+		title := seg.title
+		if title == "" {
+			title = fmt.Sprintf("第%d章", i+1)
+		}
+		wc := wordCount(seg.content)
+		cid := newID()
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+			cid, projectID, "", title, seg.content, wc, i+1, "", "", now(), now()); err != nil {
+			return result, fmt.Errorf("写入第%d章失败: %w", i+1, err)
+		}
+		vid := uuid.NewString()
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO chapter_versions(id, chapter_id, title, content, version, created_at) VALUES(?,?,?,?,1,?)`,
+			vid, cid, title, seg.content, now()); err != nil {
+			return result, nil
+		}
+		ch := Chapter{ID: cid, ProjectID: projectID, Title: title, Content: seg.content, WordCount: wc, SortOrder: i + 1}
+		result = append(result, ch)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	_, _ = s.db.ExecContext(ctx, `UPDATE projects SET updated_at=? WHERE id=?`, now(), projectID)
+	return result, nil
+}
+
+// CountSegments 预检：给定内容和分隔方式，返回能切出几段（只计数不写库）
+func (s *Store) CountSegments(content, splitBy string) int {
+	return len(splitContent(content, splitBy))
 }
 
 type chapterSeg struct {

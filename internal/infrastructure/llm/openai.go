@@ -51,7 +51,7 @@ func (a *OpenAICompatibleAdapter) Generate(ctx context.Context, systemPrompt, us
 		schema.SystemMessage(systemPrompt),
 		schema.UserMessage(userPrompt),
 	}
-	resp, err := a.chatModel.Generate(ctx, msgs)
+	resp, err := a.chatModel.Generate(ctx, msgs, model.WithMaxTokens(4096))
 	if err != nil {
 		return "", Usage{}, fmt.Errorf("%s 调用失败: %w", a.name, err)
 	}

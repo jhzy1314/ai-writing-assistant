@@ -1,15 +1,14 @@
 /* ============ app.js：应用初始化与全局事件绑定 ============ */
 document.addEventListener('DOMContentLoaded', function () {
-  // 1. 加载本地偏好（主题 / 模式 / 编辑器模式等）
+  // 0. 认证检查
+  Auth.check().then(function (result) {
+    if (result.required && !result.authenticated) { Auth.showLogin(); return; }
+    initApp();
+  });
+});
+
+function initApp() {
   Store.loadPrefs();
-  // 1.1 恢复侧栏折叠状态
-  if (Store.get('sidebarCollapsed', false)) { document.getElementById('sidebar').classList.add('collapsed'); }
-  if (Store.get('rightCollapsed', false)) { document.getElementById('rightPanel').classList.add('collapsed'); }
-  // 1.2 恢复字体大小
-  var fs = Store.get('fontSize', 0);
-  if (fs > 0) { setTimeout(function () { Editor._fs = fs; Editor.adjustFontSize(0); }, 500); }
-  // 1.3 首次使用引导
-  setTimeout(function () { UI.showOnboarding(); }, 1200);
   // 2. 初始化编辑器
   Editor.init();
   // 3. 初始化创作模式选择器
@@ -96,7 +95,8 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
   });
-});
+}
+
 
 async function loadTemplates() {
   try {
