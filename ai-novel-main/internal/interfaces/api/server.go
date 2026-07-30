@@ -739,6 +739,17 @@ func (s *Server) HandleGenerateChapter(w http.ResponseWriter, r *http.Request) {
 	if chapterIndexStr != "" {
 		fmt.Sscanf(chapterIndexStr, "%d", &chapterIndex)
 	}
+	var reqBody struct {
+		Outline string `json:"outline"`
+	}
+	if r.Method == "POST" {
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+		if err := dec.Decode(&reqBody); err == nil {
+			if reqBody.Outline != "" {
+				outline = strings.TrimSpace(reqBody.Outline)
+			}
+		}
+	}
 
 	if strings.TrimSpace(novelID) == "" {
 		fmt.Fprintf(w, "event: error\ndata: %s\n\n", "Missing novel_id")

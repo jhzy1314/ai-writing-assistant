@@ -234,6 +234,7 @@ window.initTiptap = async function () {
       </div>
       <div class="composer-inner" id="composerInner">
         <textarea id="instructionInput" placeholder="💡 输入创作需求或选中文字后使用快捷指令…（Ctrl+Enter 发送）" oninput="Editor.syncInstructionHeight(this)" onkeydown="if(event.ctrlKey&amp;&amp;event.key==='Enter'){event.preventDefault();Composer.generate()}"></textarea>
+        <textarea id="genOutline" class="outline-input" rows="2" placeholder="📝 手动填写本章或全书大纲（选填），留空则由 AI 生成" oninput="Composer.onOutlineChange()"></textarea>
         <button class="tool-btn" onclick="TemplateUI.quickOpen()" title="模板库">📚</button>
         <input class="mini-input" type="number" id="targetWordMini" value="1000" min="100" max="20000" step="100">
         <button class="btn btn-primary btn-gen" id="btnGenerate" onclick="Composer.generate()">✨ 生成</button>
@@ -273,6 +274,7 @@ window.initTiptap = async function () {
       <span class="right-tab" data-page="context" onclick="RightPanel.switch('context')" title="设定资源">👤</span>
       <span class="right-tab" data-page="models" onclick="RightPanel.switch('models')" title="模型管理">🤖</span>
       <span class="right-tab" data-page="tools" onclick="RightPanel.switch('tools')" title="工具">🔧</span>
+      <span class="right-tab" data-page="appearance" onclick="RightPanel.switch('appearance')" title="背景外观">🎨</span>
     </div>
     <div class="right-body">
 
@@ -422,6 +424,31 @@ window.initTiptap = async function () {
           <div class="reserved-btn">🧩 自定义拖拽工作流<span class="tag">规划中</span></div>
           <!-- 预留扩展入口（当前置灰）：A/B 双稿对比 -->
           <div class="reserved-btn" style="margin-top:6px">📑 A/B 双稿对比<span class="tag">规划中</span></div>
+        </div>
+      </div>
+
+      <!-- Appearance page -->
+      <div class="right-page" id="page-appearance">
+        <div class="appearance-page">
+          <h3>当前背景</h3>
+          <div class="appearance-current" id="appearanceCurrent">加载中…</div>
+
+          <h3>背景库</h3>
+          <div class="bg-grid" id="appearanceLibrary"></div>
+
+          <h3>自定义背景</h3>
+          <div class="bg-grid" id="appearanceCustom"></div>
+
+          <div class="appearance-upload">
+            <div class="drop-zone" id="appearanceDropZone">点击或拖拽上传图片 (PNG/JPG/WEBP)</div>
+            <input type="file" id="appearanceFileInput" accept="image/png,image/jpeg,image/webp" style="display:none">
+          </div>
+
+          <div class="appearance-actions">
+            <button class="btn btn-ghost btn-sm" onclick="Appearance.generateBg()">🎲 Picsum 生成</button>
+            <button class="btn btn-ghost btn-sm" onclick="Appearance.randomBg()">🔀 随机切换</button>
+            <button class="btn btn-ghost btn-sm" onclick="Appearance.resetAll()">↩ 恢复默认</button>
+          </div>
         </div>
       </div>
 

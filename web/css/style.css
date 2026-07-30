@@ -15,6 +15,9 @@
   --muted: #7a8198;
   --faint: #aab0c4;
   --accent: #e8945a;
+  --sider-bg: url('/static/backgrounds/sider-texture.svg');
+  --sider-light-bg: url('/static/backgrounds/sider-texture-light.svg');
+  --empty-bg: url('/static/backgrounds/empty-state.svg');
   --accent-hover: #d4783c;
   --accent-soft: #fef5ee;
   --accent2: #f0b878;
@@ -172,11 +175,11 @@ body::before {
   background-repeat:no-repeat; background-position:center; background-size:cover;
 }
 [data-theme="light"] body::before {
-  background-image: url('/covers/sidebar-texture-light.png');
+  background-image: var(--sider-light-bg);
   opacity:.22;
 }
 [data-theme="dark"] body::before {
-  background-image: url('/covers/sidebar-texture.png');
+  background-image: var(--sider-bg);
   opacity:.14;
 }
 body.sidebar-hidden::before { display:none; }
@@ -325,6 +328,13 @@ body.sidebar-hidden::before { display:none; }
 /* .editor-pane.has-content::before { display:none; } -- 用户要求点击项目后图片不变化，保持始终显示 */
 .editor-inner { max-width:760px; margin:0 auto; padding:40px 48px 100px; min-height:calc(100vh - 220px); }
 .editor-inner > .editor-rich { padding:24px 20px; }
+.editor-inner::before {
+  content:''; position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:400px; height:400px; pointer-events:none; z-index:0;
+  background-image:var(--empty-bg); background-repeat:no-repeat;
+  background-position:center; background-size:contain; opacity:.08;
+}
+.editor-inner.has-content::before { display:none; }
 .editor-rich {
   min-height:60vh; font-size:16px; line-height:1.95; color:var(--text); outline:none;
   white-space:pre-wrap; word-break:break-word;
@@ -383,6 +393,12 @@ body.sidebar-hidden::before { display:none; }
   box-shadow:var(--shadow); transition:border-color .14s, box-shadow .14s;
 }
 .composer-inner:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.composer-inner textarea.outline-input {
+  flex:0 0 180px; max-height:60px; font-size:11.5px; padding:6px 8px;
+  border:1px solid var(--border2); border-radius:6px; background:var(--panel2);
+  resize:none; line-height:1.4; color:var(--text);
+}
+.composer-inner textarea.outline-input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
 .composer-inner textarea {
   flex:1; border:none; box-shadow:none !important; background:transparent; padding:7px 9px; font-size:13px;
   resize:none; min-height:48px; max-height:140px; line-height:1.6;
@@ -1195,3 +1211,34 @@ body.desktop .quota-bar { display:flex; }
 .auth-error {
   color:var(--danger); font-size:12px; margin-top:6px; text-align:left; padding-left:4px;
 }
+
+/* ============ 背景外观设置 ============ */
+.appearance-page { padding:16px; overflow-y:auto; height:100%; }
+.appearance-page h3 { font-size:14px; font-weight:600; color:var(--text); margin:18px 0 10px; }
+.appearance-page h3:first-child { margin-top:0; }
+.bg-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.bg-preview-card {
+  border:2px solid var(--border); border-radius:10px; overflow:hidden; cursor:pointer;
+  transition:border-color .2s, box-shadow .2s;
+  background:var(--panel2); display:flex; flex-direction:column; align-items:stretch;
+}
+.bg-preview-card:hover { border-color:var(--accent); }
+.bg-preview-card.active { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
+.bg-preview-card .bg-thumb {
+  width:100%; height:60px; background-size:cover; background-position:center;
+  border-bottom:1px solid var(--border);
+}
+.bg-preview-card .bg-info { padding:6px 8px; font-size:11px; color:var(--text2); display:flex; align-items:center; justify-content:space-between; }
+.bg-preview-card .bg-info .bg-name { font-weight:500; }
+.bg-preview-card .bg-info .bg-badge { font-size:9px; color:var(--muted); background:var(--panel3); border-radius:4px; padding:1px 6px; }
+.appearance-upload { margin:12px 0; }
+.appearance-upload .drop-zone {
+  border:2px dashed var(--border2); border-radius:10px; padding:24px 16px;
+  text-align:center; cursor:pointer; color:var(--muted); font-size:13px;
+  transition:border-color .2s, background .2s;
+}
+.appearance-upload .drop-zone:hover { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
+.appearance-actions { display:flex; gap:8px; margin:10px 0; flex-wrap:wrap; }
+.appearance-actions button { flex:1; min-width:80px; }
+.appearance-current { margin:10px 0; padding:10px; background:var(--panel2); border-radius:8px; font-size:12px; color:var(--text2); }
+.appearance-current span { font-weight:500; color:var(--text); }

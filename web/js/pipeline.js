@@ -117,6 +117,8 @@ var PipelineUI = {
     if (outlineEl && p.outline) {
       outlineEl.style.display = '';
       document.getElementById('pipeOutlineContent').textContent = p.outline;
+      var genOutline = document.getElementById('genOutline');
+      if (genOutline && !genOutline.value.trim()) genOutline.value = p.outline;
     } else if (outlineEl) {
       outlineEl.style.display = 'none';
     }

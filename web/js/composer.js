@@ -44,6 +44,9 @@ var Composer = {
     var aaToggle = document.getElementById('autoAppendToggle');
     if (aaToggle) aaToggle.checked = Store.state.composer.autoAppend !== false;
     Store.state.composer.autoAppend = Store.state.composer.autoAppend !== false;
+    // 大纲
+    var goEl = document.getElementById('genOutline');
+    if (goEl) goEl.value = Store.state.composer.outline || '';
   },
   onSliderChange: function () {
     var val = parseInt(document.getElementById('targetWordSlider').value) || 1000;
@@ -199,6 +202,7 @@ var Composer = {
       chapter_id: ch ? ch.id : '',
       user_demand: instr,
       selected_text: sel,
+      outline: (document.getElementById('genOutline') || {}).value || Store.state.composer.outline || '',
       world_setting: Context.worldSetting(),
       character_setting: Context.characters(),
       history_content: history,
@@ -341,6 +345,11 @@ var Composer = {
   onAutoAppendChange: function () {
     var cb = document.getElementById('autoAppendToggle');
     Store.state.composer.autoAppend = cb ? cb.checked : true;
+    Store.savePrefs();
+  },
+  onOutlineChange: function () {
+    var el = document.getElementById('genOutline');
+    Store.state.composer.outline = el ? el.value.trim() : '';
     Store.savePrefs();
   },
   autoTitle: function () {

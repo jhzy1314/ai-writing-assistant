@@ -35,6 +35,7 @@ var Store = {
     this.state.composer.modelName = this.get('modelName', '');
     this.state.composer.contextScope = this.get('contextScope', 'smart');
     this.state.composer.skipWordCheck = this.get('skipWordCheck', false);
+    this.state.composer.outline = this.get('outline', '');
     this.state.editor.mode = this.get('editorMode', 'rich');
     var theme = this.get('theme', 'light');
     document.documentElement.setAttribute('data-theme', theme);
@@ -48,6 +49,7 @@ var Store = {
     this.set('editorMode', this.state.editor.mode);
     this.set('contextScope', this.state.composer.contextScope);
     this.set('skipWordCheck', this.state.composer.skipWordCheck);
+    this.set('outline', this.state.composer.outline || '');
   },
   saveSelection: function (projectId) {
     if (!projectId) return;

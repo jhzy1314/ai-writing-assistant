@@ -761,6 +761,8 @@ var ChapterUI = {
           Store.state.pipeline.outline = newOutline;
           ov.remove();
           document.getElementById('instructionInput').value = '请严格按以下大纲撰写正文：' + newOutline;
+          var genOutline = document.getElementById('genOutline');
+          if (genOutline) genOutline.value = newOutline;
           UI.toast('大纲已更新，正在生成…', 'success');
           Composer.generate();
         }}
