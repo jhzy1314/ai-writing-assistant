@@ -5,6 +5,21 @@ import (
 	"strings"
 )
 
+// writeWebRef 追加联网参考信息块（仅当用户开启联网搜索且检索到内容时注入，附严格使用规则）
+func writeWebRef(b *strings.Builder, req GenerateRequest) {
+	if strings.TrimSpace(req.WebInfo) == "" {
+		return
+	}
+	b.WriteString("【联网参考信息】（系统自动检索，内容可能不准确、过时或与创作无关）\n")
+	b.WriteString(req.WebInfo)
+	b.WriteString("\n\n【联网信息使用规则（必须严格遵守）】\n")
+	b.WriteString("1. 仅作背景知识参考（如真实历史/地理/科学常识/职业细节/流行文化），用于增强细节真实感与准确性；\n")
+	b.WriteString("2. 严禁大段复制或改写检索结果原文，严禁照搬他人作品或受版权保护的内容；\n")
+	b.WriteString("3. 若检索信息与用户设定冲突，一律以用户设定为准；\n")
+	b.WriteString("4. 不得声称自己实时搜索或编造来源，如需提及可用「据公开资料」表述；\n")
+	b.WriteString("5. 与创作无关或无法核实的内容直接忽略，不要写入正文。\n\n")
+}
+
 // buildThinkerUserPrompt 构造规划师的用户提示词
 func buildThinkerUserPrompt(req GenerateRequest, bundle ContextBundle, pl PipelineName) string {
 	var b strings.Builder
@@ -43,6 +58,7 @@ func buildThinkerUserPrompt(req GenerateRequest, bundle ContextBundle, pl Pipeli
 	}
 	b.WriteString("【审稿清单要求】在创作框架末尾必须追加一段「【审稿清单】」：结合本篇具体内容列出 3-6 条审查要点，供校验官逐项核对（如：某角色行为必须符合其人设、某伏笔必须在结尾呼应、节奏不能拖沓、字数必须接近目标等）。要点要具体到本篇剧情，不要泛泛而谈。\n")
 	b.WriteString("【输出要求】直接输出创作框架本身，不要任何开场白、解释或多余说明。\n")
+	writeWebRef(&b, req)
 	b.WriteString("\n请直接输出创作框架：")
 	return b.String()
 }
@@ -84,6 +100,7 @@ func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline st
 		b.WriteString(fmt.Sprintf("【字数要求】约 %d 字，完成后需经审稿校验，请尽量接近目标。\n\n", req.TargetWord))
 	}
 	b.WriteString("【输出要求】直接输出正文本身：不要任何开场白、标题、思考过程、解释或多余说明，从故事正文第一句开始写。\n")
+	writeWebRef(&b, req)
 	b.WriteString("请撰写正文：")
 	return b.String()
 }
@@ -109,6 +126,7 @@ func buildReviseUserPrompt(req GenerateRequest, bundle ContextBundle, review, cu
 		b.WriteString(fmt.Sprintf("【字数硬约束】当前正文 %d 字，目标 %d 字。修正后的完整正文总字数必须控制在目标字数的 80%%~110%% 之间（即 %d~%d 字）：若当前超出，必须删减冗余段落/描写以达标；若不足，可适度补充。禁止大幅扩写。\n\n", curLen, req.TargetWord, int(float64(req.TargetWord)*0.8), int(float64(req.TargetWord)*1.1)))
 	}
 	b.WriteString("请根据修改意见对正文进行微调（仅针对问题修改，保留可用内容与核心剧情），输出修改后的完整正文：")
+	writeWebRef(&b, req)
 	return b.String()
 }
 
@@ -142,6 +160,7 @@ func buildVerifierUserPrompt(req GenerateRequest, bundle ContextBundle, content 
 		b.WriteString("【审查标准】标准审查，逐项核查角色一致性、世界观冲突、剧情逻辑、文字质量、需求匹配。\n")
 	}
 	b.WriteString("\n【硬性输出格式】必须逐条输出，禁止省略：\n")
+	writeWebRef(&b, req)
 	b.WriteString("1. 先输出【清单核对】：若提供了审稿清单，对每一条单独输出一行「条目N：已执行/未执行 —— 证据（引用正文原文）」；无清单则按审查标准逐项输出结论；\n")
 	b.WriteString("2. 再输出【缺陷清单】：有缺陷逐条列出（问题位置 + 类型 + 精准修改建议）；全部通过才输出【校验通过】；\n")
 	b.WriteString("3. 禁止只输出【校验通过】四个字而不给出核对过程；\n")
@@ -172,6 +191,7 @@ func buildHelperUserPrompt(req GenerateRequest, bundle ContextBundle, lightLimit
 		b.WriteString(bundle.AssembledText())
 		b.WriteString("\n")
 	}
+	writeWebRef(&b, req)
 	b.WriteString("请直接返回处理结果：")
 	return b.String()
 }
@@ -193,7 +213,9 @@ func buildManualUserPrompt(req GenerateRequest, bundle ContextBundle) string {
 	}
 	b.WriteString("【需求】\n")
 	b.WriteString(req.UserDemand)
-	b.WriteString("\n\n请生成内容：")
+	b.WriteString("\n\n")
+	writeWebRef(&b, req)
+	b.WriteString("请生成内容：")
 	return b.String()
 }
 

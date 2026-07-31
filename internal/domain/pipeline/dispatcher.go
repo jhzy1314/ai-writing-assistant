@@ -12,6 +12,7 @@ import (
 	"github.com/ai-novel/studio/internal/infrastructure/llm"
 	"github.com/ai-novel/studio/internal/infrastructure/quota"
 	"github.com/ai-novel/studio/internal/infrastructure/rag"
+	"github.com/ai-novel/studio/internal/infrastructure/search"
 )
 
 // Dispatcher 调度中枢 Agent：
@@ -77,6 +78,15 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 		// 2. 组装共享上下文
 		bundle := d.buildContext(ctx, req)
 
+		// 2.5 联网搜索（用户开启时）：检索一次，注入到所有 Agent 提示词
+		if req.WebSearch {
+			emit(ProgressEvent{Type: EventStage, Stage: "🔎 联网搜索资料中…", Role: "web", Text: "正在检索相关背景资料"})
+			req.WebInfo = d.webSearch(ctx, req)
+			if req.WebInfo == "" {
+				emit(ProgressEvent{Type: EventStage, Stage: "联网搜索未返回结果，继续创作", Role: "web", Text: "未检索到可用资料，按常规创作"})
+			}
+		}
+
 		// 3. 解析流水线
 		lightLimit := d.store.GetConfigInt(ctx, "light_input_char_limit", 500)
 		pl := resolvePipeline(req, lightLimit)
@@ -119,6 +129,40 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 		emit(ProgressEvent{Type: EventDone, Pipeline: string(pl), FinalText: finalText, WordCount: countWords(finalText)})
 	}()
 	return out
+}
+
+// webSearch 执行联网搜索并格式化为参考信息；失败/无结果返回空串（不阻塞创作）
+func (d *Dispatcher) webSearch(ctx context.Context, req GenerateRequest) string {
+	query := buildSearchQuery(req)
+	if query == "" {
+		return ""
+	}
+	sctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	results, err := search.WebSearch(sctx, query, 5)
+	if err != nil || len(results) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("检索词：%s\n", query))
+	for i, r := range results {
+		b.WriteString(fmt.Sprintf("%d. %s\n%s\n%s\n", i+1, r.Title, r.URL, r.Snippet))
+	}
+	return b.String()
+}
+
+// buildSearchQuery 从创作需求中提炼搜索词（取前 90 字，去换行）
+func buildSearchQuery(req GenerateRequest) string {
+	q := strings.TrimSpace(req.UserDemand)
+	if q == "" {
+		q = strings.TrimSpace(req.SelectedText)
+	}
+	q = strings.NewReplacer("\n", " ", "\r", " ").Replace(q)
+	r := []rune(q)
+	if len(r) > 90 {
+		q = string(r[:90])
+	}
+	return strings.TrimSpace(q)
 }
 
 // friendlyErr 将底层错误转换为友好中文提示（禁止抛出原始 API 错误码）

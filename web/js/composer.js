@@ -5,6 +5,8 @@ var Composer = {
     document.getElementById('modeSelect').value = mode;
     var twm = document.getElementById('targetWordMini');
     if (twm) twm.value = Store.state.composer.targetWord;
+    var wst = document.getElementById('webSearchToggle');
+    if (wst) wst.checked = !!Store.state.composer.webSearch;
     var slider = document.getElementById('targetWordSlider');
     if (slider) slider.value = Store.state.composer.targetWord;
     this.onModeChange(mode, true);
@@ -310,7 +312,8 @@ var Composer = {
       context_scope: scope,
       previous_summaries: summaries,
       skip_word_check: Store.state.composer.skipWordCheck,
-      role_thinking: Store.state.composer.roleThinking || { thinker: true, worker: false, verifier: false, helper: false }
+      role_thinking: Store.state.composer.roleThinking || { thinker: true, worker: false, verifier: false, helper: false },
+      web_search: !!Store.state.composer.webSearch
     };
   },
   validate: function (payload) {
@@ -325,6 +328,12 @@ var Composer = {
       return false;
     }
     return true;
+  },
+  onWebSearchChange: function () {
+    var el = document.getElementById('webSearchToggle');
+    Store.state.composer.webSearch = !!(el && el.checked);
+    try { Store.savePrefs(); } catch (e) {}
+    UI.toast(Store.state.composer.webSearch ? '🌐 已开启联网搜索：AI 将联网检索资料辅助创作' : '已关闭联网搜索', Store.state.composer.webSearch ? 'success' : '');
   },
   generate: async function () {
     var payload = this.buildPayload();
@@ -454,7 +463,12 @@ var Composer = {
     if (!panel) return;
     var show = panel.style.display === 'none';
     panel.style.display = show ? 'flex' : 'none';
-    if (show) this._positionProPanel();
+    if (show) {
+      // 打开专业模式时收起「更多」菜单（两者互斥，避免悬浮层互相遮挡）
+      var mm = document.getElementById('moreMenu');
+      if (mm && mm.style.display !== 'none') mm.style.display = 'none';
+      this._positionProPanel();
+    }
     if (btn) btn.classList.toggle('on', show);
     // 同步大纲内容到 genOutline（生成时读取）
     if (show) this.syncProOutlineToGen();
@@ -552,7 +566,7 @@ var Composer = {
       this.syncProOutlineToGen();
     }
   },
-  /* 将专业模式面板定位为固定悬浮层：锚定在生成栏正上方，宽度对齐，超高内部滚动 */
+  /* 将专业模式面板定位为固定悬浮层：锚定在生成栏正上方，宽度对齐，不遮挡工具栏，超高内部滚动 */
   _positionProPanel: function () {
     var self = this;
     var run = function () {
@@ -564,8 +578,11 @@ var Composer = {
       panel.style.left = Math.round(r.left) + 'px';
       panel.style.width = Math.round(r.width) + 'px';
       panel.style.bottom = (window.innerHeight - Math.round(r.top) + 10) + 'px';
-      // 可用高度 = 视口顶到生成栏顶，留 20px 边距；同时不超过视口的 80%
-      var avail = Math.round(r.top) - 20;
+      // 可用高度 = 生成栏顶 到 编辑器工具栏底（避免悬浮层盖住工具栏/更多菜单）
+      var tb = document.querySelector('.editor-toolbar');
+      var topBound = tb ? tb.getBoundingClientRect().bottom : 120;
+      var avail = Math.round(r.top) - Math.round(topBound) - 16;
+      if (avail < 180) avail = 180;
       panel.style.maxHeight = Math.max(180, Math.min(avail, Math.round(window.innerHeight * 0.8))) + 'px';
       panel.scrollTop = 0;
     };

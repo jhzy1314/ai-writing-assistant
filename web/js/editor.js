@@ -295,6 +295,14 @@ var Editor = {
     var showing = menu.style.display !== 'none';
     menu.style.display = showing ? 'none' : '';
     if (!showing) {
+      // 打开「更多」菜单时，收起专业模式面板（两者互斥，避免悬浮层互相遮挡）
+      var pp = document.getElementById('proModePanel');
+      if (pp && pp.style.display !== 'none') {
+        pp.style.display = 'none';
+        var pb = document.getElementById('proModeBtn');
+        if (pb) pb.classList.remove('on');
+        try { Store.set('proModeOpen', false); } catch (e) {}
+      }
       var close = function (e) {
         if (menu && !menu.contains(e.target) && e.target.id !== 'moreMenuWrap' && !e.target.closest('.more-menu-wrap')) {
           menu.style.display = 'none';

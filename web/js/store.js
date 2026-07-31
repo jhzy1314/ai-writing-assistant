@@ -36,6 +36,7 @@ var Store = {
     this.state.composer.contextScope = this.get('contextScope', 'smart');
     this.state.composer.skipWordCheck = this.get('skipWordCheck', false);
     this.state.composer.outline = this.get('outline', '');
+    this.state.composer.webSearch = this.get('webSearch', false);
     this.state.editor.mode = this.get('editorMode', 'rich');
     // 主题：多主题系统（themes.js），经典主题 id 保持 dark/light 兼容旧值
     if (typeof Themes !== 'undefined' && Themes.loadSaved) {
@@ -57,6 +58,7 @@ var Store = {
     this.set('editorMode', this.state.editor.mode);
     this.set('contextScope', this.state.composer.contextScope);
     this.set('skipWordCheck', this.state.composer.skipWordCheck);
+    this.set('webSearch', !!this.state.composer.webSearch);
     this.set('outline', this.state.composer.outline || '');
   },
   saveSelection: function (projectId) {

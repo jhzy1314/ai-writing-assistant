@@ -56,6 +56,8 @@ type GenerateRequest struct {
 	SkipWordCheck     bool              `json:"skip_word_check"`     // 用户临时关闭字数校验
 	RoleModels        map[string]string `json:"role_models"`         // orchestrated模式：手动指派每个Agent的模型（key:thinker/worker/verifier/helper, value:model_name）
 	RoleThinking      map[string]bool   `json:"role_thinking"`       // 每个角色是否开启深度思考（key:thinker/worker/verifier/helper；缺省/未指定=开）
+	WebSearch         bool              `json:"web_search"`          // 用户手动开启：联网搜索辅助各 Agent
+	WebInfo           string            `json:"-"`                   // 后端填充：检索到的联网参考信息（已格式化）
 }
 
 // ContextBundle 注入到所有子任务的共享上下文（世界观/人物卡/前文/素材）

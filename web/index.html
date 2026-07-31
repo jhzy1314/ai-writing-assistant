@@ -326,6 +326,9 @@ window.initTiptap = async function () {
           <button class="tool-btn" onclick="Composer.previewRAG(event)" title="预览 AI 将参考的书中相关记忆（长篇小说连贯性）">🧠 相关记忆</button>
           <span style="font-size:10px;color:var(--muted)" title="目标字数">目标字数</span>
           <input class="mini-input" type="number" id="targetWordMini" value="1000" min="100" max="20000" step="100" title="目标字数">
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="开启后，AI 会联网检索相关资料辅助创作（构思/写作/审稿/轻活都会参考）">
+            <input type="checkbox" id="webSearchToggle" onchange="Composer.onWebSearchChange()"> 🌐 联网
+          </label>
         </div>
       </div>
       <div id="ragPreview" class="rag-preview" style="display:none"></div>

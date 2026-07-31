@@ -5,6 +5,7 @@ var ROLE_META = {
   verifier: { ico: '🔍', label: '品质审稿', cls: 'verifier', order: 2 },
   helper:   { ico: '⚡', label: '辅助润色', cls: 'helper', order: 0 },
   manual:   { ico: '🎯', label: '手动直调', cls: 'manual', order: 0 },
+  web:      { ico: '🌐', label: '联网搜索', cls: 'web', order: -1 },
   idle:     { ico: '·', label: '等待生成', cls: 'idle', order: -1 }
 };
 var PIPELINE_STEPS = [
