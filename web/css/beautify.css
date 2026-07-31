@@ -744,6 +744,13 @@ body {
   bottom: 0;
   height: auto !important;
 }
+/* 折叠态：禁用毛玻璃滤镜，避免卡顿 + 防止悬浮面板盖住编辑区 */
+.right-panel.collapsed {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
 [data-theme="dark"] .right-panel { box-shadow: -4px 0 24px rgba(0,0,0,.25); }
 
 .right-tabs {
