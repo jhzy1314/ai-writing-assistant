@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="264" height="600" viewBox="0 0 264 600">
+  <!-- 墨韵书斋 · 深木/竹简侧栏纹理 -->
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4a2412"/>
+      <stop offset="0.5" stop-color="#3a1a0e"/>
+      <stop offset="1" stop-color="#2d1409"/>
+    </linearGradient>
+    <linearGradient id="grain" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="rgba(255,230,190,0.10)"/>
+      <stop offset="0.5" stop-color="rgba(255,230,190,0.02)"/>
+      <stop offset="1" stop-color="rgba(255,230,190,0.08)"/>
+    </linearGradient>
+  </defs>
+  <rect width="264" height="600" fill="url(#wood)"/>
+  <!-- 竖向木纹 -->
+  <rect x="18" y="0" width="2" height="600" fill="url(#grain)"/>
+  <rect x="52" y="0" width="1.4" height="600" fill="url(#grain)"/>
+  <rect x="96" y="0" width="2.4" height="600" fill="url(#grain)"/>
+  <rect x="138" y="0" width="1.2" height="600" fill="url(#grain)"/>
+  <rect x="176" y="0" width="2" height="600" fill="url(#grain)"/>
+  <rect x="214" y="0" width="1.6" height="600" fill="url(#grain)"/>
+  <rect x="246" y="0" width="2.2" height="600" fill="url(#grain)"/>
+  <!-- 竹节横向暗纹 -->
+  <path d="M0 120 H264 M0 240 H264 M0 360 H264 M0 480 H264" stroke="rgba(0,0,0,0.18)" stroke-width="2"/>
+  <path d="M0 122 H264 M0 242 H264 M0 362 H264 M0 482 H264" stroke="rgba(255,220,170,0.05)" stroke-width="1"/>
+</svg>

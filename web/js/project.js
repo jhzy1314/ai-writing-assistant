@@ -287,15 +287,27 @@ var ProjectUI = {
       { id: 'del', label: '🗑 删除', danger: true, onClick: function () { ProjectUI.remove(id); } }
     ]);
   },
+  // P3-2：封面加载失败时记录缺失并隐藏图片（保留文字降级）
+  coverMissing: function (img, name) {
+    img.style.display = 'none';
+    try {
+      var missing = JSON.parse(sessionStorage.getItem('missingCovers') || '[]');
+      if (missing.indexOf(name) < 0) { missing.push(name); sessionStorage.setItem('missingCovers', JSON.stringify(missing)); }
+    } catch (e) {}
+  },
+
   generateCover: async function (id) {
     var p = Store.state.projects.find(function (x) { return x.id === id; });
     if (!p) return;
-    UI.toast('正在为「' + p.name + '」生成封面…', '');
+    // R2 修复：防重复点击（Pollinations 生成需 10s+，期间再次点击会重复消耗）
+    if (ProjectUI._coverGenerating) { UI.toast('封面正在生成中，请稍候…', 'warn'); return; }
+    ProjectUI._coverGenerating = true;
+    UI.toast('正在为「' + p.name + '」生成封面（约需 10-20 秒）…', '');
     try {
       var r = await fetch('/api/projects/' + id + '/cover', { method: 'POST' });
       var d = await r.json();
       if (!r.ok) throw new Error(d.error || '生成失败');
-      // 刷新封面（加时间戳破坏缓存）
+      // 刷新封面（加时间戳破缓存）
       var imgs = document.querySelectorAll('.novel-item img[src*="' + encodeURIComponent(p.name).substring(0, 10) + '"]');
       imgs.forEach(function (img) {
         img.src = d.url + '?t=' + Date.now();
@@ -305,6 +317,7 @@ var ProjectUI = {
       ProjectUI.renderList();
       UI.toast('封面已生成', 'success');
     } catch (e) { UI.toast('封面生成失败：' + e.message, 'error'); }
+    finally { ProjectUI._coverGenerating = false; }
   },
   duplicate: async function (id) {
     UI.toast('正在复制项目…', '');

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Novel Studio 使用说明</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background:#f5f3ee; color:#2a2419; line-height:1.8; padding:40px 16px; }
+  .container { max-width:860px; margin:0 auto; background:#fff; border-radius:12px; box-shadow:0 4px 24px rgba(0,0,0,.08); padding:48px 56px; }
+  h1 { font-size:28px; color:#8c2f39; margin-bottom:8px; border-bottom:3px solid #8c2f39; padding-bottom:14px; }
+  h2 { font-size:22px; color:#5c3a1e; margin:36px 0 14px; padding-left:12px; border-left:4px solid #8c2f39; }
+  h3 { font-size:17px; color:#3d3226; margin:24px 0 10px; }
+  p { margin:10px 0; }
+  ul { margin:10px 0 10px 24px; }
+  li { margin:6px 0; }
+  b { color:#8c2f39; }
+  code { background:#f0ece4; padding:2px 7px; border-radius:4px; font-size:14px; font-family:Consolas,monospace; color:#5c3a1e; }
+  blockquote { background:#faf6ef; border-left:4px solid #d4af37; padding:10px 16px; border-radius:0 8px 8px 0; margin:12px 0; color:#5c4a33; }
+  table { width:100%; border-collapse:collapse; margin:14px 0; font-size:14px; }
+  th { background:#8c2f39; color:#fff; text-align:left; padding:10px 12px; }
+  td { border-bottom:1px solid #e8e2d6; padding:9px 12px; vertical-align:top; }
+  tr:hover td { background:#faf6ef; }
+  .hero { text-align:center; margin-bottom:28px; }
+  .hero .badge { display:inline-block; background:#8c2f39; color:#fff; font-size:12px; padding:4px 16px; border-radius:99px; letter-spacing:1px; }
+  @media (max-width:640px) {
+    .container { padding:28px 20px; }
+    h1 { font-size:22px; }
+    table { font-size:12px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+<div class="hero"><span class="badge">AI NOVEL STUDIO · v1.2</span></div>
+<h1>📖 AI Novel Studio 使用说明</h1>
+<p><b>本地运行的 AI 小说创作软件</b> —— 多 Agent 协同写作（构思→执笔→审稿）、去 AI 味、长篇记忆、完全本地隐私。</p>
+<p>---</p>
+<h2>🚀 三步开始使用</h2>
+<h3>第一步：启动</h3>
+<p>双击 <b><code>启动.bat</code></b> → 自动启动服务并打开浏览器（首次启动约 3-5 秒）。</p>
+<blockquote>界面地址：<code>http://localhost:8081</code>（如未自动打开，手动访问即可）</blockquote>
+<blockquote>关闭黑窗口不影响使用；停止服务请结束 <code>server.exe</code> 进程。</blockquote>
+<h3>第二步：配置 AI 模型（关键！）</h3>
+<p>点右上角 <b>「🔑 API 密钥与模型管理」</b>（钥匙图标）：</p>
+<ul>
+<li><b>付费 API（推荐）</b>：填入你的 DeepSeek API Key（<code>sk-...</code>），点「保存」</li>
+<li>去哪申请：<code>https://platform.deepseek.com</code> → API Keys → 创建</li>
+<li>价格极低：约 ¥1/百万 tokens，写 10 万字小说约几毛钱</li>
+<li><b>免费网页 AI（零成本）</b>：切到「免费网页AI」标签 → 选豆包/DeepSeek 网页版模板 → 点「🪄 自动获取」→ 在弹出的浏览器窗口登录 → 自动抓取 Cookie</li>
+<li>注意：网页 AI 有频率限制，适合尝鲜；正式写作推荐付费 API</li>
+</ul>
+<h3>第三步：开始创作</h3>
+<ul>
+<li>左侧 <b>「＋ 新建项目」</b> → 填书名、选类型（玄幻/校园/轻小说…）</li>
+<li>底部输入框写需求（如："第一章，少年在雨天捡到一把古剑"）→ 设目标字数 → 点 <b>「✨ 生成」</b></li>
+<li>AI 自动完成：<b>构思大纲 → 动笔写作 → 审稿修正</b>，实时流式显示</li>
+</ul>
+<p>---</p>
+<h2>🛠 常用功能</h2>
+<table>
+<tr><th>功能</th><th>位置</th><th>说明</th></tr>
+<tr><td>继续写下一章</td><td>底部输入「续写下一章…」</td><td>自动衔接前文</td></tr>
+<tr><td>从光标续写</td><td>编辑器工具栏「✍️从光标续写」</td><td>从指定位置继续</td></tr>
+<tr><td>去 AI 味</td><td>编辑器工具栏「✨去AI味」</td><td>检测+润色，让文风更自然</td></tr>
+<tr><td>审稿/校对</td><td>工具箱「🔍 校对审查」</td><td>错别字/逻辑/设定一致性</td></tr>
+<tr><td>长篇记忆</td><td>底部「🧠 相关记忆」</td><td>查看 AI 将参考的旧章节</td></tr>
+<tr><td>人物卡/世界观</td><td>左侧导航</td><td>设定角色与世界观，AI 自动参考</td></tr>
+<tr><td>版本历史</td><td>工具栏「📜 版本历史」</td><td>保存/回退任意版本</td></tr>
+<tr><td>主题切换</td><td>顶栏「🌙 主题」</td><td>6 套主题自由换</td></tr>
+</table>
+<h2>⚙️ 高级</h2>
+<ul>
+<li><b>创作模式</b>：顶栏下拉可选「智能协同（推荐）/快速草稿/严谨模式/文艺创作/指派Agent模型」等 8 种</li>
+<li><b>思考开关</b>：默认仅规划师开思考（快）；「🧠 思考·全开」= 全部角色深度思考（更稳但慢）</li>
+<li><b>批量建章</b>：底部「⚙️ 选项」→「📋 批量建章」，按大纲一次建多章</li>
+<li><b>数据备份</b>：数据存在 <code>data/</code> 目录，自动每日备份到 <code>data/backups/</code></li>
+</ul>
+<h2>❓ 常见问题</h2>
+<p><b>Q：生成很慢？</b></p>
+<p>A：标准模式（构思+写作+审稿）300 字约 30-50 秒属正常。要快用「快速草稿」模式。</p>
+<p><b>Q：字数不对？</b></p>
+<p>A：目标 1000 字会生成 870-1000 字（±15% 内），超长会自动裁剪。</p>
+<p><b>Q：想卸载？</b></p>
+<p>A：删除整个文件夹即可（数据在 <code>data/</code>，需要保留请先复制）。</p>
+<p><b>Q：端口 8081 被占用？</b></p>
+<p>A：修改 <code>configs/config.yaml</code> 中 <code>server.port</code>，然后重启。</p>
+<p>---</p>
+<p>*数据完全本地存储，不上传。祝你写作愉快 ✍️*</p>
+</div>
+</body>
+</html>

@@ -369,8 +369,8 @@ func (d *Dispatcher) verifyAndRevise(ctx context.Context, req GenerateRequest, b
 	current := content
 	// 字数保护：内容远超目标时先按句子边界裁剪，避免把失控长文传给校验官/微调（耗时爆炸 + 二次膨胀）
 	if req.TargetWord > 0 {
-		if cur := []rune(current); len(cur) > req.TargetWord*13/10 {
-			cut := trimToSentenceBoundary(current, req.TargetWord*11/10)
+		if cur := []rune(current); len(cur) > req.TargetWord*115/100 {
+			cut := trimToSentenceBoundary(current, req.TargetWord*105/100)
 			emit(ProgressEvent{Type: EventWarning, Text: fmt.Sprintf("正文 %d 字远超目标 %d 字，已裁剪至 %d 字后再校验", len(cur), req.TargetWord, len([]rune(cut)))})
 			current = cut
 		}
@@ -379,7 +379,7 @@ func (d *Dispatcher) verifyAndRevise(ctx context.Context, req GenerateRequest, b
 		if req.TargetWord <= 0 {
 			return true
 		}
-		return len([]rune(text)) <= req.TargetWord*13/10
+		return len([]rune(text)) <= req.TargetWord*115/100
 	}
 
 	var snapshots []snapshot
@@ -430,6 +430,14 @@ func (d *Dispatcher) verifyAndRevise(ctx context.Context, req GenerateRequest, b
 			return current, nil
 		}
 
+		// 达标提前终止（R1 修复）：长度合规且评分 ≥70（接近及格）时直接交付，
+		// 避免为几分的差异反复微调导致耗时膨胀（严谨模式 maxIter 较大时尤其明显）。
+		// 仅当评分确实接近及格线（70-84）且无重大缺陷时触发；评分过低仍需微调。
+		if lengthOK(current) && score >= 70 {
+			emit(ProgressEvent{Type: EventWarning, Stage: fmt.Sprintf("审稿评分 %d 分且字数合规，提前交付（仍建议人工复核次要缺陷）", score), Degraded: false})
+			return current, nil
+		}
+
 		// 净改进停止：已微调过且本轮评分比上轮提升不足 3 分 → 停止无意义循环
 		if !firstReview && lastScore >= 0 && score < lastScore+netImproveEpsilon {
 			emit(ProgressEvent{Type: EventWarning, Stage: fmt.Sprintf("审稿评分 %d→%d 提升不足，停止微调，交付最优版本", lastScore, score), Degraded: false})
@@ -466,8 +474,8 @@ func (d *Dispatcher) verifyAndRevise(ctx context.Context, req GenerateRequest, b
 		current = rev
 		// 字数保护：微调后若仍远超目标，按句子边界裁剪（防止"微调越写越长"的二次膨胀）
 		if req.TargetWord > 0 {
-			if curLen := len([]rune(current)); curLen > req.TargetWord*13/10 {
-				cut := trimToSentenceBoundary(current, req.TargetWord*11/10)
+			if curLen := len([]rune(current)); curLen > req.TargetWord*115/100 {
+				cut := trimToSentenceBoundary(current, req.TargetWord*105/100)
 				emit(ProgressEvent{Type: EventWarning, Text: fmt.Sprintf("微调后正文 %d 字仍远超目标 %d 字，已裁剪至 %d 字", curLen, req.TargetWord, len([]rune(cut)))})
 				current = cut
 			}

@@ -515,6 +515,12 @@ var ModelSettings = {
   },
 
   showQuickKey: function () {
+    // P3-4：动态读取 thinker 角色主模型名（所有角色共用同一模型链时展示该名）
+    try {
+      var rm = Store.state.roleModels || {};
+      var tm = (rm.thinker && rm.thinker.models && rm.thinker.models[0]) || {};
+      ModelSettings._primaryModelName = tm.name || 'deepseek-chat';
+    } catch (e) { ModelSettings._primaryModelName = 'deepseek-chat'; }
     var models = Store.state.models || [];
     var active = models.filter(function (m) { return m.status === 'active'; });
     // 查找任意已配置 key 的模型（不限于 deepseek-v4-pro），用于展示密钥状态
@@ -526,11 +532,11 @@ var ModelSettings = {
     UI.modal({
       title: '🔑 API 密钥与模型管理',
       wide: '520px',
-      body: '<div style="margin-bottom:12px;font-size:12px;color:var(--muted)">当前所有 Agent 角色（构思、写作、审稿、助手）均使用 <b style="color:var(--accent)">deepseek-v4-pro</b>。</div>' +
+      body: '<div style="margin-bottom:12px;font-size:12px;color:var(--muted)">当前 Agent 角色默认模型：<b style="color:var(--accent)">' + (ModelSettings._primaryModelName || 'deepseek-chat') + '</b>。可在下方按角色分别绑定模型。</div>' +
         '<div class="qp-section" style="background:var(--panel3);border-radius:8px;padding:12px;margin-bottom:10px">' +
         '<div style="font-weight:600;margin-bottom:8px">DeepSeek API Key</div>' +
         '<div style="display:flex;gap:8px;align-items:center">' +
-        '<input id="' + idn + '_key" type="text" value="' + esc(dsModel.api_key || '') + '" placeholder="sk-..." style="flex:1;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">' +
+        '<input id="' + idn + '_key" type="text" value="' + esc(keyedModel.api_key || '') + '" placeholder="sk-..." style="flex:1;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">' +
         '<button class="btn btn-primary" onclick="ModelSettings.saveQuickKey(\'' + idn + '\')" style="white-space:nowrap">💾 保存</button>' +
         '</div>' +
         '<div style="font-size:10px;color:var(--muted);margin-top:4px">当前：' + maskedKey + ' &nbsp;|&nbsp; <a href="#" onclick="RightPanel.switch(\'models\');this.closest(\'.modal-overlay\').remove()" style="color:var(--accent)">管理全部模型 →</a></div>' +

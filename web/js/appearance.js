@@ -97,6 +97,26 @@ var Appearance = {
     }
   },
 
+  // P3-1 修复：主题切换时背景变量联动。
+  // 根据当前主题的明暗 mode，确保侧栏/空状态背景变量指向对应主题背景文件。
+  // 若外观面板已配置自定义背景（_data.current_files），优先复用；否则用主题 CSS 默认值。
+  applyTheme: function () {
+    var root = document.documentElement;
+    var mode = 'dark';
+    try {
+      if (typeof Themes !== 'undefined' && Themes.mode) mode = Themes.mode();
+    } catch (e) {}
+    var d = this._data;
+    var files = (d && d.current_files) || {};
+    // 亮色主题用 sider_light 背景，暗色用 sider 背景
+    if (mode === 'light') {
+      if (files.sider_light_bg) root.style.setProperty('--sider-bg', 'url(' + files.sider_light_bg + ')');
+    } else {
+      if (files.sider_bg) root.style.setProperty('--sider-bg', 'url(' + files.sider_bg + ')');
+    }
+    if (files.empty_bg) root.style.setProperty('--empty-bg', 'url(' + files.empty_bg + ')');
+  },
+
   apply: async function (type, theme, file) {
     try {
       await API.setBackground(type, theme, file);
