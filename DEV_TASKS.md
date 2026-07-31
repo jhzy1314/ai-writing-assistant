@@ -578,3 +578,17 @@
 - **④ N4 判定细化**：detectPipeline art 触发词补充 韵味/意境/美感/画面感/细腻/优美/含蓄/留白/张力/慢镜头/细节描写/环境描写/心理描写/文风/文采
 - **⑤ 增量索引恢复**：发现 P0-039 的 Update/Create 钩子在后续 fix 中被误删（只剩 Delete），已恢复 IndexChapter×2 + Delete×1
 - 全部编译通过 + 部署
+
+### P0-045 v1.2 发布：git 提交+上传 GitHub / 启动模拟 / 使用说明HTML（2026-08-01 00:55-01:15 轮）
+- **任务一：v1.2 保存到 git + 上传 GitHub**：
+  - 发现仓库结构问题：git 同时跟踪根目录（真实代码）和旧 ai-novel-main/ 子目录（7月28日过时副本 97 文件）
+  - 用户确认后：git rm -r --cached ai-novel-main 移除旧跟踪；更新 .gitignore（排除第三方参考目录/备份/测试脚本/报告/zip）
+  - 提交 v1.2（多Agent+RAG+前端优化+上线修复），推送 origin master（94458ef..ab375fb）✅
+  - 网络坑：github.com 直连超时但 api.github.com 通，重试后推送成功
+- **任务二：模拟一键启动**：
+  - 实测发现启动.bat 中文乱码+命令解析错误——根因：LF 换行（Windows 批处理必须 CRLF）+ chcp 65001 与 GBK 内容冲突
+  - 修复：CRLF+GBK 编码、删 chcp 行 → 模拟双击验证：全新启动✅ 防重复启动✅ 中文显示✅ 服务6秒就绪✅
+- **任务三：使用说明 HTML 版**：
+  - md2html.py 极简 markdown 转换器 → 使用说明.html（自包含单文件，纸墨书香风格样式）
+  - 结构验证：doctype/表格/列表/代码块全齐 ✅
+- 全部推送 GitHub（5b4cd09），本地与远程同步
