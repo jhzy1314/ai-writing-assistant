@@ -17,7 +17,6 @@
   --accent: #e8945a;
   --sider-bg: url('/backgrounds/sider-texture.svg');
   --sider-light-bg: url('/backgrounds/sider-texture-light.svg');
-  --empty-bg: url('/backgrounds/empty-state.svg');
   --accent-hover: #d4783c;
   --accent-soft: #fef5ee;
   --accent2: #f0b878;
@@ -199,8 +198,13 @@ body.sidebar-hidden::before { display:none; }
 .side-new { padding:0 12px 10px; flex-shrink:0; }
 .side-section { display:flex; flex-direction:column; flex-shrink:0; }
 .side-section.novels { flex:1; border-top:1px solid var(--border); overflow-y:auto; min-height:0; }
-.side-section.resources { display:none !important; }
+.side-section.resources { display:none; }
 .side-section.resources.show { display:flex; }
+.side-section.resources.collapsed .chapter-tree,
+.side-section.resources.collapsed .res-list { display:none; }
+.side-section.resources .side-label { cursor:pointer; user-select:none; }
+.side-section.resources .side-label:hover { color:var(--text); }
+.res-caret { display:inline-block; width:14px; font-size:9px; transition:transform .15s; }
 .side-label {
   padding:9px 14px 5px; font-size:10.5px; font-weight:600; color:var(--muted);
   text-transform:uppercase; letter-spacing:.6px;
@@ -312,33 +316,12 @@ body.sidebar-hidden::before { display:none; }
   background: rgba(255,255,255,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   box-shadow: inset 0 0 0 1px var(--border);
 }
-[data-theme="dark"] .editor-pane::before {
-  content:''; position:absolute; inset:0;
-  background: url('/covers/empty-state.png') center/cover no-repeat;
-  opacity:.55; pointer-events:none; z-index:0;
-  filter: brightness(1.1) saturate(0.8);
-}
-[data-theme="light"] .editor-pane::before {
-  content:''; position:absolute; inset:0;
-  background: url('/covers/empty-state-light.png') center/cover no-repeat;
-  opacity:.65; pointer-events:none; z-index:0;
-  filter: brightness(1.05) saturate(0.9);
-}
 /* 纯净模式：隐藏装饰元素 */
-.clean-mode .editor-pane::before,
 .clean-mode .app::before,
 .clean-mode .novel-cover img { display:none !important; }
 .clean-mode .novel-cover .cover-fallback { display:flex !important; }
-/* .editor-pane.has-content::before { display:none; } -- 用户要求点击项目后图片不变化，保持始终显示 */
 .editor-inner { max-width:760px; margin:0 auto; padding:40px 48px 100px; min-height:calc(100vh - 220px); font-size:var(--font-size); }
 .editor-inner > .editor-rich { padding:24px 20px; }
-.editor-inner::before {
-  content:''; position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
-  width:400px; height:400px; pointer-events:none; z-index:0;
-  background-image:var(--empty-bg); background-repeat:no-repeat;
-  background-position:center; background-size:contain; opacity:.08;
-}
-.editor-inner.has-content::before { display:none; }
 .editor-rich {
   min-height:60vh; font-size:16px; line-height:1.95; color:var(--text); outline:none;
   white-space:pre-wrap; word-break:break-word;

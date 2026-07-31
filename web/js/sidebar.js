@@ -90,5 +90,22 @@ var Sidebar = {
     html += '</div></div>';
     document.getElementById('resList').innerHTML = html;
   },
-  toggleGroup: function (head) { head.parentElement.classList.toggle('collapsed'); }
+  toggleGroup: function (head) { head.parentElement.classList.toggle('collapsed'); },
+  toggleResources: function () {
+    var sec = document.getElementById('resourceSection');
+    if (!sec) return;
+    sec.classList.toggle('collapsed');
+    var caret = document.getElementById('resCaret');
+    if (caret) caret.textContent = sec.classList.contains('collapsed') ? '▸' : '▾';
+    Store.set('resourcesCollapsed', sec.classList.contains('collapsed'));
+  },
+  restoreResourcesState: function () {
+    var sec = document.getElementById('resourceSection');
+    if (!sec) return;
+    if (Store.get('resourcesCollapsed', false)) {
+      sec.classList.add('collapsed');
+      var caret = document.getElementById('resCaret');
+      if (caret) caret.textContent = '▸';
+    }
+  }
 };

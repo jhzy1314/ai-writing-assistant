@@ -107,7 +107,10 @@ window.initTiptap = async function () {
     </div>
 
       <div class="side-section resources" id="resourceSection">
-        <div class="side-label"><span id="resProjName">当前项目资源</span></div>
+        <div class="side-label" onclick="Sidebar.toggleResources()" title="折叠/展开当前项目资源" role="button" tabindex="0" aria-label="折叠/展开当前项目资源">
+          <span class="res-caret" id="resCaret">▾</span><span id="resProjName">当前项目资源</span>
+          <span class="link-btn" style="margin-left:auto" onclick="event.stopPropagation();UI.toggleSidebar()" title="折叠整个侧栏">◀</span>
+        </div>
         <div id="chapterTree" class="chapter-tree"></div>
         <div class="res-list" id="resList"></div>
       </div>
@@ -142,6 +145,7 @@ window.initTiptap = async function () {
             <option value="light">轻量快捷</option>
           </optgroup>
         </select>
+        <button class="tool-btn" style="font-size:11px;padding:3px 7px" onclick="Composer.showModeHelp(event)" title="查看各创作模式说明">❓</button>
         <select id="modelSelect" style="display:none" title="选择模型"></select>
         <div id="orchestratedModels" style="display:none;background:var(--panel2);border-radius:6px;padding:6px 10px;margin-left:8px"></div>
       </div>
@@ -1138,8 +1142,6 @@ window.initTiptap = async function () {
           <div class="ghead">预留扩展</div>
           <!-- 预留扩展入口（当前置灰）：自定义拖拽工作流-->
           <div class="reserved-btn">🚧 自定义拖拽工作流<span class="tag">规划中</span></div>
-          <!-- 预留扩展入口（当前置灰）：A/B 双稿对比 -->
-          <div class="reserved-btn" style="margin-top:6px">⚖️ A/B 双稿对比<span class="tag">规划中</span></div>
         </div>
       </div>
 

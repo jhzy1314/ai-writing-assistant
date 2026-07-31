@@ -106,6 +106,25 @@ var Composer = {
     var label = { thinker: '规划师', worker: '写作', verifier: '审稿', helper: '轻活' }[role] || role;
     UI.toast((checked ? '🧠 ' : '⚡ ') + label + '角色' + (checked ? '已开启' : '已关闭') + '思考', '');
   },
+  showModeHelp: function (e) {
+    if (e) e.stopPropagation();
+    var modes = [
+      { v: 'auto', n: '智能协同（推荐）', d: '自动判断任务类型匹配创作模式：续写/润色/审稿等分别走最合适的流程，无需手动选择。' },
+      { v: 'draft', n: '快速草稿', d: '跳过构思和审稿环节，由写作 Agent 直接产出初稿，速度最快，适合灵感记录。' },
+      { v: 'orchestrated', n: '指派Agent模型', d: '为规划师/写作/审稿三个角色分别手动指定模型，跑完整协同流程，适合对质量要求高的用户。' },
+      { v: 'manual', n: '手动自选模型', d: '跳过流水线，直接调用指定模型生成，所见即所得。' },
+      { v: 'strict', n: '严谨模式', d: 'Thinker 初稿 → Worker 润色 → Verifier 严格审校，层层把关，适合正式章节。' },
+      { v: 'art', n: '文艺创作', d: '极简框架 → Worker 高度自由创作 → 宽松审查，文风更自然有灵气。' },
+      { v: 'collab', n: '协同闭环', d: 'Thinker 规划 → Worker 写作 → Verifier 审查 → 发现问题自动返回重规划重写，直到通过，质量最稳但耗时较长。' },
+      { v: 'light', n: '轻量快捷', d: '直接调用 Helper 处理轻量任务（缩写/摘要/改写等），选中文本超 500 字请切换其他模式。' }
+    ];
+    var html = '<div style="max-height:62vh;overflow-y:auto">' + modes.map(function (m) {
+      return '<div style="padding:10px 12px;border-bottom:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--panel2)">' +
+        '<div style="font-weight:600;color:var(--accent);font-size:12.5px;margin-bottom:3px">' + m.n + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text2);line-height:1.7">' + m.d + '</div></div>';
+    }).join('') + '</div>';
+    UI.modal({ title: '🎨 创作模式说明', body: html, actions: [{ id: 'ok', label: '知道了', cls: 'btn-primary' }] });
+  },
   onModeChange: function (mode, skipPersist) {
     Store.state.composer.runMode = mode;
     document.getElementById('modeSelect').value = mode;

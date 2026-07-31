@@ -48,7 +48,6 @@
   --gold-gradient: linear-gradient(135deg, #c89656 0%, #e0b878 50%, #b5854c 100%);
   --sider-bg: url('/backgrounds/sider-texture-ink.svg');
   --sider-light-bg: url('/backgrounds/sider-texture-light.svg');
-  --empty-bg: url('/backgrounds/empty-state.svg');
   --accent-glow: rgba(196,43,43,.30);
   --font: 'KaiTi','STKaiti','SimSun','PingFang SC','Microsoft YaHei',serif;
 }
@@ -154,7 +153,6 @@
   --gold-gradient: linear-gradient(135deg, #f0d98d 0%, #e8c85a 50%, #b8912b 100%);
   --sider-bg: url('/backgrounds/sider-texture.svg');
   --sider-light-bg: url('/backgrounds/sider-texture-light.svg');
-  --empty-bg: url('/backgrounds/empty-state.svg');
   --accent-glow: rgba(212,175,55,.28);
 }
 [data-theme="gold"] .sidebar {
@@ -214,7 +212,6 @@
   --gold-gradient: linear-gradient(135deg, #e8c85a 0%, #f0b878 50%, #c89656 100%);
   --sider-bg: url('/backgrounds/sider-texture.svg');
   --sider-light-bg: url('/backgrounds/sider-texture-light.svg');
-  --empty-bg: url('/backgrounds/empty-state.svg');
   --accent-glow: rgba(232,160,53,.40);
 }
 [data-theme="focus"] body {

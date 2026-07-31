@@ -13,6 +13,7 @@ function initApp() {
   Store.loadPrefs();
   UI.initTheme();
   UI.initFontSize();
+  Sidebar.restoreResourcesState();
   // 1.5 初始化路由
   Router.init();
   // 2. 初始化编辑器
