@@ -91,12 +91,20 @@ var UI = {
     sidebar.classList.toggle('collapsed');
     document.body.classList.toggle('sidebar-hidden', sidebar.classList.contains('collapsed'));
     Store.set('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+    // 明确的折叠/展开反馈（用户可感知）
+    try {
+      UI.toast(sidebar.classList.contains('collapsed') ? '已收起侧栏，点击左侧橙色按钮可展开' : '已展开侧栏', 'info');
+    } catch (e) {}
   },
   toggleRight: function () {
     var right = document.getElementById('rightPanel');
     right.classList.toggle('collapsed');
     document.body.classList.toggle('right-hidden', right.classList.contains('collapsed'));
     Store.set('rightCollapsed', right.classList.contains('collapsed'));
+    // 明确的折叠/展开反馈（用户可感知）
+    try {
+      UI.toast(right.classList.contains('collapsed') ? '已收起右侧面板（编辑区已加宽）' : '已展开右侧面板', 'info');
+    } catch (e) {}
   },
   toggleTheme: function () {
     // 快捷切换：经典深色 <-> 经典浅色（多主题系统由 Themes 接管）
