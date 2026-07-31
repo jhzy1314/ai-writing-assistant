@@ -165,8 +165,19 @@ html.theme-anim .topbar {
 
 /* 专注主题：输入区毛玻璃强化 */
 [data-theme="focus"] .composer-box, [data-theme="focus"] .editor-toolbar {
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+/* 纸墨书香：纸张质感强化（微噪点 + 段落首行缩进） */
+[data-theme="paper-ink"] .editor-rich, [data-theme="paper-ink"] .editor-markdown {
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='0.035'/></feComponentTransfer></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+    repeating-linear-gradient(180deg, transparent 0 30px, rgba(140,47,57,.045) 30px 31px);
+  background-blend-mode: overlay;
+}
+[data-theme="paper-ink"] .editor-rich p, [data-theme="paper-ink"] .editor-markdown p {
+  text-indent: 2em;
 }
 
 /* 墨韵主题：按钮印章感 */

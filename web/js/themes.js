@@ -40,6 +40,12 @@ var Themes = {
     var t = this.get(id) || this.get(this.defaultId);
     if (!t) return;
     this.current = t.id;
+    // 主题切换过渡动画（polish.css html.theme-anim 规则）
+    document.documentElement.classList.add('theme-anim');
+    clearTimeout(this._animTimer);
+    this._animTimer = setTimeout(function () {
+      document.documentElement.classList.remove('theme-anim');
+    }, 400);
     document.documentElement.setAttribute('data-theme', t.id);
     document.body.classList.toggle('theme-light', t.mode === 'light');
     document.body.classList.toggle('theme-dark', t.mode === 'dark');
