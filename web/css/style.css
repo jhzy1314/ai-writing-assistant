@@ -389,6 +389,7 @@ body.right-hidden .main .right-toggle:hover::after { opacity: 1; }
 .editor-toolbar {
   padding:6px 18px 6px 30px; background:var(--panel); border-bottom:1px solid var(--border);
   display:flex; align-items:center; gap:4px; flex-shrink:0; flex-wrap:wrap; min-height:38px;
+  position:relative; z-index:70;
 }
 .editor-toolbar .tool-right { margin-left:auto; display:flex; align-items:center; gap:4px; }
 .editor-toolbar .wc { margin-left:10px; font-size:11px; color:var(--muted); display:flex; gap:10px; }

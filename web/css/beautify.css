@@ -528,6 +528,8 @@ body {
   border-bottom: 1px solid var(--border);
   padding: 7px 14px;
   gap: 4px;
+  position: relative;
+  z-index: 70;
 }
 .editor-stage {
   background: var(--bg);
