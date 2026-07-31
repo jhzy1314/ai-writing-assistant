@@ -743,6 +743,7 @@ body {
   top: 96px;
   bottom: 0;
   height: auto !important;
+  z-index: 50;
 }
 /* 折叠态：禁用毛玻璃滤镜，避免卡顿 + 防止悬浮面板盖住编辑区 */
 .right-panel.collapsed {
