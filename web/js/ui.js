@@ -28,6 +28,38 @@ var UI = {
     html += '</div>';
     this.modal({ title: '通知历史（最近 50 条）', body: html, actions: [{ id: 'close', label: '关闭' }] });
   },
+  /* 新手指南：从零开始使用 */
+  showGuide: function () {
+    var step = function (n, t, d) {
+      return '<div class="guide-step"><span class="guide-num">' + n + '</span><div><b>' + t + '</b><div class="guide-desc">' + d + '</div></div></div>';
+    };
+    var body =
+      '<div class="guide-wrap">' +
+      step('1', '配置 AI 模型（必做）', '点击右上角「🔑 API」，填入任一家 API 密钥并选择模型（推荐 DeepSeek / 智谱）。没有密钥时 AI 生成不可用，但本地写作、保存、导出不受影响。') +
+      step('2', '新建项目', '左侧「＋ 新建项目」，填写书名与题材。项目支持随时切换、归档，全部数据保存在本地数据库。') +
+      step('3', '写下需求，一键生成', '在底部输入框描述本章剧情（例如“主角在拍卖会上打脸反派”），点击「✨ 生成」。AI 自动完成 构思大纲 → 动笔写作 → 审稿修正 全流程。') +
+      step('4', '专业模式：详细设定', '点「⚡ 专业模式」填写书名 / 主角 / 世界观 / 分卷等 8 项设定，每一项都有「✨AI」按钮可让 AI 按严格约束生成建议；也可一键「🤖 AI 自动生成大纲」。') +
+      step('5', '管理设定与素材', '左侧导航：🌳 章节大纲 / 👤 人物卡 / 🌍 世界观 / 🧰 AI工具箱 / 📊 仪表盘。工具栏「⋯ 更多」还有 伏笔检查 / 角色互动 / 剧情分支 等 AI 辅助工具。') +
+      step('6', '保存与导出', '内容自动保存；工具栏「📥 导入文档 / 📤 导出文档」支持 docx / md / txt。右上角「🧼 纯净」可切换专注模式。') +
+      '</div>';
+    this.modal({
+      title: '📖 新手指南 · 三步上手 AI Novel Studio',
+      wide: '620px',
+      body: body,
+      actions: [{ id: 'ok', label: '开始创作 ✍️', cls: 'btn-primary' }]
+    });
+    // 已看过指南，不再自动弹出
+    try { localStorage.setItem('guideSeen', '1'); } catch (e) {}
+  },
+  /* 首次运行自动弹出新手指南（仅当无项目且未看过） */
+  maybeShowGuide: function () {
+    try {
+      if (localStorage.getItem('guideSeen')) return;
+      if (Store.state.projects && Store.state.projects.length) return;
+      var self = this;
+      setTimeout(function () { self.showGuide(); }, 900);
+    } catch (e) {}
+  },
   modal: function (opts) {
     var root = document.getElementById('modalRoot');
     // 单例守卫：已有弹窗则先关闭（防止快速双击叠加多个重叠弹窗）

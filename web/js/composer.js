@@ -60,6 +60,12 @@ var Composer = {
     if (goEl) goEl.value = Store.state.composer.outline || '';
     // 专业模式：恢复上次状态
     try { this.restoreProMode(); } catch (e) {}
+    // 窗口尺寸变化时重算专业模式面板位置（若展开）
+    var self = this;
+    window.addEventListener('resize', function () {
+      var p = document.getElementById('proModePanel');
+      if (p && p.style.display !== 'none') self._positionProPanel();
+    });
   },
   onSliderChange: function () {
     var val = parseInt(document.getElementById('targetWordSlider').value) || 1000;
@@ -448,6 +454,7 @@ var Composer = {
     if (!panel) return;
     var show = panel.style.display === 'none';
     panel.style.display = show ? 'flex' : 'none';
+    if (show) this._positionProPanel();
     if (btn) btn.classList.toggle('on', show);
     // 同步大纲内容到 genOutline（生成时读取）
     if (show) this.syncProOutlineToGen();
@@ -541,8 +548,31 @@ var Composer = {
     if (panel && Store.get('proModeOpen', false)) {
       panel.style.display = 'flex';
       if (btn) btn.classList.add('on');
+      this._positionProPanel();
       this.syncProOutlineToGen();
     }
+  },
+  /* 将专业模式面板定位为固定悬浮层：锚定在生成栏正上方，宽度对齐，超高内部滚动 */
+  _positionProPanel: function () {
+    var self = this;
+    var run = function () {
+      var panel = document.getElementById('proModePanel');
+      var ci = document.getElementById('composerInner');
+      if (!panel || !ci || panel.style.display === 'none') return;
+      var r = ci.getBoundingClientRect();
+      panel.style.position = 'fixed';
+      panel.style.left = Math.round(r.left) + 'px';
+      panel.style.width = Math.round(r.width) + 'px';
+      panel.style.bottom = (window.innerHeight - Math.round(r.top) + 10) + 'px';
+      // 可用高度 = 视口顶到生成栏顶，留 20px 边距；同时不超过视口的 80%
+      var avail = Math.round(r.top) - 20;
+      panel.style.maxHeight = Math.max(180, Math.min(avail, Math.round(window.innerHeight * 0.8))) + 'px';
+      panel.scrollTop = 0;
+    };
+    run();
+    // 页面布局可能仍在沉降（章节异步加载等），延迟再校准一次
+    clearTimeout(this._proPosTimer);
+    this._proPosTimer = setTimeout(run, 120);
   },
   /* 通用 AI 工具执行：展示结果弹窗 */
   _runTool: async function (tool, content, btn, label) {
@@ -586,6 +616,93 @@ var Composer = {
     var demand = Store.state.composer.outline || '';
     if (!demand.trim()) demand = '现代都市言情，男主：清冷克制型霸总；女主：独立飒爽型设计师';
     this._runTool('namegen', demand, null, '👤 AI 生成角色名');
+  },
+  /* 专业模式逐字段 AI 提示：严格限定只生成该字段 */
+  _fieldMeta: {
+    bookname: { el: 'proBookName', name: '书名', multi: false },
+    genre: { el: 'proGenre', name: '题材', multi: false },
+    selling: { el: 'proSelling', name: '核心卖点', multi: false },
+    hero: { el: 'proHero', name: '主角设定', multi: false },
+    world: { el: 'proWorld', name: '世界观/环境设定', multi: false },
+    power: { el: 'proPower', name: '力量/等级体系', multi: false },
+    plot: { el: 'proPlot', name: '主线剧情概述', multi: true },
+    volumes: { el: 'proVolumes', name: '分卷规划', multi: true }
+  },
+  aiField: async function (ev, field) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var meta = this._fieldMeta[field];
+    if (!meta) { UI.toast('未知字段', 'warn'); return; }
+    var btn = ev && ev.currentTarget;
+    // 收集上下文：当前已填字段 + 底部需求输入
+    var ctx = this._proContext(field);
+    if (!ctx.trim()) { UI.toast('请先填写任一设定或底部需求输入框，AI 才能给出建议', 'warn'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    try {
+      var r = await API.post('/api/tools/execute', {
+        tool: 'fieldgen',
+        content: ctx.slice(0, 3000),
+        params: { instruction: field }
+      });
+      var result = (r && r.result || '').trim();
+      if (!result) { UI.toast('AI 生成失败，请重试', 'error'); return; }
+      result = this._cleanFieldResult(field, result);
+      if (!result) { UI.toast('AI 返回内容为空，请重试', 'error'); return; }
+      var el = document.getElementById(meta.el);
+      if (el) {
+        el.value = result;
+        el.dispatchEvent(new Event('input'));
+        this.onProOutline();
+      }
+      UI.toast('✨ ' + meta.name + ' 已生成' + (meta.multi ? '' : '，可继续编辑'), 'success');
+    } catch (e) {
+      UI.toast('AI 生成失败：' + e.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '✨AI'; }
+    }
+  },
+  /* 聚合当前已填字段作为 AI 上下文（排除正在生成的字段本身） */
+  _proContext: function (excludeField) {
+    var parts = [];
+    var ins = (document.getElementById('instructionInput') || {}).value || '';
+    var self = this;
+    Object.keys(this._fieldMeta).forEach(function (k) {
+      if (k === excludeField) return;
+      var m = self._fieldMeta[k];
+      var el = document.getElementById(m.el);
+      var v = el ? el.value.trim() : '';
+      if (v) parts.push(m.name + '：' + v);
+    });
+    if (ins.trim()) parts.push('创作需求：' + ins.trim());
+    if (!parts.length) {
+      // 完全空白时给 AI 一个通用起点
+      return '';
+    }
+    return parts.join('\n');
+  },
+  /* 清洗 AI 返回：去掉标签前缀/引号/序号/候选标记，只留字段内容 */
+  _cleanFieldResult: function (field, result) {
+    var meta = this._fieldMeta[field];
+    var name = meta ? meta.name : field;
+    var lines = result.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    var cleaned = [];
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      // 去掉 “书名：” “【书名】” “书名：xxx” 等标签前缀
+      l = l.replace(new RegExp('^【?' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '】?[：:]\\s*'), '');
+      l = l.replace(/^[【\[]/, '').replace(/[】\]]$/, '');
+      l = l.replace(/^\*{1,2}/, '').replace(/\*{1,2}$/, '');
+      l = l.replace(/^[-•·]\s*/, '');
+      l = l.replace(/^\d+[.、)]\s*/, '');
+      // 去掉候选标记行（如 “方案A：”“1. 书名：”）
+      if (/^(方案|候选|选项)[A-D0-9一二三四]?[：:]/.test(l)) continue;
+      if (l === name) continue;
+      if (l) cleaned.push(l);
+    }
+    var out = cleaned.join('\n').trim();
+    out = out.replace(/^[「『“"']+/, '').replace(/[」』”"']+$/, '');
+    // 单行字段只取第一行
+    if (meta && !meta.multi) out = out.split('\n')[0].trim();
+    return out;
   },
   /* 辅助工具：伏笔检查 / 角色互动 / 剧情分支 */
   aiPlotCheck: function () {

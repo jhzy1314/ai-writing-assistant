@@ -269,6 +269,14 @@ func buildToolPrompt(tool, content, from, to, instruction string) string {
 
 请务必从正文中提取真实信息。例如给出了"林风是青云门弟子"、"师父张玄"、"红发男子来攻打"等事实，就要如实地列出。`, content)
 
+	case "fieldgen":
+		// 专业模式逐字段 AI 提示：instruction 传字段 key（bookname/genre/selling/hero/world/power/plot/volumes）
+		field := instruction
+		if field == "" {
+			field = "bookname"
+		}
+		return buildFieldPrompt(field, content)
+
 	case "proofread":
 		return fmt.Sprintf(`【工具：文字校对】
 你是专业中文校对助手。请仔细检查以下文本中的错别字、标点符号错误、的地得混用、用词不当等问题。
@@ -293,4 +301,53 @@ func buildToolPrompt(tool, content, from, to, instruction string) string {
 	default:
 		return ""
 	}
+}
+
+// buildFieldPrompt 专业模式逐字段 AI 提示：严格限定只输出该字段内容
+func buildFieldPrompt(field, content string) string {
+	fieldNames := map[string]string{
+		"bookname": "书名",
+		"genre":    "题材",
+		"selling":  "核心卖点",
+		"hero":     "主角设定",
+		"world":    "世界观/环境设定",
+		"power":    "力量/等级体系",
+		"plot":     "主线剧情概述",
+		"volumes":  "分卷规划",
+	}
+	fieldName := fieldNames[field]
+	if fieldName == "" {
+		fieldName = field
+	}
+	lengthRule := "内容精炼，单行输出，不超过 100 字。"
+	switch field {
+	case "bookname":
+		lengthRule = "书名控制在 2-12 个字，要有记忆点和网文感，避免生僻字堆砌，单行输出。"
+	case "genre":
+		lengthRule = "题材控制在 2-20 个字，用网文常见分类（都市异能/玄幻修仙/科幻末世/古代言情等），可写复合题材，单行输出。"
+	case "selling":
+		lengthRule = "核心卖点控制在 5-50 个字，说清最吸引人的 1-3 个点（废柴逆袭打脸、悬疑烧脑反转、爽点密度高等），单行输出。"
+	case "hero":
+		lengthRule = "主角设定控制在 20-120 个字：姓名（可给）、身份/职业、核心特质、性格、潜在背景伏笔，单行输出。"
+	case "world":
+		lengthRule = "世界观控制在 20-150 个字：时代背景、核心规则/设定、主要势力或格局，单行输出。"
+	case "power":
+		lengthRule = "力量体系控制在 20-100 个字：体系名称、等级划分（如 E→D→C→B→A→S）、获取方式，单行输出。"
+	case "plot":
+		lengthRule = "主线剧情控制在 50-300 个字，按「开局→发展→高潮→结局」四段式概述，每段一行（最多 4 行）。"
+	case "volumes":
+		lengthRule = "分卷规划控制在 50-300 个字，每卷一行，格式：第X卷《卷名》章节范围：内容概要（最多 5 行）。"
+	}
+	return fmt.Sprintf(`你是一个网文创作辅助 AI。用户正在填写小说设定表单中的「%s」字段，请你只负责生成这一项内容。
+
+【严格输出要求】
+1. 只输出「%s」字段的内容本身，直接可用于填入表单——不要任何开场白、解释、前后缀、序号、标题、引号、星号或 Markdown 标记。
+2. 严禁输出「好的」「以下是」「建议如下」等任何多余文字；严禁列出多个候选方案让用户挑选——只能输出唯一确定的最终内容。
+3. 严禁输出与字段无关的信息（不要输出剧情大纲、不要输出其他字段的内容）。
+4. 内容必须严格基于用户提供的创作需求；需求信息不足时，按网文常见套路合理补全，但不得与需求中已有的设定冲突。
+5. 长度要求：%s
+6. 全部用简体中文输出。
+
+用户创作需求/上下文：
+%s`, fieldName, fieldName, lengthRule, content)
 }

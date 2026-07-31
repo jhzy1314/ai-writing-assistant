@@ -509,12 +509,17 @@ body.right-hidden .main .right-toggle:hover::after { opacity: 1; }
 .composer-inner .btn-gen { border-radius:8px; padding:12px 28px; font-size:14px; font-weight:600; }
 
 /* ============ 专业模式（pro mode） ============ */
-.pro-mode-toggle.on { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+/* 专业模式面板：body 级悬浮，锚定在生成栏上方，内部可滚动 */
 .pro-mode {
   margin-top:10px; padding:12px 14px;
   background:var(--panel2); border:1px solid var(--border); border-radius:12px;
   display:flex; flex-direction:column; gap:10px;
+  z-index:60;
+  max-height:70vh;
+  overflow-y:auto;
+  box-shadow:0 8px 28px rgba(0,0,0,.28);
 }
+.pro-mode-toggle.on { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
 .pro-mode-head { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
 .pro-mode-title { font-size:12.5px; font-weight:700; color:var(--accent); }
 .pro-mode-sub { font-size:10.5px; color:var(--muted); }
@@ -540,6 +545,24 @@ body.right-hidden .main .right-toggle:hover::after { opacity: 1; }
 .pro-actions { display:flex; gap:6px; flex-wrap:wrap; }
 .pro-actions .btn { font-size:11px; padding:5px 10px; }
 .pro-tip { font-size:10.5px; color:var(--muted); line-height:1.6; background:var(--panel3); border-radius:6px; padding:6px 9px; }
+/* 逐字段 AI 提示按钮 */
+.pro-ai-btn {
+  margin-left:7px; padding:0 8px; font-size:9.5px; line-height:17px;
+  border-radius:999px; border:1px solid var(--border); background:var(--panel);
+  color:var(--accent); cursor:pointer; vertical-align:1px; font-family:var(--font);
+  transition:all .15s;
+}
+.pro-ai-btn:hover { border-color:var(--accent); background:var(--accent-soft); }
+.pro-ai-btn:disabled { opacity:.5; cursor:wait; }
+/* ============ 新手指南 ============ */
+.guide-wrap { display:flex; flex-direction:column; gap:11px; max-height:60vh; overflow-y:auto; padding-right:4px; }
+.guide-step { display:flex; gap:10px; align-items:flex-start; }
+.guide-num {
+  flex:0 0 22px; height:22px; border-radius:50%; background:var(--accent); color:var(--accent-fg,#fff);
+  font-size:11.5px; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px;
+}
+.guide-step b { font-size:12px; color:var(--text); display:block; margin-bottom:2px; }
+.guide-desc { font-size:11px; color:var(--muted); line-height:1.65; }
 .btn-gen {
   background:linear-gradient(115deg, var(--accent) 0%, var(--accent2) 45%, var(--accent) 100%);
   background-size:220% 220%;

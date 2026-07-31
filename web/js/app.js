@@ -45,6 +45,8 @@ function initApp() {
     if (lastId && Store.state.projects.some(function (p) { return p.id === lastId; })) {
       ProjectUI.select(lastId);
     }
+    // 首次运行（无项目且未看过）自动弹出新手指南
+    UI.maybeShowGuide();
   }).catch(function (e) { /* silent */ });
   // 兜底轮询
   var pollCount = 0;
