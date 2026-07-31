@@ -735,12 +735,13 @@ body {
   -webkit-backdrop-filter: blur(10px);
   border-left: 1px solid var(--border);
   box-shadow: -4px 0 24px rgba(0,0,0,.04);
+  /* 悬浮面板：在 .app 外侧，absolute 定位到右侧。top:210px 避开三层工具栏。z-index:30：高于编辑器内容，低于工具栏(z:70，.app 无 stacking context 时 70 上升到 body 层参与比较) */
   position: absolute !important;
   right: 0;
-  top: 96px;
+  top: 210px;
   bottom: 0;
   height: auto !important;
-  z-index: 50;
+  z-index: 30;
 }
 /* 鎶樺彔鎬侊細绂佺敤姣涚幓鐠冩护闀滐紝閬垮厤鍗￠】 + 闃叉鎮诞闈㈡澘鐩栦綇缂栬緫鍖?*/
 .right-panel.collapsed {
