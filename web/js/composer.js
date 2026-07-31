@@ -454,36 +454,80 @@ var Composer = {
     Store.set('proModeOpen', show);
   },
   onProOutline: function () {
-    var el = document.getElementById('proOutline');
-    if (!el) return;
-    Store.state.composer.outline = el.value.trim();
+    // 聚合专业模式所有字段为结构化大纲（写入 genOutline 供生成使用）
+    var fields = {
+      bookName: document.getElementById('proBookName'),
+      genre: document.getElementById('proGenre'),
+      selling: document.getElementById('proSelling'),
+      hero: document.getElementById('proHero'),
+      world: document.getElementById('proWorld'),
+      power: document.getElementById('proPower'),
+      plot: document.getElementById('proPlot'),
+      volumes: document.getElementById('proVolumes')
+    };
+    var parts = [];
+    var book = (fields.bookName ? fields.bookName.value : '').trim();
+    var genre = (fields.genre ? fields.genre.value : '').trim();
+    var selling = (fields.selling ? fields.selling.value : '').trim();
+    var hero = (fields.hero ? fields.hero.value : '').trim();
+    var world = (fields.world ? fields.world.value : '').trim();
+    var power = (fields.power ? fields.power.value : '').trim();
+    var plot = (fields.plot ? fields.plot.value : '').trim();
+    var volumes = (fields.volumes ? fields.volumes.value : '').trim();
+    if (book) parts.push('书名：' + book);
+    if (genre) parts.push('题材：' + genre);
+    if (selling) parts.push('核心卖点：' + selling);
+    if (hero) parts.push('主角设定：' + hero);
+    if (world) parts.push('世界观：' + world);
+    if (power) parts.push('力量体系：' + power);
+    if (plot) parts.push('主线剧情：\n' + plot);
+    if (volumes) parts.push('分卷规划：\n' + volumes);
+    var outline = parts.join('\n\n');
+    Store.state.composer.outline = outline;
     var gen = document.getElementById('genOutline');
-    if (gen && gen.value !== el.value) gen.value = el.value;
+    if (gen && gen.value !== outline) gen.value = outline;
     this.onOutlineChange();
   },
   syncProOutlineToGen: function () {
-    var el = document.getElementById('proOutline');
-    var gen = document.getElementById('genOutline');
-    var cur = Store.state.composer.outline || (gen ? gen.value : '') || '';
-    if (el && !el.value && cur) el.value = cur;
-    if (el && el.value && gen && gen.value !== el.value) gen.value = el.value;
+    var cur = Store.state.composer.outline || '';
+    if (!cur) return;
+    // 尝试把已有大纲文本解析回字段（简化：按“标签：”匹配）
+    var lines = cur.split('\n');
+    var curText = '';
+    var mapping = { '书名': 'proBookName', '题材': 'proGenre', '核心卖点': 'proSelling', '主角设定': 'proHero', '世界观': 'proWorld', '力量体系': 'proPower' };
+    var lastField = null;
+    lines.forEach(function (l) {
+      var m = l.match(/^([^：:]{2,6})[：:]\s*(.*)$/);
+      if (m && mapping[m[1]]) {
+        var el = document.getElementById(mapping[m[1]]);
+        if (el && !el.value) el.value = m[2].trim();
+        lastField = m[1];
+      } else if (lastField === '主线剧情' || lastField === '分卷规划') {
+        var ta = document.getElementById(lastField === '主线剧情' ? 'proPlot' : 'proVolumes');
+        if (ta && !ta.value) ta.value += (ta.value ? '\n' : '') + l;
+      }
+    });
+    // 主线/分卷单独尝试匹配
+    var pm = cur.match(/主线剧情[：:]\s*\n?([\s\S]*?)(?=\n\s*分卷规划|$)/);
+    if (pm) { var elp = document.getElementById('proPlot'); if (elp && !elp.value) elp.value = pm[1].trim(); }
+    var vm = cur.match(/分卷规划[：:]\s*\n?([\s\S]*?)$/);
+    if (vm) { var elv = document.getElementById('proVolumes'); if (elv && !elv.value) elv.value = vm[1].trim(); }
   },
   aiOutline: async function () {
-    var demand = (document.getElementById('proOutline') || {}).value || (document.getElementById('instructionInput') || {}).value || '';
+    // 用聚合后的结构化大纲作为输入（含所有字段）
+    var outline = Store.state.composer.outline || '';
+    var demand = outline || (document.getElementById('instructionInput') || {}).value || '';
     if (!demand.trim()) { UI.toast('请先填写题材/灵感，或使用上面的需求输入框', 'warn'); return; }
     var pid = Store.state.currentProject;
     if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
     var btn = event && event.currentTarget;
     if (btn) { btn.disabled = true; btn.textContent = '🤖 生成中…'; }
-    var out = document.getElementById('proOutline');
     try {
       var r = await API.post('/api/tools/execute', { tool: 'outline', content: demand.slice(0, 6000) });
       var result = (r && r.result) || '';
       if (!result.trim()) { UI.toast('AI 生成失败，请重试', 'error'); return; }
-      if (out) {
-        out.value = result.trim();
-        Composer.onProOutline();
-      }
+      // 结果写入专业模式弹窗 + 主线剧情字段
+      this._runToolResult('🤖 AI 生成的大纲', result);
       UI.toast('✅ 大纲已生成，可继续编辑或直接生成正文', 'success');
     } catch (e) {
       UI.toast('大纲生成失败：' + e.message, 'error');
@@ -509,20 +553,7 @@ var Composer = {
       var result = (r && r.result) || '';
       if (!result.trim()) { UI.toast('AI 生成失败，请重试', 'error'); return; }
       // 结果弹窗，可复制
-      var idn = 't_' + Date.now();
-      UI.modal({
-        title: label,
-        width: '560px',
-        body: '<div class="form-group"><textarea id="' + idn + '" rows="14" style="width:100%;font-size:12px;line-height:1.7;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:var(--font)">' + esc(result) + '</textarea></div>' +
-              '<div style="font-size:10.5px;color:var(--muted);margin-top:4px">💡 可编辑后复制到对应模块，或作为灵感参考</div>',
-        actions: [
-          { id: 'cancel', label: '关闭' },
-          { id: 'copy', label: '📋 复制结果', cls: 'btn-primary', onClick: function (m, ov) {
-            var ta = document.getElementById(idn);
-            if (ta) { ta.select(); document.execCommand('copy'); UI.toast('已复制', 'success'); }
-          } }
-        ]
-      });
+      this._runToolResult(label, result);
       return result;
     } catch (e) {
       UI.toast(label + '失败：' + e.message, 'error');
@@ -530,12 +561,29 @@ var Composer = {
       if (btn) { btn.disabled = false; btn.textContent = label; }
     }
   },
+  /* 通用 AI 结果弹窗（可编辑+复制） */
+  _runToolResult: function (label, result) {
+    var idn = 't_' + Date.now();
+    UI.modal({
+      title: label,
+      width: '560px',
+      body: '<div class="form-group"><textarea id="' + idn + '" rows="14" style="width:100%;font-size:12px;line-height:1.7;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:var(--font)">' + esc(result) + '</textarea></div>' +
+            '<div style="font-size:10.5px;color:var(--muted);margin-top:4px">💡 可编辑后复制到对应模块，或作为灵感参考</div>',
+      actions: [
+        { id: 'cancel', label: '关闭' },
+        { id: 'copy', label: '📋 复制结果', cls: 'btn-primary', onClick: function (m, ov) {
+          var ta = document.getElementById(idn);
+          if (ta) { ta.select(); document.execCommand('copy'); UI.toast('已复制', 'success'); }
+        } }
+      ]
+    });
+  },
   aiWorldbuild: function () {
-    var demand = (document.getElementById('proOutline') || {}).value || (document.getElementById('instructionInput') || {}).value || '';
+    var demand = Store.state.composer.outline || (document.getElementById('instructionInput') || {}).value || '';
     this._runTool('worldbuild', demand || '一个原创架空世界（请提供题材）', null, '🌍 AI 生成世界观');
   },
   aiNames: function () {
-    var demand = (document.getElementById('proOutline') || {}).value || '';
+    var demand = Store.state.composer.outline || '';
     if (!demand.trim()) demand = '现代都市言情，男主：清冷克制型霸总；女主：独立飒爽型设计师';
     this._runTool('namegen', demand, null, '👤 AI 生成角色名');
   },

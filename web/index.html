@@ -319,11 +319,41 @@ window.initTiptap = async function () {
         <div class="pro-mode" id="proModePanel" style="display:none">
           <div class="pro-mode-head">
             <span class="pro-mode-title">⚡ 专业创作设置</span>
-            <span class="pro-mode-sub">填写越详细，AI 输出越贴合你的构思</span>
+            <span class="pro-mode-sub">按提示填写，AI 会严格遵循你的设定</span>
+          </div>
+          <div class="pro-form-grid">
+            <div class="form-group">
+              <label>📕 书名 <span class="pro-opt">（选填）</span></label>
+              <input class="pro-input" id="proBookName" placeholder="例如：风起西陵" oninput="Composer.onProOutline()">
+            </div>
+            <div class="form-group">
+              <label>📂 题材 <span class="pro-opt">（选填）</span></label>
+              <input class="pro-input" id="proGenre" placeholder="例如：都市异能 / 玄幻修仙 / 科幻末世" oninput="Composer.onProOutline()">
+            </div>
+            <div class="form-group">
+              <label>🎯 核心卖点 <span class="pro-opt">（选填）</span></label>
+              <input class="pro-input" id="proSelling" placeholder="例如：废柴逆袭打脸爽文 / 悬疑烧脑反转" oninput="Composer.onProOutline()">
+            </div>
+            <div class="form-group">
+              <label>🎭 主角设定 <span class="pro-opt">（选填）</span></label>
+              <input class="pro-input" id="proHero" placeholder="例如：林夜，外卖员，实为上古灵脉传人，性格隐忍腹黑" oninput="Composer.onProOutline()">
+            </div>
+            <div class="form-group">
+              <label>🌍 世界观/环境设定 <span class="pro-opt">（选填）</span></label>
+              <input class="pro-input" id="proWorld" placeholder="例如：灵气复苏的现代都市，五大势力暗中博弈" oninput="Composer.onProOutline()">
+            </div>
+            <div class="form-group">
+              <label>⚔️ 力量/等级体系 <span class="pro-opt">（选填）</span></label>
+              <input class="pro-input" id="proPower" placeholder="例如：觉醒者九阶：E→D→C→B→A→S→SS→SSS→神阶" oninput="Composer.onProOutline()">
+            </div>
           </div>
           <div class="form-group">
-            <label>📝 全书大纲 <span class="pro-hint">（手动填写，AI 生成时可参考）</span></label>
-            <textarea id="proOutline" class="pro-outline" rows="5" placeholder="例如：\n题材：都市异能\n主角：林夜，表面是普通外卖员，实为上古灵脉传人\n主线：意外卷入城市灵异事件，逐步揭开家族秘辛，最终守护城市\n分卷：第一卷 觉醒（1-30章），第二卷 入局（31-60章）…" oninput="Composer.onProOutline()"></textarea>
+            <label>📝 主线剧情概述 <span class="pro-opt">（选填，可多行）</span></label>
+            <textarea id="proPlot" class="pro-outline" rows="3" placeholder="例如：\n开局：主角意外觉醒，卷入城市灵异事件\n发展：逐步揭开家族秘辛，卷入五大势力争斗\n高潮：决战幕后黑手，守护城市\n结局：完成传承，开启新篇章" oninput="Composer.onProOutline()"></textarea>
+          </div>
+          <div class="form-group">
+            <label>📑 分卷规划 <span class="pro-opt">（选填，每卷一行）</span></label>
+            <textarea id="proVolumes" class="pro-outline" rows="3" placeholder="例如：\n第一卷《觉醒》1-30章：主角觉醒能力，结识伙伴\n第二卷《入局》31-60章：卷入势力斗争\n第三卷《决战》61-90章：终极对决" oninput="Composer.onProOutline()"></textarea>
           </div>
           <div class="pro-actions">
             <button class="btn btn-ghost btn-sm" onclick="Composer.aiOutline()">🤖 AI 自动生成大纲</button>
@@ -333,7 +363,7 @@ window.initTiptap = async function () {
             <button class="btn btn-ghost btn-sm" onclick="Router.navigate('characters')">✍️ 手动填人物卡</button>
             <button class="btn btn-ghost btn-sm" onclick="Router.navigate('worldbuilding')">✍️ 手动填世界观</button>
           </div>
-          <div class="pro-tip">💡 提示：专业模式下生成时，会自动带上你填写的大纲与角色/世界观设定，AI 会严格遵循。</div>
+          <div class="pro-tip">💡 提示：专业模式下生成时，会自动带上你填写的全部设定，AI 会严格遵循。字段越多，输出越贴合你的构思。</div>
         </div>
         <div class="gen-opts" id="genOpts" style="display:none">
           <button class="tool-btn" style="font-size:10px;margin-right:4px" onclick="ChapterUI.batchFromOutline()" title="根据大纲批量创建空白章节">📋 批量建章</button>

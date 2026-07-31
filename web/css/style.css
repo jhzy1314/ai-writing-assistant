@@ -520,6 +520,16 @@ body.right-hidden .main .right-toggle:hover::after { opacity: 1; }
 .pro-mode-sub { font-size:10.5px; color:var(--muted); }
 .pro-mode .form-group label { font-size:11.5px; }
 .pro-hint { font-size:10px; color:var(--faint); font-weight:400; }
+.pro-opt { font-size:10px; color:var(--faint); font-weight:400; }
+.pro-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; }
+@media (max-width: 700px) { .pro-form-grid { grid-template-columns:1fr; } }
+.pro-input {
+  width:100%;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  padding:7px 10px; font-size:12px; color:var(--text); font-family:var(--font);
+}
+.pro-input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
+.pro-input::placeholder { color:var(--faint); }
 .pro-outline {
   width:100%; min-height:96px; resize:vertical;
   background:var(--panel); border:1px solid var(--border); border-radius:8px;
