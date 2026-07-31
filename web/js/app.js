@@ -15,6 +15,19 @@ function initApp() {
   UI.initFontSize();
   Sidebar.restoreResourcesState();
   Sidebar.restoreNavMoreState();
+  // 恢复侧栏/右栏折叠状态（body 类同步，保证折叠按钮显示正确）
+  try {
+    var sb = document.getElementById('sidebar');
+    if (sb && Store.get('sidebarCollapsed', false)) {
+      sb.classList.add('collapsed');
+      document.body.classList.add('sidebar-hidden');
+    }
+    var rp = document.getElementById('rightPanel');
+    if (rp && Store.get('rightCollapsed', false)) {
+      rp.classList.add('collapsed');
+      document.body.classList.add('right-hidden');
+    }
+  } catch (e) {}
   decorateShortcuts();
   // 1.5 初始化路由
   Router.init();

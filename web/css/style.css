@@ -324,6 +324,8 @@ body.sidebar-hidden .main .side-toggle:hover::after { opacity: 1; }
   border-radius:9px 0 0 9px; cursor:pointer; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px;
 }
+/* 右侧面板展开时：隐藏 .main 的悬浮按钮（面板自带收起按钮） */
+body:not(.right-hidden) .main .right-toggle { display:none; }
 .main .right-toggle:hover { background:var(--panel2); color:var(--text); }
 /* 右栏折叠后：恢复按钮同样高亮 */
 body.right-hidden .main .right-toggle {
@@ -531,7 +533,16 @@ body.right-hidden .main .right-toggle:hover::after { opacity: 1; }
   box-shadow: -2px 0 12px rgba(60,40,20,.05); border-left: 1px solid rgba(200,180,160,.15);
 }
 .right-panel.collapsed { width:0; min-width:0; border-left:none; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
-.right-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+.right-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; position:relative; }
+.right-tab-collapse {
+  position:absolute; right:4px; top:50%; transform:translateY(-50%);
+  width:24px; height:24px; border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-size:11px; color:var(--muted);
+  background:var(--panel2); border:1px solid var(--border);
+  z-index:5; user-select:none; transition:all .14s;
+}
+.right-tab-collapse:hover { color:var(--accent); background:var(--accent-soft); border-color:var(--accent); }
 .right-tab {
   flex:1; padding:8px 2px; text-align:center; cursor:pointer; font-size:15px; color:var(--muted);
   border-bottom:2px solid transparent; transition:all .14s; font-weight:500;

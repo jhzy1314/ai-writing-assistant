@@ -990,6 +990,7 @@ window.initTiptap = async function () {
   <!-- ================= Right panel ================= -->
   <aside class="right-panel" id="rightPanel">
     <div class="right-tabs">
+      <span class="right-tab-collapse" onclick="UI.toggleRight()" title="收起控制面板" role="button" tabindex="0">▶</span>
       <span class="right-tab active" data-page="pipeline" onclick="RightPanel.switch('pipeline')" title="流水线状态">⚙️</span>
       <span class="right-tab" data-page="templates" onclick="RightPanel.switch('templates')" title="模板库">📚</span>
       <span class="right-tab" data-page="context" onclick="RightPanel.switch('context')" title="设定资源">👤</span>
