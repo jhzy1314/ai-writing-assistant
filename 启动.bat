@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 title AI Novel Studio Æô¶¯Æ÷
 cd /d "%~dp0"
 
