@@ -94,8 +94,16 @@ window.initTiptap = async function () {
       <a class="nav-link" data-page="outline" onclick="Router.navigate('outline')">🌳 章节大纲</a>
       <a class="nav-link" data-page="characters" onclick="Router.navigate('characters')">👤 人物卡</a>
       <a class="nav-link" data-page="worldbuilding" onclick="Router.navigate('worldbuilding')">🌍 世界观</a>
-      <a class="nav-link" data-page="toolbox" onclick="Router.navigate('toolbox')">🧰 AI工具箱</a>
-      <a class="nav-link" data-page="dashboard" onclick="Router.navigate('dashboard')">📊 仪表盘</a>
+      <div class="nav-more" id="navMore">
+        <div class="nav-more-head" onclick="Sidebar.toggleNavMore(event)" role="button" tabindex="0" aria-expanded="false">
+          <span class="nav-more-caret" id="navMoreCaret">▸</span><span>更多</span>
+          <span class="nav-more-count" id="navMoreCount">2</span>
+        </div>
+        <div class="nav-more-body" id="navMoreBody" style="display:none">
+          <a class="nav-link" data-page="toolbox" onclick="Router.navigate('toolbox')">🧰 AI工具箱</a>
+          <a class="nav-link" data-page="dashboard" onclick="Router.navigate('dashboard')">📊 仪表盘</a>
+        </div>
+      </div>
     </div>
 
     <div class="side-section novels">
@@ -127,7 +135,7 @@ window.initTiptap = async function () {
       <input type="hidden" id="targetWord" value="1000">
       <span class="doc-title" id="docTitle">未选择稿件</span>
       <button class="tool-btn" id="btnAutoTitle" title="AI 生成标题" style="display:none" onclick="Composer.autoTitle()">✍️拟标题</button>
-      <button class="tool-btn" onclick="ChapterUI.searchAllChapters()" title="全文搜索 (Ctrl+F)">🔍</button>
+      <button class="tool-btn" onclick="ChapterUI.searchAllChapters()" title="全文搜索 (Ctrl+F)" data-shortcut="Ctrl+F">🔍</button>
       <span class="doc-meta" id="docMeta"></span>
       <div class="spacer"></div>
       <div class="grp">
@@ -201,7 +209,7 @@ window.initTiptap = async function () {
         <button class="tool-btn" onclick="Editor.insertH('## ')" title="二级标题">H2</button>
         <button class="tool-btn" onclick="Editor.insertH('### ')" title="三级标题">H3</button>
         <span class="tool-divider"></span>
-        <button class="tool-btn" onclick="ManualSave.saveDraft()" title="保存为版本(Ctrl+S)">💾 保存版本</button>
+        <button class="tool-btn" onclick="ManualSave.saveDraft()" title="保存为版本(Ctrl+S)" data-shortcut="Ctrl+S">💾 保存版本</button>
         <button class="tool-btn" onclick="VersionUI.open()" title="版本历史">📜 版本历史</button>
         <span class="tool-divider"></span>
         <button class="tool-btn" onclick="ChapterUI.splitChapterAtCursor()" title="从光标处拆分章节">✂️拆分</button>
@@ -299,7 +307,7 @@ window.initTiptap = async function () {
         <textarea id="instructionInput" placeholder="💡 输入创作需求或选中文字后使用快捷指令…（Ctrl+Enter 发送）" oninput="Editor.syncInstructionHeight(this)" onkeydown="if(event.ctrlKey&amp;&amp;event.key==='Enter'){event.preventDefault();Composer.generate()}"></textarea>
         <textarea id="genOutline" class="outline-input" rows="2" placeholder="📝 手动填写本章或全书大纲（选填），留空则由 AI 生成" oninput="Composer.onOutlineChange()"></textarea>
         <div class="gen-main-row">
-          <button class="btn btn-primary btn-gen" id="btnGenerate" onclick="Composer.generate()">✨ 生成</button>
+          <button class="btn btn-primary btn-gen" id="btnGenerate" onclick="Composer.generate()" data-shortcut="Ctrl+Enter">✨ 生成</button>
           <button class="tool-btn gen-opt-toggle" onclick="Composer.toggleGenOptions(event)" title="更多生成选项">⚙️ 选项</button>
         </div>
         <div class="gen-opts" id="genOpts" style="display:none">

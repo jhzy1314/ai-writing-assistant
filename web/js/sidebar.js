@@ -99,6 +99,30 @@ var Sidebar = {
     if (caret) caret.textContent = sec.classList.contains('collapsed') ? '▸' : '▾';
     Store.set('resourcesCollapsed', sec.classList.contains('collapsed'));
   },
+  toggleNavMore: function (ev) {
+    ev = ev || window.event;
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var body = document.getElementById('navMoreBody');
+    if (!body) return;
+    var open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    var caret = document.getElementById('navMoreCaret');
+    if (caret) caret.textContent = open ? '▸' : '▾';
+    var head = document.getElementById('navMore');
+    if (head) head.setAttribute('aria-expanded', String(!open));
+    Store.set('navMoreOpen', !open);
+  },
+  restoreNavMoreState: function () {
+    var body = document.getElementById('navMoreBody');
+    if (!body) return;
+    if (Store.get('navMoreOpen', false)) {
+      body.style.display = 'block';
+      var caret = document.getElementById('navMoreCaret');
+      if (caret) caret.textContent = '▾';
+      var head = document.getElementById('navMore');
+      if (head) head.setAttribute('aria-expanded', 'true');
+    }
+  },
   restoreResourcesState: function () {
     var sec = document.getElementById('resourceSection');
     if (!sec) return;

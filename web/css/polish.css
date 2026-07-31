@@ -193,3 +193,64 @@ html.theme-anim .topbar {
 /* 鎏金主题：金色辉光 */
 [data-theme="gold"] .btn-primary { box-shadow: 0 2px 12px rgba(212,175,55,.3); }
 [data-theme="gold"] .quota-meter > i { box-shadow: 0 0 8px rgba(212,175,55,.5); }
+
+/* ---------- 快捷键 chip（P1-3） ---------- */
+.kbd-chip {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 4px;
+  font-family: 'Cascadia Code', Consolas, Menlo, monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--muted);
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  vertical-align: 1px;
+  white-space: nowrap;
+  opacity: .85;
+  pointer-events: none;
+  user-select: none;
+}
+.tool-btn .kbd-chip { opacity: .8; }
+.btn-primary .kbd-chip {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.25);
+  color: rgba(255,255,255,.9);
+}
+
+/* ---------- 导航「更多」折叠组（P1-4） ---------- */
+.nav-more { margin: 2px 10px; }
+.nav-more-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px; font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  transition: background .14s, color .14s;
+}
+.nav-more-head:hover { background: var(--panel2); color: var(--text); }
+.nav-more-caret {
+  width: 10px;
+  font-size: 11px;
+  transition: transform .15s;
+  flex-shrink: 0;
+}
+.nav-more-count {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--faint);
+  background: var(--panel3);
+  border-radius: 8px;
+  padding: 0 6px;
+  line-height: 1.6;
+}
+.nav-more-body .nav-link {
+  margin: 1px 10px 1px 20px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+}

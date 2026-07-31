@@ -50,6 +50,18 @@ var Router = {
     document.querySelectorAll('.nav-link').forEach(function (el) {
       el.classList.toggle('active', el.getAttribute('data-page') === page);
     });
+    // 导航到「更多」组内的页面时自动展开该组
+    if (page === 'toolbox' || page === 'dashboard') {
+      var body = document.getElementById('navMoreBody');
+      if (body && body.style.display === 'none') {
+        body.style.display = 'block';
+        var caret = document.getElementById('navMoreCaret');
+        if (caret) caret.textContent = '▾';
+        var head = document.getElementById('navMore');
+        if (head) head.setAttribute('aria-expanded', 'true');
+        try { Store.set('navMoreOpen', true); } catch (e) {}
+      }
+    }
   },
   saveDraft: function (page) {
     if (!this.cache[page]) this.cache[page] = {};

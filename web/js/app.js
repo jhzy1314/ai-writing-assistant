@@ -14,6 +14,8 @@ function initApp() {
   UI.initTheme();
   UI.initFontSize();
   Sidebar.restoreResourcesState();
+  Sidebar.restoreNavMoreState();
+  decorateShortcuts();
   // 1.5 初始化路由
   Router.init();
   // 2. 初始化编辑器
@@ -193,3 +195,28 @@ function watchA11y() {
   mo.observe(document.body, { childList: true, subtree: true });
 }
 document.addEventListener('DOMContentLoaded', function () { setTimeout(watchA11y, 500); });
+
+/* ============ 快捷键 chip：给带 data-shortcut 的按钮注入 <kbd> 徽标 ============ */
+function decorateShortcuts() {
+  try {
+    document.querySelectorAll('[data-shortcut]').forEach(function (btn) {
+      if (btn.querySelector('.kbd-chip')) return; // 已注入过
+      var sc = btn.getAttribute('data-shortcut');
+      if (!sc) return;
+      var chip = document.createElement('kbd');
+      chip.className = 'kbd-chip';
+      chip.textContent = sc;
+      // 生成按钮等主要按钮：chip 放按钮内右侧
+      btn.appendChild(chip);
+    });
+  } catch (e) { /* 注入失败不影响主流程 */ }
+}
+// 动态渲染的按钮也用 MutationObserver 兜底补 chip
+var _scObserved = false;
+function watchShortcuts() {
+  if (_scObserved) return;
+  _scObserved = true;
+  var mo = new MutationObserver(function () { decorateShortcuts(); });
+  mo.observe(document.body, { childList: true, subtree: true });
+}
+document.addEventListener('DOMContentLoaded', function () { setTimeout(watchShortcuts, 800); });
