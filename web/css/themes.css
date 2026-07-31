@@ -6,6 +6,7 @@
 
 /* ---------- 墨韵书斋（中国古典：深木案 + 宣纸 + 朱砂） ---------- */
 [data-theme="ink-study"] {
+  --btn-text: #ffffff;
   --bg: #241207;
   --bg-gradient: linear-gradient(165deg, #2d1409 0%, #241207 55%, #1d0e05 100%);
   --bg-radial-a: radial-gradient(ellipse at 80% 0%, rgba(196,43,43,.10) 0%, transparent 55%);
@@ -180,6 +181,7 @@
 
 /* ---------- 沉浸专注（毛玻璃 + 氛围背景） ---------- */
 [data-theme="focus"] {
+  --btn-text: #241505;
   --bg: #10131a;
   --bg-gradient: linear-gradient(165deg, #141721 0%, #0e1118 55%, #0b0e14 100%);
   --bg-radial-a: radial-gradient(ellipse at 75% 12%, rgba(120,90,190,.25) 0%, transparent 55%);
@@ -309,6 +311,7 @@
 
 /* ---------- 纸墨书香（InkOS 风格：暖米白纸感 + 酒红 + 衬线标题，浅色） ---------- */
 [data-theme="paper-ink"] {
+  --btn-text: #ffffff;
   --bg: #f3eddf;
   --bg-gradient: linear-gradient(165deg, #f7f2e7 0%, #f1e9d8 55%, #ece2cd 100%);
   --bg-radial-a: radial-gradient(ellipse at 80% 0%, rgba(140,47,57,.07) 0%, transparent 55%);

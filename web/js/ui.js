@@ -95,6 +95,7 @@ var UI = {
   toggleRight: function () {
     var right = document.getElementById('rightPanel');
     right.classList.toggle('collapsed');
+    document.body.classList.toggle('right-hidden', right.classList.contains('collapsed'));
     Store.set('rightCollapsed', right.classList.contains('collapsed'));
   },
   toggleTheme: function () {

@@ -173,6 +173,7 @@ var Editor = {
     document.getElementById('sidebar').classList.toggle('collapsed', this.focusMode);
     document.body.classList.toggle('sidebar-hidden', this.focusMode);
     document.getElementById('rightPanel').classList.toggle('collapsed', this.focusMode);
+    document.body.classList.toggle('right-hidden', this.focusMode);
     document.querySelector('.quota-bar').classList.toggle('focus-hidden', this.focusMode);
     document.querySelector('.composer').classList.toggle('focus-mini', this.focusMode);
     document.getElementById('focusBtn').classList.toggle('on', this.focusMode);

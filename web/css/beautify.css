@@ -615,7 +615,7 @@ body {
 .composer-inner textarea::placeholder { color: var(--faint); }
 .btn-gen {
   background: var(--accent-gradient) !important;
-  color: #fff !important;
+  color: var(--btn-text, #fff) !important;
   font-weight: 700;
   font-size: 13px;
   padding: 10px 22px !important;
@@ -1799,4 +1799,23 @@ body {
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: bx-spin .8s linear infinite;
+}
+/* R5 对比度修复：亮 accent 主题按钮深色字，暗 accent 主题白字（追加于末尾确保优先级） */
+[data-theme="dark"] .btn-primary, [data-theme="light"] .btn-primary,
+[data-theme="gold"] .btn-primary, [data-theme="focus"] .btn-primary,
+[data-theme="dusk"] .btn-primary {
+  color: #241505 !important;
+}
+[data-theme="ink-study"] .btn-primary, [data-theme="paper-ink"] .btn-primary {
+  color: #ffffff !important;
+}
+
+/* R5b: .btn-gen 直接按主题定文字色（避免 var 继承歧义） */
+[data-theme="dark"] .btn-gen, [data-theme="light"] .btn-gen,
+[data-theme="gold"] .btn-gen, [data-theme="focus"] .btn-gen,
+[data-theme="dusk"] .btn-gen {
+  color: #241505 !important;
+}
+[data-theme="ink-study"] .btn-gen, [data-theme="paper-ink"] .btn-gen {
+  color: #ffffff !important;
 }
