@@ -79,8 +79,8 @@ html.theme-anim .topbar {
 .router-page > .topbar {
   border-bottom: 1px solid var(--border);
   background: var(--panel-glass);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 [data-theme="ink-study"] .router-page > .topbar {
   background: rgba(245,237,219,.92);
@@ -165,8 +165,8 @@ html.theme-anim .topbar {
 
 /* 专注主题：输入区毛玻璃强化 */
 [data-theme="focus"] .composer-box, [data-theme="focus"] .editor-toolbar {
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
 
 /* 纸墨书香：纸张质感强化（微噪点 + 段落首行缩进） */

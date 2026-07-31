@@ -1,17 +1,16 @@
-/* ============================================================
- * AI Novel Studio · 设计稿对齐视觉系统 v2
- * 双主题: 深色+橙(默认dark) / 米色+橙(light)
- * 设计参考: 前端ui设计图 文件夹 (7张)
- * 对齐原则: 不改HTML结构,只重定义视觉层
- * ============================================================ */
+﻿/* ============================================================
+ * AI Novel Studio 路 璁捐绋垮榻愯瑙夌郴缁?v2
+ * 鍙屼富棰? 娣辫壊+姗?榛樿dark) / 绫宠壊+姗?light)
+ * 璁捐鍙傝€? 鍓嶇ui璁捐鍥?鏂囦欢澶?(7寮?
+ * 瀵归綈鍘熷垯: 涓嶆敼HTML缁撴瀯,鍙噸瀹氫箟瑙嗚灞? * ============================================================ */
 
 /* ============================================================
- * 1. 设计令牌 (Design Tokens)
- *    light=米色+橙(图2/图3风格)
- *    dark=深色+橙(图1/图5/图6/图7风格)
+ * 1. 璁捐浠ょ墝 (Design Tokens)
+ *    light=绫宠壊+姗?鍥?/鍥?椋庢牸)
+ *    dark=娣辫壊+姗?鍥?/鍥?/鍥?/鍥?椋庢牸)
  * ============================================================ */
 :root {
-  /* Light/Cream · 米色+橙 */
+  /* Light/Cream 路 绫宠壊+姗?*/
   --bg: #faf3e8;
   --bg-gradient: linear-gradient(165deg, #fbf6ef 0%, #f4e9d4 60%, #faf2e0 100%);
   --bg-radial-a: radial-gradient(ellipse at 80% 0%, rgba(255,180,120,.18) 0%, transparent 55%);
@@ -68,7 +67,7 @@
 }
 
 [data-theme="dark"] {
-  /* Dark · 深色+橙 */
+  /* Dark 路 娣辫壊+姗?*/
   --bg: #0a0e1a;
   --bg-gradient: linear-gradient(165deg, #0d1117 0%, #131826 50%, #0e1018 100%);
   --bg-radial-a: radial-gradient(ellipse at 80% 0%, rgba(255,120,73,.12) 0%, transparent 55%);
@@ -116,8 +115,7 @@
 }
 
 /* ============================================================
- * 2. 全局基础 · 滚动条/选区/背景层
- * ============================================================ */
+ * 2. 鍏ㄥ眬鍩虹 路 婊氬姩鏉?閫夊尯/鑳屾櫙灞? * ============================================================ */
 html, body { background: var(--bg); color: var(--text); }
 body {
   background:
@@ -146,13 +144,13 @@ body {
 ::-moz-selection { background: var(--accent-soft); color: var(--accent); }
 
 /* ============================================================
- * 3. 顶部额度条 (对齐图1 logo+token 顶栏)
+ * 3. 椤堕儴棰濆害鏉?(瀵归綈鍥? logo+token 椤舵爮)
  * ============================================================ */
 .quota-bar {
   height: 48px;
   background: var(--panel-glass);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   padding: 0 22px;
   gap: 18px;
@@ -221,7 +219,7 @@ body {
   transform: translateY(-1px);
 }
 
-/* 字体大小滑块 */
+/* 瀛椾綋澶у皬婊戝潡 */
 #fontSizeSlider {
   -webkit-appearance: none;
   appearance: none;
@@ -255,7 +253,7 @@ body {
 }
 
 /* ============================================================
- * 4. 主布局骨架 (3 栏)
+ * 4. 涓诲竷灞€楠ㄦ灦 (3 鏍?
  * ============================================================ */
 .app {
   position: relative;
@@ -271,12 +269,12 @@ body {
 }
 
 /* ============================================================
- * 5. 侧边栏 - 项目列表对齐图1 风格
+ * 5. 渚ц竟鏍?- 椤圭洰鍒楄〃瀵归綈鍥? 椋庢牸
  * ============================================================ */
 .sidebar {
   background: var(--panel-glass);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-right: 1px solid var(--border);
   box-shadow: 4px 0 24px rgba(0,0,0,.04);
 }
@@ -351,7 +349,7 @@ body {
 .side-new .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(255,120,73,.5); }
 .side-new .btn-primary:hover::after { transform: translateX(100%); }
 
-/* 侧边导航 */
+/* 渚ц竟瀵艰埅 */
 .side-nav {
   padding: 8px 10px;
   display: flex;
@@ -394,7 +392,7 @@ body {
   border-radius: 2px;
 }
 
-/* 项目列表 - 对齐图1 圆角卡片 */
+/* 椤圭洰鍒楄〃 - 瀵归綈鍥? 鍦嗚鍗＄墖 */
 .side-section { padding: 14px; }
 .side-label {
   font-size: 10.5px;
@@ -456,16 +454,15 @@ body {
 }
 
 /* ============================================================
- * 6. 主区域 + 编辑器 - 对齐图1/图2 中央创作区
- * ============================================================ */
+ * 6. 涓诲尯鍩?+ 缂栬緫鍣?- 瀵归綈鍥?/鍥? 涓ぎ鍒涗綔鍖? * ============================================================ */
 .main {
   position: relative;
   z-index: 1;
 }
 .topbar {
   background: var(--panel-glass);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   padding: 10px 18px;
   box-shadow: 0 2px 12px rgba(0,0,0,.04);
@@ -520,11 +517,11 @@ body {
   margin: 0 4px;
 }
 
-/* 编辑器工具栏 */
+/* 缂栬緫鍣ㄥ伐鍏锋爮 */
 .editor-toolbar {
   background: var(--panel-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   padding: 7px 14px;
   gap: 4px;
@@ -559,11 +556,11 @@ body {
   color: var(--text);
 }
 
-/* 状态栏 */
+/* 鐘舵€佹爮 */
 .status-bar {
   background: var(--panel-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
   padding: 5px 18px;
   font-size: 11px;
@@ -571,11 +568,11 @@ body {
 }
 .status-bar b { color: var(--accent); font-weight: 700; }
 
-/* 创作栏 - 对齐图1/图2 输入+Generate 样式 */
+/* 鍒涗綔鏍?- 瀵归綈鍥?/鍥? 杈撳叆+Generate 鏍峰紡 */
 .composer {
   background: var(--panel-glass);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
   padding: 14px 18px;
 }
@@ -670,7 +667,7 @@ body {
   color: var(--text2);
 }
 
-/* 选中文本工具栏 */
+/* 閫変腑鏂囨湰宸ュ叿鏍?*/
 .sel-toolbar {
   background: var(--panel);
   border: 1px solid var(--accent);
@@ -690,7 +687,7 @@ body {
 .sel-toolbar .st-btn:hover { background: var(--accent-soft); color: var(--accent); }
 .st-div { width: 1px; background: var(--border); margin: 4px 2px; }
 
-/* 生成状态 */
+/* 鐢熸垚鐘舵€?*/
 .gen-status {
   background: var(--accent-gradient);
   color: #fff;
@@ -718,7 +715,7 @@ body {
 .gen-stop:hover { background: rgba(255,255,255,.3); }
 @keyframes bx-spin { to { transform: rotate(360deg); } }
 
-/* 生成后动作 */
+/* 鐢熸垚鍚庡姩浣?*/
 .gen-actions {
   background: var(--panel);
   border: 1px solid var(--accent);
@@ -730,12 +727,12 @@ body {
 .gen-actions .gen-act-hint { color: var(--muted); font-size: 11px; }
 
 /* ============================================================
- * 7. 右侧控制面板 - 对齐图1 AI 助手
+ * 7. 鍙充晶鎺у埗闈㈡澘 - 瀵归綈鍥? AI 鍔╂墜
  * ============================================================ */
 .right-panel {
   background: var(--panel-glass);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-left: 1px solid var(--border);
   box-shadow: -4px 0 24px rgba(0,0,0,.04);
   position: absolute !important;
@@ -745,7 +742,7 @@ body {
   height: auto !important;
   z-index: 50;
 }
-/* 折叠态：禁用毛玻璃滤镜，避免卡顿 + 防止悬浮面板盖住编辑区 */
+/* 鎶樺彔鎬侊細绂佺敤姣涚幓鐠冩护闀滐紝閬垮厤鍗￠】 + 闃叉鎮诞闈㈡澘鐩栦綇缂栬緫鍖?*/
 .right-panel.collapsed {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -792,7 +789,7 @@ body {
   background: transparent;
 }
 
-/* 流水线卡片 */
+/* 娴佹按绾垮崱鐗?*/
 .pipe-card {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -871,7 +868,7 @@ body {
 .pipe-panel.collapsed .pipe-panel-body { display: none; }
 .pipe-panel-body { padding: 10px 12px; font-size: 11.5px; line-height: 1.65; color: var(--text2); }
 
-/* 资源勾选组 */
+/* 璧勬簮鍕鹃€夌粍 */
 .res-check-group {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -895,15 +892,15 @@ body {
 }
 
 /* ============================================================
- * 8. 仪表盘 - 对齐图6 (3 hero 卡 + 趋势 + 完成度)
+ * 8. 浠〃鐩?- 瀵归綈鍥? (3 hero 鍗?+ 瓒嬪娍 + 瀹屾垚搴?
  * ============================================================ */
 .page-dashboard {
   padding: 24px;
 }
 .page-head {
   background: var(--panel-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px 22px;
@@ -980,7 +977,7 @@ body {
   font-weight: 500;
 }
 
-/* 小统计卡 (位于第二行) */
+/* 灏忕粺璁″崱 (浣嶄簬绗簩琛? */
 .dash-cards-mini {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1016,7 +1013,7 @@ body {
 }
 .dash-mini-lbl { font-size: 11px; color: var(--muted); margin-top: 3px; }
 
-/* 仪表盘章节/区块 */
+/* 浠〃鐩樼珷鑺?鍖哄潡 */
 .dash-section {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -1033,7 +1030,7 @@ body {
   margin: 0;
 }
 
-/* 完成度进度条 (对齐图6底部) */
+/* 瀹屾垚搴﹁繘搴︽潯 (瀵归綈鍥?搴曢儴) */
 .dash-progress-row {
   display: flex;
   align-items: center;
@@ -1068,7 +1065,7 @@ body {
 }
 .dash-progress-pct { font-size: 13px; font-weight: 700; color: var(--accent); font-family: monospace; }
 
-/* 折线图占位 */
+/* 鎶樼嚎鍥惧崰浣?*/
 .dash-line-chart {
   width: 100%;
   height: 220px;
@@ -1114,7 +1111,7 @@ body {
 }
 
 /* ============================================================
- * 9. AI 工具箱 - 对齐图5 (渐变图标卡)
+ * 9. AI 宸ュ叿绠?- 瀵归綈鍥? (娓愬彉鍥炬爣鍗?
  * ============================================================ */
 .page-toolbox { padding: 24px; }
 .toolbox-tabs {
@@ -1178,7 +1175,7 @@ body {
   box-shadow: var(--shadow-lg), 0 0 24px var(--bx-tool-glow, rgba(79,172,254,.2));
 }
 .tool-card:hover::before { opacity: .08; }
-/* 工具图标颜色按 cat 自动分配 */
+/* 宸ュ叿鍥炬爣棰滆壊鎸?cat 鑷姩鍒嗛厤 */
 .tool-card[data-cat="generate"] { --bx-tool-bg: var(--hero-orange); --bx-tool-glow: rgba(255,120,73,.25); }
 .tool-card[data-cat="proofread"] { --bx-tool-bg: var(--hero-blue); --bx-tool-glow: rgba(79,172,254,.25); }
 .tool-card[data-cat="analyze"]   { --bx-tool-bg: var(--hero-purple); --bx-tool-glow: rgba(118,75,162,.25); }
@@ -1234,7 +1231,7 @@ body {
 }
 
 /* ============================================================
- * 10. 人物卡 - 对齐图4 (金色装饰边框 + 圆形头像)
+ * 10. 浜虹墿鍗?- 瀵归綈鍥? (閲戣壊瑁呴グ杈规 + 鍦嗗舰澶村儚)
  * ============================================================ */
 .page-characters { padding: 24px; }
 .char-grid {
@@ -1335,7 +1332,7 @@ body {
 }
 .char-act-btn:hover { background: var(--accent-soft); color: var(--accent); }
 
-/* 世界观卡片 (与人物卡同风格) */
+/* 涓栫晫瑙傚崱鐗?(涓庝汉鐗╁崱鍚岄鏍? */
 .world-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1373,7 +1370,7 @@ body {
 .world-card-desc { font-size: 11.5px; color: var(--muted); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* ============================================================
- * 11. 章节大纲 - 对齐图7 (卷章树 + 彩色状态点)
+ * 11. 绔犺妭澶х翰 - 瀵归綈鍥? (鍗风珷鏍?+ 褰╄壊鐘舵€佺偣)
  * ============================================================ */
 .page-outline { padding: 24px; }
 .outline-tree { display: flex; flex-direction: column; gap: 10px; }
@@ -1504,7 +1501,7 @@ body {
 }
 .ot-ch-acts .link-btn:hover { background: var(--panel2); color: var(--accent); }
 
-/* 章节状态指示点 (基于字数 自动分配颜色) */
+/* 绔犺妭鐘舵€佹寚绀虹偣 (鍩轰簬瀛楁暟 鑷姩鍒嗛厤棰滆壊) */
 .ot-ch-status {
   width: 8px; height: 8px;
   border-radius: 50%;
@@ -1518,7 +1515,7 @@ body {
 .ot-ch-item.wc-big .ot-ch-status { background: var(--info); }
 
 /* ============================================================
- * 12. 模态框 - 对齐图3 (新建项目)
+ * 12. 妯℃€佹 - 瀵归綈鍥? (鏂板缓椤圭洰)
  * ============================================================ */
 .modal-overlay {
   background: rgba(0,0,0,.55);
@@ -1613,7 +1610,7 @@ body {
 }
 .modal-foot .btn-ghost:hover { background: var(--accent-soft); color: var(--accent); }
 
-/* 通用按钮样式统一 */
+/* 閫氱敤鎸夐挳鏍峰紡缁熶竴 */
 .btn-primary {
   background: var(--accent-gradient);
   color: #fff;
@@ -1643,7 +1640,7 @@ body {
 .btn-block { display: block; width: 100%; }
 
 /* ============================================================
- * 13. Toast 通知
+ * 13. Toast 閫氱煡
  * ============================================================ */
 .toast-wrap {
   position: fixed;
@@ -1691,7 +1688,7 @@ body {
 }
 
 /* ============================================================
- * 14. 通用页面元素
+ * 14. 閫氱敤椤甸潰鍏冪礌
  * ============================================================ */
 .page-search {
   background: var(--panel2);
@@ -1714,7 +1711,7 @@ body {
 .page-empty-icon { font-size: 48px; opacity: .55; margin-bottom: 12px; }
 .page-stats, .page-hint { font-size: 11.5px; color: var(--muted); }
 
-/* 离线提示 */
+/* 绂荤嚎鎻愮ず */
 #offlineBar {
   background: var(--warning) !important;
   color: #fff !important;
@@ -1722,7 +1719,7 @@ body {
   text-shadow: 0 1px 2px rgba(0,0,0,.15);
 }
 
-/* 折叠按钮 */
+/* 鎶樺彔鎸夐挳 */
 .side-toggle, .right-toggle {
   background: var(--panel) !important;
   border: 1px solid var(--border);
@@ -1734,8 +1731,7 @@ body {
 .side-toggle:hover, .right-toggle:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 
 /* ============================================================
- * 15. 响应式
- * ============================================================ */
+ * 15. 鍝嶅簲寮? * ============================================================ */
 @media (max-width: 1200px) {
   .dash-cards { grid-template-columns: 1fr 1fr; }
   .toolbox-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
@@ -1755,7 +1751,7 @@ body {
 }
 
 /* ============================================================
- * 16. 工具提示 / 微调
+ * 16. 宸ュ叿鎻愮ず / 寰皟
  * ============================================================ */
 .spin-loader {
   width: 14px; height: 14px;
@@ -1767,7 +1763,7 @@ body {
   vertical-align: middle;
 }
 
-/* 进度条 shimmer 通用类 */
+/* 杩涘害鏉?shimmer 閫氱敤绫?*/
 .shimmer-track { position: relative; overflow: hidden; }
 .shimmer-track::after {
   content: '';
@@ -1777,22 +1773,22 @@ body {
   animation: bx-shimmer 1.6s infinite;
 }
 
-/* 滚动容器美化 */
+/* 婊氬姩瀹瑰櫒缇庡寲 */
 .dash-chart-wrap, .toolbox-output-body, .right-body, .sidebar, .novel-list {
   scrollbar-width: thin;
   scrollbar-color: var(--scroll-thumb) transparent;
 }
 
-/* 字体阅读舒适度 */
+/* 瀛椾綋闃呰鑸掗€傚害 */
 .editor-rich {
   font-family: 'Source Serif Pro', 'Songti SC', 'SimSun', serif;
 }
 [data-theme="light"] .editor-rich { color: #2a2419; }
 
-/* 隐藏原生滚动条按钮 */
+/* 闅愯棌鍘熺敓婊氬姩鏉℃寜閽?*/
 ::-webkit-scrollbar-button { display: none; }
 
-/* 加载占位 */
+/* 鍔犺浇鍗犱綅 */
 .loading {
   display: flex;
   align-items: center;
@@ -1810,7 +1806,7 @@ body {
   border-radius: 50%;
   animation: bx-spin .8s linear infinite;
 }
-/* R5 对比度修复：亮 accent 主题按钮深色字，暗 accent 主题白字（追加于末尾确保优先级） */
+/* R5 瀵规瘮搴︿慨澶嶏細浜?accent 涓婚鎸夐挳娣辫壊瀛楋紝鏆?accent 涓婚鐧藉瓧锛堣拷鍔犱簬鏈熬纭繚浼樺厛绾э級 */
 [data-theme="dark"] .btn-primary, [data-theme="light"] .btn-primary,
 [data-theme="gold"] .btn-primary, [data-theme="focus"] .btn-primary,
 [data-theme="dusk"] .btn-primary {
@@ -1820,7 +1816,7 @@ body {
   color: #ffffff !important;
 }
 
-/* R5b: .btn-gen 直接按主题定文字色（避免 var 继承歧义） */
+/* R5b: .btn-gen 鐩存帴鎸変富棰樺畾鏂囧瓧鑹诧紙閬垮厤 var 缁ф壙姝т箟锛?*/
 [data-theme="dark"] .btn-gen, [data-theme="light"] .btn-gen,
 [data-theme="gold"] .btn-gen, [data-theme="focus"] .btn-gen,
 [data-theme="dusk"] .btn-gen {
@@ -1829,3 +1825,4 @@ body {
 [data-theme="ink-study"] .btn-gen, [data-theme="paper-ink"] .btn-gen {
   color: #ffffff !important;
 }
+

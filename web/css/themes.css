@@ -234,8 +234,8 @@
 [data-theme="focus"] .sidebar,
 [data-theme="focus"] .right-panel,
 [data-theme="focus"] .main .router-page {
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 [data-theme="focus"] .sidebar {
   background: rgba(24,27,37,.60);
