@@ -26,7 +26,7 @@ models:
     - name: deepseek-chat
       vendor: DeepSeek
       api_endpoint: https://api.deepseek.com
-      api_key: sk-94d…e744
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 65536
@@ -34,7 +34,7 @@ models:
     - name: deepseek-v4-flash
       vendor: DeepSeek
       api_endpoint: https://api.deepseek.com
-      api_key: sk-94d…e744
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 65536
@@ -42,7 +42,7 @@ models:
     - name: deepseek-v4-pro
       vendor: DeepSeek
       api_endpoint: https://api.deepseek.com
-      api_key: sk-94d…e744
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 65536
@@ -50,7 +50,7 @@ models:
     - name: kimi-k3
       vendor: Kimi
       api_endpoint: https://api.moonshot.cn/v1
-      api_key: sk-oRJ…W6xU
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 262144
@@ -58,7 +58,7 @@ models:
     - name: kimi-k2.6
       vendor: Kimi
       api_endpoint: https://api.moonshot.cn/v1
-      api_key: sk-oRJ…W6xU
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -66,7 +66,7 @@ models:
     - name: kimi-k2.7-code
       vendor: Kimi
       api_endpoint: https://api.moonshot.cn/v1
-      api_key: sk-oRJ…W6xU
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -74,7 +74,7 @@ models:
     - name: mimo-v2.5
       vendor: 小米MiMo
       api_endpoint: https://api.xiaomimimo.com/v1
-      api_key: sk-cp8…y6a4
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -82,7 +82,7 @@ models:
     - name: mimo-v2.5-pro
       vendor: 小米MiMo
       api_endpoint: https://api.xiaomimimo.com/v1
-      api_key: sk-cp8…y6a4
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -90,7 +90,7 @@ models:
     - name: MiniMax-M3
       vendor: MiniMax
       api_endpoint: https://api.minimax.chat/v1
-      api_key: sk-api-E2SawIs7R9m9uX2CFlzCQcFyMbql7yNzfV5Bydt8zqGAMdoqb-gDs1ZvaE3N_Hf0Dv1I4wXM_XkXiD6YY4dks6giDG_2tnx9rcdjvrz_CtYdIARF1KMlg9w
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -98,7 +98,7 @@ models:
     - name: MiniMax-M2.1
       vendor: MiniMax
       api_endpoint: https://api.minimax.chat/v1
-      api_key: sk-api-E2SawIs7R9m9uX2CFlzCQcFyMbql7yNzfV5Bydt8zqGAMdoqb-gDs1ZvaE3N_Hf0Dv1I4wXM_XkXiD6YY4dks6giDG_2tnx9rcdjvrz_CtYdIARF1KMlg9w
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -106,7 +106,7 @@ models:
     - name: glm-4.7
       vendor: 智谱GLM
       api_endpoint: https://open.bigmodel.cn/api/paas/v4
-      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -114,7 +114,7 @@ models:
     - name: glm-4.5-air
       vendor: 智谱GLM
       api_endpoint: https://open.bigmodel.cn/api/paas/v4
-      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -122,7 +122,7 @@ models:
     - name: glm-5
       vendor: 智谱GLM
       api_endpoint: https://open.bigmodel.cn/api/paas/v4
-      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -130,7 +130,7 @@ models:
     - name: glm-5-turbo
       vendor: 智谱GLM
       api_endpoint: https://open.bigmodel.cn/api/paas/v4
-      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -138,7 +138,7 @@ models:
     - name: glm-4.5
       vendor: 智谱GLM
       api_endpoint: https://open.bigmodel.cn/api/paas/v4
-      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -146,7 +146,7 @@ models:
     - name: glm-4.6
       vendor: 智谱GLM
       api_endpoint: https://open.bigmodel.cn/api/paas/v4
-      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -154,7 +154,7 @@ models:
     - name: glm-5.1
       vendor: 智谱GLM
       api_endpoint: https://open.bigmodel.cn/api/paas/v4
-      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
@@ -162,7 +162,7 @@ models:
     - name: glm-5.2
       vendor: 智谱GLM
       api_endpoint: https://open.bigmodel.cn/api/paas/v4
-      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      api_key: ""
       status: active
       daily_limit: 0
       context_limit: 131072
