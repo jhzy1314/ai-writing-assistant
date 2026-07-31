@@ -322,6 +322,18 @@ body.sidebar-hidden::before { display:none; }
 .clean-mode .novel-cover .cover-fallback { display:flex !important; }
 .editor-inner { max-width:760px; margin:0 auto; padding:40px 48px 100px; min-height:calc(100vh - 220px); font-size:var(--font-size); }
 .editor-inner > .editor-rich { padding:24px 20px; }
+/* 空内容区装饰插图：内联 SVG 钢笔+墨迹（无外部依赖，深/浅主题自适应） */
+.editor-inner::before {
+  content:''; position:fixed; left:50%; top:44%; transform:translate(-50%,-50%);
+  width:340px; height:340px; pointer-events:none; z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23e8945a' stroke-opacity='.35' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M78 96 L122 96 L128 128 L72 128 Z'/%3E%3Cpath d='M78 96 L84 86 L100 82 L116 86 L122 96'/%3E%3Cpath d='M92 82 L92 74 M100 82 L100 74 M108 82 L108 74'/%3E%3Cpath d='M96 128 L96 142 M104 128 L104 142'/%3E%3Cpath d='M88 142 Q100 150 112 142'/%3E%3C/g%3E%3Cpath d='M60 152 Q80 138 100 140 Q118 142 140 152' stroke='%23e8945a' stroke-opacity='.28' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M52 162 Q85 146 100 148 Q115 150 148 162' stroke='%23e8945a' stroke-opacity='.18' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='100' cy='100' r='72' stroke='%23e8945a' stroke-opacity='.12' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:center; background-size:contain;
+  opacity:.5; transition:opacity .3s;
+}
+.editor-inner.has-content::before { display:none; }
+/* 浅色主题适配 */
+[data-theme="light"] .editor-inner::before { opacity:.45; }
+[data-theme="paper-ink"] .editor-inner::before { filter:sepia(.2); }
 .editor-rich {
   min-height:60vh; font-size:16px; line-height:1.95; color:var(--text); outline:none;
   white-space:pre-wrap; word-break:break-word;

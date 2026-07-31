@@ -9,7 +9,8 @@ var Themes = {
     { id: 'ink-study', name: '墨韵书斋', icon: '🖌️', mode: 'dark',  swatch: 'linear-gradient(135deg,#5c3a1e,#2d1409)' },
     { id: 'gold',      name: '鎏金',     icon: '👑', mode: 'dark',  swatch: 'linear-gradient(135deg,#2c2c2c,#1a1a1a)' },
     { id: 'focus',     name: '沉浸专注', icon: '🌌', mode: 'dark',  swatch: 'linear-gradient(135deg,#23262f,#10131a)' },
-    { id: 'paper-ink', name: '纸墨书香', icon: '📜', mode: 'light', swatch: 'linear-gradient(135deg,#f7f2e7,#efe5d2)' }
+    { id: 'paper-ink', name: '纸墨书香', icon: '📜', mode: 'light', swatch: 'linear-gradient(135deg,#f7f2e7,#efe5d2)' },
+    { id: 'dusk',      name: '暮色余晖', icon: '🌅', mode: 'dark',  swatch: 'linear-gradient(135deg,#2e271f,#16100d)' }
   ],
   current: 'dark',
   defaultId: 'dark',
