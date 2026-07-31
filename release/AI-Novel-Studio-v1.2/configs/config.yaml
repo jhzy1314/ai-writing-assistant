@@ -135,6 +135,38 @@ models:
       daily_limit: 0
       context_limit: 131072
       description: 智谱 GLM-5-Turbo（高速版）
+    - name: glm-4.5
+      vendor: 智谱GLM
+      api_endpoint: https://open.bigmodel.cn/api/paas/v4
+      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      status: active
+      daily_limit: 0
+      context_limit: 131072
+      description: 智谱 GLM-4.5（经典均衡版）
+    - name: glm-4.6
+      vendor: 智谱GLM
+      api_endpoint: https://open.bigmodel.cn/api/paas/v4
+      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      status: active
+      daily_limit: 0
+      context_limit: 131072
+      description: 智谱 GLM-4.6（新一代均衡版）
+    - name: glm-5.1
+      vendor: 智谱GLM
+      api_endpoint: https://open.bigmodel.cn/api/paas/v4
+      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      status: active
+      daily_limit: 0
+      context_limit: 131072
+      description: 智谱 GLM-5.1（旗舰进阶）
+    - name: glm-5.2
+      vendor: 智谱GLM
+      api_endpoint: https://open.bigmodel.cn/api/paas/v4
+      api_key: 85db2f4a52b84b289de7e5fc98586404.sKkyKhkoRRfUlN2b
+      status: active
+      daily_limit: 0
+      context_limit: 131072
+      description: 智谱 GLM-5.2（旗舰，编程全球第一，速度最快 168 Token/s）
 quotas:
     daily_call_limit: 500
     daily_token_limit: 2000000

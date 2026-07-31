@@ -7,7 +7,7 @@
  */
 var MODEL_RECOMMEND = {
   quality: ['kimi-k3'],        // 文本质量最高
-  speed: ['glm-5-turbo', 'glm-5', 'glm-5.2'],  // 生成速度最快
+  speed: ['glm-5.2', 'glm-5', 'glm-5-turbo', 'glm-5.1'],  // 生成速度最快
   value: ['deepseek-v4-flash', 'deepseek-chat'], // 性价比
   recommended: ['deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-chat', 'kimi-k3'] // 官方推荐
 };
@@ -81,7 +81,7 @@ var ModelSettings = {
       '<div class="model-guide" style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;line-height:1.8">' +
         '<div style="font-weight:600;color:var(--accent);margin-bottom:4px">🎯 怎么选模型？</div>' +
         '<div>🏆 <b>质量最高</b>：<b>Kimi K3</b>（2.8万亿参数，综合智能逼近 Claude/GPT 旗舰，中文创作口碑最佳）</div>' +
-        '<div>⚡ <b>速度最快</b>：<b>智谱 GLM-5/5-Turbo</b>（约 168 Token/秒，旗舰中最快）</div>' +
+        '<div>⚡ <b>速度最快</b>：<b>智谱 GLM-5.2/5-Turbo</b>（约 168 Token/秒，旗舰中最快）</div>' +
         '<div>💰 <b>性价比最高</b>：<b>DeepSeek V4 Flash/Chat</b>（价格仅为旗舰的 1/18，日常写作首选）</div>' +
         '<div style="margin-top:3px;padding-top:5px;border-top:1px dashed var(--border)">⭐ <b>推荐组合</b>：DeepSeek 系列做日常主力（便宜稳定）+ <b>Kimi K3</b> 写重要章节（质量天花板）</div>' +
       '</div>' +
