@@ -835,7 +835,23 @@ body.sidebar-hidden::before { display:none; }
 .mc-acts { display:flex; gap:4px; }
 .mc-acts .tool-btn { padding:3px 7px; font-size:10.5px; }
 
-.mc-acts .tool-btn { padding:3px 7px; font-size:10.5px; }
+/* 模型推荐徽章 */
+.mc-badges { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+.mc-badge {
+  font-size:9.5px; padding:1px 7px; border-radius:8px; font-weight:600;
+  display:inline-flex; align-items:center; gap:3px;
+}
+.mc-badge-quality { background:rgba(212,175,55,.15); color:#d4af37; border:1px solid rgba(212,175,55,.4); }
+.mc-badge-speed   { background:rgba(56,189,248,.13); color:#38bdf8; border:1px solid rgba(56,189,248,.4); }
+.mc-badge-value   { background:rgba(74,222,128,.13); color:#4ade80; border:1px solid rgba(74,222,128,.4); }
+.mc-badge-reco    { background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent); }
+[data-theme="light"] .mc-badge-quality { color:#a8842a; }
+[data-theme="light"] .mc-badge-speed   { color:#0284c7; }
+[data-theme="light"] .mc-badge-value   { color:#15803d; }
+
+/* 模型选择指南 */
+.model-guide { font-size:11px; color:var(--text2); }
+.model-guide b { color:var(--text); }
 
 /* Model presets advanced settings */
 .adv-wrap .adv-toggle {

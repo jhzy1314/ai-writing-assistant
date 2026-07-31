@@ -1,4 +1,16 @@
 /* ============ modelsettings.js：自定义 API 模型管理面板 ============ */
+/* ===== 推荐模型标注（基于 2026-07 国产大模型公开评测） =====
+ * 质量最高：Kimi K3（2.8万亿参数，综合智能逼近 Claude/GPT 旗舰，中文创作口碑最佳）
+ * 速度最快：智谱 GLM-5.2（168 Token/秒，三款旗舰中最快）
+ * 性价比最高：DeepSeek V4 Pro（价格仅为 K3 的 1/18）
+ * 推荐组合：DeepSeek 系列（主力，便宜稳定）+ Kimi K3（质量天花板，写重要章节用）
+ */
+var MODEL_RECOMMEND = {
+  quality: ['kimi-k3'],        // 文本质量最高
+  speed: ['glm-5-turbo', 'glm-5', 'glm-5.2'],  // 生成速度最快
+  value: ['deepseek-v4-flash', 'deepseek-chat'], // 性价比
+  recommended: ['deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-chat', 'kimi-k3'] // 官方推荐
+};
 /* ===== 顶层常量：厂商预设列表，后续新增模型仅修改此处 ===== */
 var MODEL_PRESETS = [
   { label:"DeepSeek",           baseUrl:"https://api.deepseek.com/v1",                     models:["deepseek-v4-pro","deepseek-v4-flash"] },
@@ -34,7 +46,9 @@ var ModelSettings = {
       '<span class="model-tab" id="tabWebai" style="padding:6px 16px;cursor:pointer;border-bottom:2px solid ' + (self._tab === 'webai' ? 'var(--accent)' : 'transparent') + ';margin-bottom:-2px;font-weight:' + (self._tab === 'webai' ? '600' : '400') + ';color:' + (self._tab === 'webai' ? 'var(--accent)' : 'var(--text2)') + '" onclick="ModelSettings.switchTab(\'webai\')">🌐 免费网页AI</span>' +
       '</div>' +
       '<div id="modelTabContent"></div>' +
-      '<div class="ghead" style="margin-top:20px">Agent 角色模型分配</div>' +
+      '<div class="ghead" style="margin-top:20px;display:flex;align-items:center;gap:8px">Agent 角色模型分配' +
+      '<span class="link-btn" onclick="ModelSettings.applyRecommended()" title="一键推荐：规划/写作/审稿/轻活全部绑定 DeepSeek V4 Flash 主力 + Kimi K3 质量备用">✨ 一键推荐分配</span>' +
+      '</div>' +
       '<div class="role-assign-list" id="roleAssignList">加载中…</div>';
     ModelSettings.loadRoleAssignments();
     self.switchTab(self._tab);
@@ -63,6 +77,13 @@ var ModelSettings = {
     ct.innerHTML = '<div class="ghead" style="display:flex;align-items:center;gap:8px">' +
       '付费API模型' +
       '<span class="link-btn" onclick="ModelSettings.showCreate()" title="新增自定义API模型">＋ 新增</span>' +
+      '</div>' +
+      '<div class="model-guide" style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;line-height:1.8">' +
+        '<div style="font-weight:600;color:var(--accent);margin-bottom:4px">🎯 怎么选模型？</div>' +
+        '<div>🏆 <b>质量最高</b>：<b>Kimi K3</b>（2.8万亿参数，综合智能逼近 Claude/GPT 旗舰，中文创作口碑最佳）</div>' +
+        '<div>⚡ <b>速度最快</b>：<b>智谱 GLM-5/5-Turbo</b>（约 168 Token/秒，旗舰中最快）</div>' +
+        '<div>💰 <b>性价比最高</b>：<b>DeepSeek V4 Flash/Chat</b>（价格仅为旗舰的 1/18，日常写作首选）</div>' +
+        '<div style="margin-top:3px;padding-top:5px;border-top:1px dashed var(--border)">⭐ <b>推荐组合</b>：DeepSeek 系列做日常主力（便宜稳定）+ <b>Kimi K3</b> 写重要章节（质量天花板）</div>' +
       '</div>' +
       '<div class="model-list" id="modelList">' +
       (models.length ? models.map(function (m) { return ModelSettings.modelCard(m); }).join('') : '<div class="res-check-empty">暂无模型，点击"新增"添加 API 配置。或者切换到「免费网页AI」标签使用免费通道。</div>') +
@@ -226,12 +247,27 @@ var ModelSettings = {
     var isCustom = m.is_custom === 1;
     var isDefault = m.is_default === 1;
     var isActive = m.status === 'active';
+    var badges = '';
+    var name = (m.name || '').toLowerCase();
+    if (MODEL_RECOMMEND.quality.indexOf(m.name) >= 0 || MODEL_RECOMMEND.quality.indexOf(name) >= 0) {
+      badges += '<span class="mc-badge mc-badge-quality" title="评测：文本生成质量最高（2.8万亿参数，中文创作天花板）">🏆 质量最高</span>';
+    }
+    if (MODEL_RECOMMEND.speed.indexOf(m.name) >= 0 || MODEL_RECOMMEND.speed.indexOf(name) >= 0) {
+      badges += '<span class="mc-badge mc-badge-speed" title="评测：生成速度最快（168 Token/秒）">⚡ 速度最快</span>';
+    }
+    if (MODEL_RECOMMEND.value.indexOf(m.name) >= 0 || MODEL_RECOMMEND.value.indexOf(name) >= 0) {
+      badges += '<span class="mc-badge mc-badge-value" title="性价比最高，价格仅为旗舰的 1/18">💰 性价比</span>';
+    }
+    if (MODEL_RECOMMEND.recommended.indexOf(m.name) >= 0 || MODEL_RECOMMEND.recommended.indexOf(name) >= 0) {
+      badges += '<span class="mc-badge mc-badge-reco" title="官方推荐组合：DeepSeek 系列（主力）+ Kimi K3（质量天花板）">⭐ 推荐</span>';
+    }
     return '<div class="model-card' + (isDefault ? ' default' : '') + (!isActive ? ' disabled' : '') + '">' +
       '<div class="mc-head">' +
         '<span class="mc-name">' + esc(m.name) + (isDefault ? ' <span class="tag builtin">默认</span>' : '') + '</span>' +
         '<span class="mc-vendor">' + esc(m.vendor || '未设置厂商') + '</span>' +
         '<span class="mc-status ' + (isActive ? 'on' : 'off') + '">' + (isActive ? '启用' : '停用') + '</span>' +
       '</div>' +
+      (badges ? '<div class="mc-badges">' + badges + '</div>' : '') +
       '<div class="mc-body">' +
         '<div class="mc-row"><span>端点</span><span>' + esc(m.api_endpoint || '—') + '</span></div>' +
         '<div class="mc-row"><span>流式</span><span>' + (m.support_stream === 1 ? '支持' : '不支持') + '</span></div>' +
@@ -478,6 +514,39 @@ var ModelSettings = {
       } catch (e) { html += '<div class="role-row" style="padding:8px 0;color:var(--muted)">' + ModelSettings.roleLabels[role] + '：加载失败</div>'; }
     }
     el.innerHTML = html;
+  },
+
+  applyRecommended: async function () {
+    var models = Store.state.models || [];
+    var find = function (names) {
+      for (var i = 0; i < names.length; i++) {
+        var m = models.find(function (x) { return x.name === names[i] && x.status === 'active'; });
+        if (m) return m.id;
+      }
+      return null;
+    };
+    // 推荐：主力 DeepSeek V4 Flash，质量备选 Kimi K3，速度备选 GLM-5-Turbo
+    var main = find(['deepseek-v4-flash', 'deepseek-chat', 'deepseek-v4-pro']);
+    var quality = find(['kimi-k3', 'kimi-k2.6', 'glm-5']);
+    var speed = find(['glm-5-turbo', 'glm-4.7', 'mimo-v2.5']);
+    if (!main) { UI.toast('未找到可用的 DeepSeek 模型，请先配置', 'warn'); return; }
+    var plan = {
+      thinker:  [main, quality, speed].filter(Boolean),
+      worker:   [main, quality, speed].filter(Boolean),
+      verifier: [main, speed].filter(Boolean),
+      helper:   [main, speed].filter(Boolean)
+    };
+    var self = this;
+    var nameOf = function (id) { var m = models.find(function (x) { return x.id === id; }); return m ? m.name : id; };
+    UI.confirm('一键推荐分配', '将按推荐组合绑定角色模型：<br><br>🧭 规划师：' + plan.thinker.map(nameOf).join(' → ') + '<br>✍️ 创作者：' + plan.worker.map(nameOf).join(' → ') + '<br>🔍 校验官：' + plan.verifier.map(nameOf).join(' → ') + '<br>🤖 轻助手：' + plan.helper.map(nameOf).join(' → ') + '<br><br>继续？', async function () {
+      try {
+        for (var role in plan) {
+          await API.setRoleModels(role, plan[role]);
+        }
+        UI.toast('✅ 已应用推荐模型分配', 'success');
+        self.loadRoleAssignments();
+      } catch (e) { UI.toast('分配失败：' + e.message, 'error'); }
+    });
   },
 
   assignRole: function (role) {
