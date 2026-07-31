@@ -852,6 +852,9 @@ body.sidebar-hidden::before { display:none; }
 /* 模型选择指南 */
 .model-guide { font-size:11px; color:var(--text2); }
 .model-guide b { color:var(--text); }
+.model-guide.open .mg-caret { transform:rotate(90deg); }
+.model-guide.open .model-guide-body { display:block !important; }
+.model-guide-head:hover { background:var(--panel2); }
 
 /* Model presets advanced settings */
 .adv-wrap .adv-toggle {

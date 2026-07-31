@@ -78,8 +78,18 @@ var ModelSettings = {
       '付费API模型' +
       '<span class="link-btn" onclick="ModelSettings.showCreate()" title="新增自定义API模型">＋ 新增</span>' +
       '</div>' +
-      '<div class="model-guide" style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;line-height:1.8">' +
-        '<div style="font-weight:600;color:var(--accent);margin-bottom:4px">🎯 怎么选模型？</div>' +
+      '<div class="model-guide" style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;font-size:11px;overflow:hidden">' +
+        '<div class="model-guide-head" onclick="this.parentElement.classList.toggle(\'open\')" style="display:flex;align-items:center;gap:6px;padding:8px 12px;cursor:pointer;user-select:none;font-weight:600;color:var(--accent)">' +
+          '<span class="mg-caret" style="transition:transform .15s;display:inline-block">▸</span>🎯 怎么选模型？<span style="margin-left:auto;font-weight:400;font-size:10px;color:var(--faint)">点击展开</span>' +
+        '</div>' +
+        '<div class="model-guide-body" style="display:none;padding:0 12px 10px;line-height:1.8;border-top:1px dashed var(--border);padding-top:8px">' +
+          '<div>🏆 <b>质量最高</b>：<b>Kimi K3</b>（2.8万亿参数，综合智能逼近 Claude/GPT 旗舰，中文创作口碑最佳）</div>' +
+          '<div>⚡ <b>速度最快</b>：<b>智谱 GLM-5.2/5-Turbo</b>（约 168 Token/秒，旗舰中最快）</div>' +
+          '<div>💰 <b>性价比最高</b>：<b>DeepSeek V4 Flash/Chat</b>（价格仅为旗舰的 1/18，日常写作首选）</div>' +
+          '<div style="margin-top:3px;padding-top:5px;border-top:1px dashed var(--border)">⭐ <b>推荐组合</b>：DeepSeek 系列做日常主力（便宜稳定）+ <b>Kimi K3</b> 写重要章节（质量天花板）</div>' +
+          '<div style="margin-top:6px;font-size:10px;color:var(--muted)">📊 数据来源：2026-07 国产大模型公开评测（掘金/CSDN 横评）</div>' +
+        '</div>' +
+      '</div>' +
         '<div>🏆 <b>质量最高</b>：<b>Kimi K3</b>（2.8万亿参数，综合智能逼近 Claude/GPT 旗舰，中文创作口碑最佳）</div>' +
         '<div>⚡ <b>速度最快</b>：<b>智谱 GLM-5.2/5-Turbo</b>（约 168 Token/秒，旗舰中最快）</div>' +
         '<div>💰 <b>性价比最高</b>：<b>DeepSeek V4 Flash/Chat</b>（价格仅为旗舰的 1/18，日常写作首选）</div>' +
