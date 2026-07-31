@@ -489,7 +489,7 @@
   background-clip: initial;
   -webkit-text-fill-color: currentColor;
 }
-[data-theme="dusk"] .editor-inner::before { filter:saturate(1.15); }
+[data-theme="dusk"] .editor-inner::before { opacity:.55; }
 /* 环境光 */
 [data-theme="dusk"] .app::before {
   background: radial-gradient(circle at 50% 50%, transparent 0%, rgba(232,120,60,.07) 200%);

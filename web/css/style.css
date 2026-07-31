@@ -322,18 +322,26 @@ body.sidebar-hidden::before { display:none; }
 .clean-mode .novel-cover .cover-fallback { display:flex !important; }
 .editor-inner { max-width:760px; margin:0 auto; padding:40px 48px 100px; min-height:calc(100vh - 220px); font-size:var(--font-size); }
 .editor-inner > .editor-rich { padding:24px 20px; }
-/* 空内容区装饰插图：内联 SVG 钢笔+墨迹（无外部依赖，深/浅主题自适应） */
+/* 空内容区装饰插图：主题化 SVG（无外部依赖，按主题选用不同图形） */
 .editor-inner::before {
   content:''; position:fixed; left:50%; top:44%; transform:translate(-50%,-50%);
   width:340px; height:340px; pointer-events:none; z-index:0;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23e8945a' stroke-opacity='.35' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M78 96 L122 96 L128 128 L72 128 Z'/%3E%3Cpath d='M78 96 L84 86 L100 82 L116 86 L122 96'/%3E%3Cpath d='M92 82 L92 74 M100 82 L100 74 M108 82 L108 74'/%3E%3Cpath d='M96 128 L96 142 M104 128 L104 142'/%3E%3Cpath d='M88 142 Q100 150 112 142'/%3E%3C/g%3E%3Cpath d='M60 152 Q80 138 100 140 Q118 142 140 152' stroke='%23e8945a' stroke-opacity='.28' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M52 162 Q85 146 100 148 Q115 150 148 162' stroke='%23e8945a' stroke-opacity='.18' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='100' cy='100' r='72' stroke='%23e8945a' stroke-opacity='.12' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-image:var(--empty-art);
   background-repeat:no-repeat; background-position:center; background-size:contain;
   opacity:.5; transition:opacity .3s;
 }
+:root { --empty-art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23e8945a' stroke-opacity='.35' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M78 96 L122 96 L128 128 L72 128 Z'/%3E%3Cpath d='M78 96 L84 86 L100 82 L116 86 L122 96'/%3E%3Cpath d='M92 82 L92 74 M100 82 L100 74 M108 82 L108 74'/%3E%3Cpath d='M96 128 L96 142 M104 128 L104 142'/%3E%3Cpath d='M88 142 Q100 150 112 142'/%3E%3C/g%3E%3Cpath d='M60 152 Q80 138 100 140 Q118 142 140 152' stroke='%23e8945a' stroke-opacity='.28' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M52 162 Q85 146 100 148 Q115 150 148 162' stroke='%23e8945a' stroke-opacity='.18' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='100' cy='100' r='72' stroke='%23e8945a' stroke-opacity='.12' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); }
+/* 鎏金主题：羽毛笔+墨痕 */
+[data-theme="gold"] { --empty-art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23d4af37' stroke-opacity='.32' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M112 78 C124 66 132 62 138 66 C144 70 140 80 128 92 L112 108 L92 128 L88 112 Z'/%3E%3Cpath d='M138 66 C146 58 152 60 148 68 C144 76 134 84 128 92'/%3E%3Cpath d='M112 108 L104 116 M100 120 L94 126 M96 116 L88 124'/%3E%3Cpath d='M88 112 L72 118 L84 126 L88 112'/%3E%3Cpath d='M60 148 Q84 134 100 136 Q118 138 140 148'/%3E%3Cpath d='M52 158 Q86 142 100 144 Q114 146 148 158'/%3E%3C/g%3E%3Ccircle cx='100' cy='100' r='72' stroke='%23d4af37' stroke-opacity='.12' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); }
+/* 暮色余晖主题：暖橙月牙+星光墨迹 */
+[data-theme="dusk"] { --empty-art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23e8843c' stroke-opacity='.34' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M118 86 A34 34 0 1 0 132 118 A28 28 0 1 1 118 86 Z'/%3E%3Cpath d='M78 96 L122 96 L128 128 L72 128 Z'/%3E%3Cpath d='M78 96 L84 86 L100 82 L116 86 L122 96'/%3E%3Cpath d='M92 82 L92 74 M100 82 L100 74 M108 82 L108 74'/%3E%3Cpath d='M96 128 L96 142 M104 128 L104 142'/%3E%3Ccircle cx='64' cy='64' r='3'/%3E%3Ccircle cx='142' cy='52' r='2'/%3E%3Ccircle cx='148' cy='96' r='2.5'/%3E%3Cpath d='M60 152 Q84 138 100 140 Q118 142 140 152'/%3E%3Cpath d='M52 162 Q85 146 100 148 Q115 150 148 162'/%3E%3C/g%3E%3C/svg%3E"); }
 .editor-inner.has-content::before { display:none; }
 /* 浅色主题适配 */
 [data-theme="light"] .editor-inner::before { opacity:.45; }
-[data-theme="paper-ink"] .editor-inner::before { filter:sepia(.2); }
+[data-theme="paper-ink"] .editor-inner::before { filter:sepia(.2); opacity:.4; }
+/* 已有背景图的主题（墨韵/专注）不再叠加中央插图，避免图叠图 */
+[data-theme="ink-study"] .editor-inner::before,
+[data-theme="focus"] .editor-inner::before { display:none; }
 .editor-rich {
   min-height:60vh; font-size:16px; line-height:1.95; color:var(--text); outline:none;
   white-space:pre-wrap; word-break:break-word;
