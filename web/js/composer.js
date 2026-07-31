@@ -58,6 +58,8 @@ var Composer = {
     // 大纲
     var goEl = document.getElementById('genOutline');
     if (goEl) goEl.value = Store.state.composer.outline || '';
+    // 专业模式：恢复上次状态
+    try { this.restoreProMode(); } catch (e) {}
   },
   onSliderChange: function () {
     var val = parseInt(document.getElementById('targetWordSlider').value) || 1000;
@@ -437,6 +439,66 @@ var Composer = {
     box.style.display = show ? 'flex' : 'none';
     var btn = ev && ev.currentTarget;
     if (btn) btn.classList.toggle('active', show);
+  },
+  /* ===== 专业模式：详细大纲 + AI 辅助设定 ===== */
+  toggleProMode: function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var panel = document.getElementById('proModePanel');
+    var btn = document.getElementById('proModeBtn');
+    if (!panel) return;
+    var show = panel.style.display === 'none';
+    panel.style.display = show ? 'flex' : 'none';
+    if (btn) btn.classList.toggle('on', show);
+    // 同步大纲内容到 genOutline（生成时读取）
+    if (show) this.syncProOutlineToGen();
+    Store.set('proModeOpen', show);
+  },
+  onProOutline: function () {
+    var el = document.getElementById('proOutline');
+    if (!el) return;
+    Store.state.composer.outline = el.value.trim();
+    var gen = document.getElementById('genOutline');
+    if (gen && gen.value !== el.value) gen.value = el.value;
+    this.onOutlineChange();
+  },
+  syncProOutlineToGen: function () {
+    var el = document.getElementById('proOutline');
+    var gen = document.getElementById('genOutline');
+    var cur = Store.state.composer.outline || (gen ? gen.value : '') || '';
+    if (el && !el.value && cur) el.value = cur;
+    if (el && el.value && gen && gen.value !== el.value) gen.value = el.value;
+  },
+  aiOutline: async function () {
+    var demand = (document.getElementById('proOutline') || {}).value || (document.getElementById('instructionInput') || {}).value || '';
+    if (!demand.trim()) { UI.toast('请先填写题材/灵感，或使用上面的需求输入框', 'warn'); return; }
+    var pid = Store.state.currentProject;
+    if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
+    var btn = event && event.currentTarget;
+    if (btn) { btn.disabled = true; btn.textContent = '🤖 生成中…'; }
+    var out = document.getElementById('proOutline');
+    try {
+      var r = await API.post('/api/tools/execute', { tool: 'outline', content: demand.slice(0, 6000) });
+      var result = (r && r.result) || '';
+      if (!result.trim()) { UI.toast('AI 生成失败，请重试', 'error'); return; }
+      if (out) {
+        out.value = result.trim();
+        Composer.onProOutline();
+      }
+      UI.toast('✅ 大纲已生成，可继续编辑或直接生成正文', 'success');
+    } catch (e) {
+      UI.toast('大纲生成失败：' + e.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🤖 AI 自动生成大纲'; }
+    }
+  },
+  restoreProMode: function () {
+    var panel = document.getElementById('proModePanel');
+    var btn = document.getElementById('proModeBtn');
+    if (panel && Store.get('proModeOpen', false)) {
+      panel.style.display = 'flex';
+      if (btn) btn.classList.add('on');
+      this.syncProOutlineToGen();
+    }
   },
   previewRAG: async function (ev) {
     if (ev && ev.stopPropagation) ev.stopPropagation();

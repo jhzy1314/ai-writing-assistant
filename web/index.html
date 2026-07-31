@@ -309,6 +309,24 @@ window.initTiptap = async function () {
         <div class="gen-main-row">
           <button class="btn btn-primary btn-gen" id="btnGenerate" onclick="Composer.generate()" data-shortcut="Ctrl+Enter">✨ 生成</button>
           <button class="tool-btn gen-opt-toggle" onclick="Composer.toggleGenOptions(event)" title="更多生成选项">⚙️ 选项</button>
+          <button class="tool-btn pro-mode-toggle" id="proModeBtn" onclick="Composer.toggleProMode(event)" title="专业模式：详细填写大纲，AI 辅助完善设定">⚡ 专业模式</button>
+        </div>
+        <div class="pro-mode" id="proModePanel" style="display:none">
+          <div class="pro-mode-head">
+            <span class="pro-mode-title">⚡ 专业创作设置</span>
+            <span class="pro-mode-sub">填写越详细，AI 输出越贴合你的构思</span>
+          </div>
+          <div class="form-group">
+            <label>📝 全书大纲 <span class="pro-hint">（手动填写，AI 生成时可参考）</span></label>
+            <textarea id="proOutline" class="pro-outline" rows="5" placeholder="例如：\n题材：都市异能\n主角：林夜，表面是普通外卖员，实为上古灵脉传人\n主线：意外卷入城市灵异事件，逐步揭开家族秘辛，最终守护城市\n分卷：第一卷 觉醒（1-30章），第二卷 入局（31-60章）…" oninput="Composer.onProOutline()"></textarea>
+          </div>
+          <div class="pro-actions">
+            <button class="btn btn-ghost btn-sm" onclick="Composer.aiOutline()">🤖 AI 自动生成大纲</button>
+            <button class="btn btn-ghost btn-sm" onclick="ResourceUI.summarizeSettings()">🤖 从正文提取人物/世界观</button>
+            <button class="btn btn-ghost btn-sm" onclick="Router.navigate('characters')">✍️ 手动填人物卡</button>
+            <button class="btn btn-ghost btn-sm" onclick="Router.navigate('worldbuilding')">✍️ 手动填世界观</button>
+          </div>
+          <div class="pro-tip">💡 提示：专业模式下生成时，会自动带上你填写的大纲与角色/世界观设定，AI 会严格遵循。</div>
         </div>
         <div class="gen-opts" id="genOpts" style="display:none">
           <button class="tool-btn" style="font-size:10px;margin-right:4px" onclick="ChapterUI.batchFromOutline()" title="根据大纲批量创建空白章节">📋 批量建章</button>

@@ -507,6 +507,29 @@ body.right-hidden .main .right-toggle:hover::after { opacity: 1; }
 .composer-inner select, .composer-inner .mini-input { border:none; background:var(--panel2); border-radius:6px; font-size:11.5px; padding:6px 8px; box-shadow:none !important; flex-shrink:0; }
 .composer-inner .mini-input { width:74px; }
 .composer-inner .btn-gen { border-radius:8px; padding:12px 28px; font-size:14px; font-weight:600; }
+
+/* ============ 专业模式（pro mode） ============ */
+.pro-mode-toggle.on { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+.pro-mode {
+  margin-top:10px; padding:12px 14px;
+  background:var(--panel2); border:1px solid var(--border); border-radius:12px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.pro-mode-head { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.pro-mode-title { font-size:12.5px; font-weight:700; color:var(--accent); }
+.pro-mode-sub { font-size:10.5px; color:var(--muted); }
+.pro-mode .form-group label { font-size:11.5px; }
+.pro-hint { font-size:10px; color:var(--faint); font-weight:400; }
+.pro-outline {
+  width:100%; min-height:96px; resize:vertical;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  padding:8px 10px; font-size:12.5px; line-height:1.7; color:var(--text);
+  font-family:var(--font);
+}
+.pro-outline:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
+.pro-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.pro-actions .btn { font-size:11px; padding:5px 10px; }
+.pro-tip { font-size:10.5px; color:var(--muted); line-height:1.6; background:var(--panel3); border-radius:6px; padding:6px 9px; }
 .btn-gen {
   background:linear-gradient(115deg, var(--accent) 0%, var(--accent2) 45%, var(--accent) 100%);
   background-size:220% 220%;
