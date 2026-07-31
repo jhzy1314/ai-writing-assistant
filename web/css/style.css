@@ -1642,6 +1642,7 @@ body.desktop .quota-bar { display:flex; }
 .more-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:60; min-width:200px; background:var(--panel); border:1px solid var(--border2); border-radius:8px; padding:4px; box-shadow:var(--shadow-lg); display:flex; flex-direction:column; gap:2px; }
 .more-menu .mm-item { width:100%; text-align:left; justify-content:flex-start; padding:6px 10px; font-size:12px; border-radius:6px; }
 .more-menu .mm-item:hover { background:var(--panel2); }
+.more-menu .mm-divider { height:1px; background:var(--border); margin:3px 6px; flex-shrink:0; }
 
 .eg-card { position:relative; }
 .eg-close { position:absolute; top:10px; right:12px; width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:var(--panel2); color:var(--muted); font-size:13px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .15s; }

@@ -225,6 +225,11 @@ window.initTiptap = async function () {
             <div class="more-menu" id="moreMenu" style="display:none">
               <button class="tool-btn mm-item" onclick="Editor.importFile()">📥 导入文档</button>
               <button class="tool-btn mm-item" onclick="Editor.exportFile()">📤 导出文档</button>
+              <div class="mm-divider"></div>
+              <button class="tool-btn mm-item" onclick="Composer.aiPlotCheck()">🔍 伏笔与逻辑检查</button>
+              <button class="tool-btn mm-item" onclick="Composer.aiRoleplay()">🎭 角色互动模拟</button>
+              <button class="tool-btn mm-item" onclick="Composer.aiBranch()">🎲 剧情分支推演</button>
+              <div class="mm-divider"></div>
               <button class="tool-btn mm-item" onclick="ResourceUI.summarizeSettings()">🤖 AI 总结（提取人物卡/世界观）</button>
               <button class="tool-btn mm-item" onclick="Editor.cleanAIFiller()">🧹 净化（清理AI多余话术）</button>
             </div>
@@ -322,6 +327,8 @@ window.initTiptap = async function () {
           </div>
           <div class="pro-actions">
             <button class="btn btn-ghost btn-sm" onclick="Composer.aiOutline()">🤖 AI 自动生成大纲</button>
+            <button class="btn btn-ghost btn-sm" onclick="Composer.aiWorldbuild()">🌍 AI 生成世界观</button>
+            <button class="btn btn-ghost btn-sm" onclick="Composer.aiNames()">👤 AI 生成角色名</button>
             <button class="btn btn-ghost btn-sm" onclick="ResourceUI.summarizeSettings()">🤖 从正文提取人物/世界观</button>
             <button class="btn btn-ghost btn-sm" onclick="Router.navigate('characters')">✍️ 手动填人物卡</button>
             <button class="btn btn-ghost btn-sm" onclick="Router.navigate('worldbuilding')">✍️ 手动填世界观</button>

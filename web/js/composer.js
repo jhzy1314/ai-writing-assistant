@@ -500,6 +500,66 @@ var Composer = {
       this.syncProOutlineToGen();
     }
   },
+  /* 通用 AI 工具执行：展示结果弹窗 */
+  _runTool: async function (tool, content, btn, label) {
+    if (!content || !content.trim()) { UI.toast('请先填写内容', 'warn'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 生成中…'; }
+    try {
+      var r = await API.post('/api/tools/execute', { tool: tool, content: content.slice(0, 8000) });
+      var result = (r && r.result) || '';
+      if (!result.trim()) { UI.toast('AI 生成失败，请重试', 'error'); return; }
+      // 结果弹窗，可复制
+      var idn = 't_' + Date.now();
+      UI.modal({
+        title: label,
+        width: '560px',
+        body: '<div class="form-group"><textarea id="' + idn + '" rows="14" style="width:100%;font-size:12px;line-height:1.7;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:var(--font)">' + esc(result) + '</textarea></div>' +
+              '<div style="font-size:10.5px;color:var(--muted);margin-top:4px">💡 可编辑后复制到对应模块，或作为灵感参考</div>',
+        actions: [
+          { id: 'cancel', label: '关闭' },
+          { id: 'copy', label: '📋 复制结果', cls: 'btn-primary', onClick: function (m, ov) {
+            var ta = document.getElementById(idn);
+            if (ta) { ta.select(); document.execCommand('copy'); UI.toast('已复制', 'success'); }
+          } }
+        ]
+      });
+      return result;
+    } catch (e) {
+      UI.toast(label + '失败：' + e.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = label; }
+    }
+  },
+  aiWorldbuild: function () {
+    var demand = (document.getElementById('proOutline') || {}).value || (document.getElementById('instructionInput') || {}).value || '';
+    this._runTool('worldbuild', demand || '一个原创架空世界（请提供题材）', null, '🌍 AI 生成世界观');
+  },
+  aiNames: function () {
+    var demand = (document.getElementById('proOutline') || {}).value || '';
+    if (!demand.trim()) demand = '现代都市言情，男主：清冷克制型霸总；女主：独立飒爽型设计师';
+    this._runTool('namegen', demand, null, '👤 AI 生成角色名');
+  },
+  /* 辅助工具：伏笔检查 / 角色互动 / 剧情分支 */
+  aiPlotCheck: function () {
+    var text = Editor.getText();
+    if (!text || !text.trim()) { UI.toast('编辑器内容为空', 'warn'); return; }
+    this._runTool('plotcheck', text.slice(0, 20000), null, '🔍 伏笔与逻辑检查');
+  },
+  aiRoleplay: function () {
+    var p = Store.state.currentProject;
+    var chars = Store.state.characters || [];
+    if (!chars.length) { UI.toast('请先创建至少两个人物卡', 'warn'); return; }
+    var brief = chars.slice(0, 4).map(function (c, i) { return '角色' + (i + 1) + '：' + (c.name || '未命名') + '\n' + (c.personality ? '性格：' + c.personality : '') + (c.appearance ? '外貌：' + c.appearance : ''); }).join('\n\n');
+    var scene = '场景：两人在一场重要事件后相遇，请模拟他们的对话互动';
+    this._runTool('roleplay', brief + '\n\n' + scene, null, '🎭 角色互动模拟');
+  },
+  aiBranch: function () {
+    var demand = (document.getElementById('instructionInput') || {}).value || '';
+    var ch = Store.state.currentChapter;
+    var cur = ch ? (ch.content || '').slice(-800) : Editor.getText().slice(-800);
+    var node = demand || cur || '主角刚刚发现被最信任的人背叛';
+    this._runTool('branch', node, null, '🎲 剧情分支推演');
+  },
   previewRAG: async function (ev) {
     if (ev && ev.stopPropagation) ev.stopPropagation();
     var p = Store.state.currentProject;
