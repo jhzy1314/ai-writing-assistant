@@ -319,7 +319,7 @@ body.sidebar-hidden .main .side-toggle::after {
 }
 body.sidebar-hidden .main .side-toggle:hover::after { opacity: 1; }
 .main .right-toggle {
-  position:absolute; right:0; top:50%; transform:translateY(-50%); z-index:20;
+  position:absolute; right:0; top:50%; transform:translateY(-50%); z-index:60;
   width:22px; height:56px; background:var(--panel); border:1px solid var(--border); border-right:none;
   border-radius:9px 0 0 9px; cursor:pointer; display:flex; align-items:center; justify-content:center;
   color:var(--muted); font-size:12px;
@@ -335,7 +335,7 @@ body.right-hidden .main .right-toggle {
   border-radius: 10px 0 0 10px;
   box-shadow: -2px 0 14px var(--accent-glow);
   font-size: 13px;
-  z-index: 40;
+  z-index: 70;
 }
 body.right-hidden .main .right-toggle:hover {
   background: var(--accent-hover);
