@@ -105,12 +105,20 @@ func (l *Limiter) checkDailyQuota(ctx context.Context) error {
 }
 
 // checkAndRecordRate 单 IP 每分钟请求数限流：原子地校验并记录命中（避免竞态）
+// 每次请求时从数据库重新读取限流配置，确保热更新生效
 func (l *Limiter) checkAndRecordRate(ip string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// 每次请求重新读取限流配置，确保 API 热更新 configs 表后立即生效
+	l.ratePerMin = l.store.GetConfigInt(context.Background(), "rate_limit_per_minute", 20)
+	if l.ratePerMin < 1 {
+		l.ratePerMin = 20
+	}
 	if l.ratePerMin <= 0 {
 		return nil
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
+
 	now := time.Now()
 	cutoff := now.Add(-time.Minute)
 	hits := l.hits[ip]

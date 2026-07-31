@@ -34,6 +34,8 @@ type Chapter struct {
 	Synopsis  string `json:"synopsis"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
+	IsDeleted int    `json:"is_deleted"`
+	DeletedAt string `json:"deleted_at,omitempty"`
 }
 
 // ChapterWithVolume 章节附带卷信息（树形展示用）
@@ -162,12 +164,12 @@ func (s *Store) ListChapters(ctx context.Context, projectID, volumeID string) ([
 	if volumeID != "" {
 		q = `SELECT c.id, c.project_id, c.volume_id, c.title, c.content, c.word_count, c.sort_order, c.created_at, c.updated_at,
 			COALESCE(v.title,'') FROM chapters c LEFT JOIN volumes v ON v.id=c.volume_id
-			WHERE c.project_id=? AND c.volume_id=? ORDER BY c.sort_order`
+			WHERE c.project_id=? AND c.volume_id=? AND c.is_deleted=0 ORDER BY c.sort_order`
 		args = []interface{}{projectID, volumeID}
 	} else {
 		q = `SELECT c.id, c.project_id, c.volume_id, c.title, c.content, c.word_count, c.sort_order, c.created_at, c.updated_at,
 			COALESCE(v.title,'') FROM chapters c LEFT JOIN volumes v ON v.id=c.volume_id
-			WHERE c.project_id=? ORDER BY c.volume_id, c.sort_order`
+			WHERE c.project_id=? AND c.is_deleted=0 ORDER BY c.volume_id, c.sort_order`
 		args = []interface{}{projectID}
 	}
 	rows, err := s.db.QueryContext(ctx, q, args...)
@@ -195,7 +197,7 @@ func (s *Store) CreateChapter(ctx context.Context, projectID, volumeID, title, c
 		WordCount: wc, SortOrder: maxOrd + 1, CreatedAt: now(), UpdatedAt: now(),
 	}
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at, is_deleted, deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'')`,
 		c.ID, c.ProjectID, c.VolumeID, c.Title, c.Content, c.WordCount, c.SortOrder, c.Tags, c.Synopsis, c.CreatedAt, c.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -207,8 +209,8 @@ func (s *Store) CreateChapter(ctx context.Context, projectID, volumeID, title, c
 func (s *Store) GetChapter(ctx context.Context, id string) (*Chapter, error) {
 	var c Chapter
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, project_id, volume_id, title, content, word_count, sort_order, COALESCE(tags,''), COALESCE(synopsis,''), created_at, updated_at FROM chapters WHERE id=?`, id).
-		Scan(&c.ID, &c.ProjectID, &c.VolumeID, &c.Title, &c.Content, &c.WordCount, &c.SortOrder, &c.Tags, &c.Synopsis, &c.CreatedAt, &c.UpdatedAt)
+		`SELECT id, project_id, volume_id, title, content, word_count, sort_order, COALESCE(tags,''), COALESCE(synopsis,''), created_at, updated_at, is_deleted, COALESCE(deleted_at,'') FROM chapters WHERE id=?`, id).
+		Scan(&c.ID, &c.ProjectID, &c.VolumeID, &c.Title, &c.Content, &c.WordCount, &c.SortOrder, &c.Tags, &c.Synopsis, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted, &c.DeletedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -218,7 +220,7 @@ func (s *Store) GetChapter(ctx context.Context, id string) (*Chapter, error) {
 	return &c, nil
 }
 
-func (s *Store) UpdateChapter(ctx context.Context, id string, title, content, volumeID *string) (*Chapter, error) {
+func (s *Store) UpdateChapter(ctx context.Context, id string, title, content, volumeID, ifUpdatedAt *string) (*Chapter, error) {
 	if title == nil && content == nil && volumeID == nil {
 		return s.GetChapter(ctx, id)
 	}
@@ -243,15 +245,83 @@ func (s *Store) UpdateChapter(ctx context.Context, id string, title, content, vo
 	args = append(args, now())
 	args = append(args, id)
 	q := "UPDATE chapters SET " + joinStrings(setParts, ", ") + " WHERE id=?"
-	if _, err := s.db.ExecContext(ctx, q, args...); err != nil {
+	// 乐观锁：若客户端提供了上次看到的 updated_at，则仅在该时间戳匹配时更新
+	if ifUpdatedAt != nil && *ifUpdatedAt != "" {
+		q += " AND updated_at=?"
+		args = append(args, *ifUpdatedAt)
+	}
+	result, err := s.db.ExecContext(ctx, q, args...)
+	if err != nil {
 		return nil, err
+	}
+	if ifUpdatedAt != nil && *ifUpdatedAt != "" {
+		n, _ := result.RowsAffected()
+		if n == 0 {
+			return nil, fmt.Errorf("内容已被其他窗口修改，请刷新后重试")
+		}
 	}
 	return s.GetChapter(ctx, id)
 }
 
 func (s *Store) DeleteChapter(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM chapters WHERE id=?`, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE chapters SET is_deleted=1, deleted_at=? WHERE id=?`, now(), id)
 	return err
+}
+
+// ListTrashChapters 列出已软删除的章节（回收站）
+func (s *Store) ListTrashChapters(ctx context.Context, projectID string) ([]Chapter, error) {
+	var q string
+	var args []interface{}
+	if projectID != "" {
+		q = `SELECT id, project_id, volume_id, title, content, word_count, sort_order, COALESCE(tags,''), COALESCE(synopsis,''), created_at, updated_at, is_deleted, COALESCE(deleted_at,'') FROM chapters WHERE is_deleted=1 AND project_id=? ORDER BY deleted_at DESC`
+		args = []interface{}{projectID}
+	} else {
+		q = `SELECT id, project_id, volume_id, title, content, word_count, sort_order, COALESCE(tags,''), COALESCE(synopsis,''), created_at, updated_at, is_deleted, COALESCE(deleted_at,'') FROM chapters WHERE is_deleted=1 ORDER BY deleted_at DESC`
+	}
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Chapter{}
+	for rows.Next() {
+		var c Chapter
+		if err := rows.Scan(&c.ID, &c.ProjectID, &c.VolumeID, &c.Title, &c.Content, &c.WordCount, &c.SortOrder, &c.Tags, &c.Synopsis, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted, &c.DeletedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// RestoreChapter 恢复软删除的章节
+func (s *Store) RestoreChapter(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, `UPDATE chapters SET is_deleted=0, deleted_at='' WHERE id=? AND is_deleted=1`, id)
+	if err != nil {
+		return err
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("章节不存在或未被删除")
+	}
+	return nil
+}
+
+// PermanentDeleteChapter 永久删除章节（二次确认后调用）
+func (s *Store) PermanentDeleteChapter(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM chapters WHERE id=? AND is_deleted=1`, id)
+	return err
+}
+
+// PurgeOldTrash 清理超过7天的回收站章节
+func (s *Store) PurgeOldTrash(ctx context.Context) (int, error) {
+	result, err := s.db.ExecContext(ctx,
+		`DELETE FROM chapters WHERE is_deleted=1 AND deleted_at != '' AND datetime(deleted_at) < datetime('now', '-7 days')`)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := result.RowsAffected()
+	return int(n), nil
 }
 
 func (s *Store) CopyChapter(ctx context.Context, id string) (*Chapter, error) {
@@ -377,11 +447,8 @@ func (s *Store) ImportChapters(ctx context.Context, projectID string, data *Expo
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// 清除旧数据
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chapter_versions WHERE chapter_id IN (SELECT id FROM chapters WHERE project_id=?)`, projectID); err != nil {
-		return 0, err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chapters WHERE project_id=?`, projectID); err != nil {
+	// 软删除旧章节
+	if _, err := tx.ExecContext(ctx, `UPDATE chapters SET is_deleted=1, deleted_at=? WHERE project_id=?`, now(), projectID); err != nil {
 		return 0, err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM volumes WHERE project_id=?`, projectID); err != nil {
@@ -410,7 +477,7 @@ func (s *Store) ImportChapters(ctx context.Context, projectID string, data *Expo
 		wc := wordCount(c.Content)
 		newID := newID()
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+			`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at, is_deleted, deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'')`,
 			newID, projectID, vid, c.Title, c.Content, wc, count, "", "", now(), now()); err != nil {
 			return 0, err
 		}
@@ -447,18 +514,15 @@ func (s *Store) SplitChapters(ctx context.Context, req *SplitChaptersRequest) ([
 		return result, nil
 	}
 
-	// 多章分割：在事务中先清空现有章节再写入，避免编号冲突
+	// 多章分割：在事务中先软删除现有章节再写入，避免编号冲突
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// 清除旧章节及其版本
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chapter_versions WHERE chapter_id IN (SELECT id FROM chapters WHERE project_id=?)`, req.ProjectID); err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chapters WHERE project_id=?`, req.ProjectID); err != nil {
+	// 软删除旧章节
+	if _, err := tx.ExecContext(ctx, `UPDATE chapters SET is_deleted=1, deleted_at=? WHERE project_id=?`, now(), req.ProjectID); err != nil {
 		return nil, err
 	}
 
@@ -472,7 +536,7 @@ func (s *Store) SplitChapters(ctx context.Context, req *SplitChaptersRequest) ([
 		ord := i + 1
 		newID := newID()
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+			`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at, is_deleted, deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'')`,
 			newID, req.ProjectID, "", title, seg.content, wc, ord, "", "", now(), now()); err != nil {
 			return result, fmt.Errorf("写入第%d章失败: %w", ord, err)
 		}
@@ -634,10 +698,7 @@ func (s *Store) commitSegments(ctx context.Context, projectID string, segments [
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chapter_versions WHERE chapter_id IN (SELECT id FROM chapters WHERE project_id=?)`, projectID); err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chapters WHERE project_id=?`, projectID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE chapters SET is_deleted=1, deleted_at=? WHERE project_id=?`, now(), projectID); err != nil {
 		return nil, err
 	}
 
@@ -650,7 +711,7 @@ func (s *Store) commitSegments(ctx context.Context, projectID string, segments [
 		wc := wordCount(seg.content)
 		cid := newID()
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+			`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at, is_deleted, deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'')`,
 			cid, projectID, "", title, seg.content, wc, i+1, "", "", now(), now()); err != nil {
 			return result, fmt.Errorf("写入第%d章失败: %w", i+1, err)
 		}
@@ -891,7 +952,7 @@ func matchChapterRegex(s string) bool {
 // ChapterCount 返回项目章节总数
 func (s *Store) ChapterCount(ctx context.Context, projectID string) int {
 	var n int
-	_ = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM chapters WHERE project_id=?`, projectID).Scan(&n)
+	_ = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM chapters WHERE project_id=? AND is_deleted=0`, projectID).Scan(&n)
 	return n
 }
 
@@ -1039,7 +1100,7 @@ func (s *Store) MergeChapters(ctx context.Context, chapterIDs []string, newTitle
 			return nil, fmt.Errorf("只能合并连续章节，\"%s\" 与 \"%s\" 之间存在间隔", chapters[i-1].Title, c.Title)
 		}
 	}
-	// 软删除：为每个被合并章节保存最终版本
+	// 为每个被合并章节保存最终版本后软删除
 	for _, c := range chapters {
 		_, _ = s.SaveChapterVersion(ctx, c.ID, c.Title+" (合并前)", c.Content)
 	}
@@ -1060,7 +1121,7 @@ func (s *Store) MergeChapters(ctx context.Context, chapterIDs []string, newTitle
 		}
 		merged.WriteString(c.Content)
 	}
-	// 删除旧章节（版本已保存）
+	// 软删除旧章节（版本已保存）
 	ids := make([]string, len(chapters))
 	for i, c := range chapters {
 		ids[i] = c.ID
@@ -1071,19 +1132,15 @@ func (s *Store) MergeChapters(ctx context.Context, chapterIDs []string, newTitle
 		args[i] = id
 	}
 	if _, err := tx.ExecContext(ctx,
-		`DELETE FROM chapter_versions WHERE chapter_id IN (`+placeholders+`)`, args...); err != nil {
-		return nil, err
-	}
-	args2 := append([]interface{}{projectID}, args...)
-	if _, err := tx.ExecContext(ctx,
-		`DELETE FROM chapters WHERE id IN (`+placeholders+`) AND project_id=?`, args2...); err != nil {
+		`UPDATE chapters SET is_deleted=1, deleted_at=? WHERE id IN (`+placeholders+`) AND project_id=?`,
+		append([]interface{}{now()}, args...)...); err != nil {
 		return nil, err
 	}
 
 	wc := wordCount(merged.String())
 	newID := newID()
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at, is_deleted, deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'')`,
 		newID, projectID, volumeID, newTitle, merged.String(), wc, minOrd, "", "", now(), now()); err != nil {
 		return nil, err
 	}
@@ -1129,11 +1186,8 @@ func (s *Store) SplitChapter(ctx context.Context, chapterID string, cursorPos in
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// 删除原始章节及其版本记录
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chapter_versions WHERE chapter_id=?`, chapterID); err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chapters WHERE id=?`, chapterID); err != nil {
+	// 软删除原始章节（拆分前版本已保存）
+	if _, err := tx.ExecContext(ctx, `UPDATE chapters SET is_deleted=1, deleted_at=? WHERE id=?`, now(), chapterID); err != nil {
 		return nil, err
 	}
 
@@ -1141,12 +1195,12 @@ func (s *Store) SplitChapter(ctx context.Context, chapterID string, cursorPos in
 	wc1, wc2 := wordCount(part1), wordCount(part2)
 	id1, id2 := newID(), newID()
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at, is_deleted, deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'')`,
 		id1, ch.ProjectID, ch.VolumeID, newTitle1, part1, wc1, ch.SortOrder, ch.Tags, ch.Synopsis, now(), now()); err != nil {
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at, is_deleted, deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'')`,
 		id2, ch.ProjectID, ch.VolumeID, newTitle2, part2, wc2, ch.SortOrder+1, ch.Tags, ch.Synopsis, now(), now()); err != nil {
 		return nil, err
 	}

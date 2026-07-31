@@ -150,6 +150,12 @@ func (s *Server) HandleCreateChapter(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// RAG 增量索引
+	if s.rag != nil && ch.Content != "" {
+		go func() {
+			_ = s.rag.IndexChapter(r.Context(), req.ProjectID, ch.ID)
+		}()
+	}
 	writeCreated(w, map[string]interface{}{"item": ch})
 }
 
@@ -170,16 +176,21 @@ func (s *Server) HandleGetChapter(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleUpdateChapter(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var req struct {
-		Title    *string `json:"title"`
-		Content  *string `json:"content"`
-		VolumeID *string `json:"volume_id"`
+		Title       *string `json:"title"`
+		Content     *string `json:"content"`
+		VolumeID    *string `json:"volume_id"`
+		IfUpdatedAt *string `json:"if_updated_at"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	ch, err := s.store.UpdateChapter(r.Context(), id, req.Title, req.Content, req.VolumeID)
+	ch, err := s.store.UpdateChapter(r.Context(), id, req.Title, req.Content, req.VolumeID, req.IfUpdatedAt)
 	if err != nil {
+		if strings.Contains(err.Error(), "已被其他窗口修改") {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -187,12 +198,64 @@ func (s *Server) HandleUpdateChapter(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "章节不存在")
 		return
 	}
+	// RAG 增量索引：章节内容更新后重建该章向量块
+	if s.rag != nil && ch.Content != "" {
+		go func() {
+			_ = s.rag.IndexChapter(r.Context(), ch.ProjectID, ch.ID)
+		}()
+	}
 	writeOK(w, map[string]interface{}{"item": ch})
 }
 
 func (s *Server) HandleDeleteChapter(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := s.store.DeleteChapter(r.Context(), id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// RAG 索引清理
+	if s.rag != nil {
+		go func() {
+			_ = s.store.DeleteRAGChunksByChapter(r.Context(), id)
+		}()
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) HandleListTrashChapters(w http.ResponseWriter, r *http.Request) {
+	pid := r.URL.Query().Get("project_id")
+	items, err := s.store.ListTrashChapters(r.Context(), pid)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeOK(w, map[string]interface{}{"items": items})
+}
+
+func (s *Server) HandleRestoreChapter(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := s.store.RestoreChapter(r.Context(), id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeOK(w, map[string]string{"status": "ok"})
+}
+
+func (s *Server) HandlePermanentDeleteChapter(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	// 二次确认：需在请求体中传递 confirm=true
+	var req struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "需要提供确认参数")
+		return
+	}
+	if !req.Confirm {
+		writeError(w, http.StatusBadRequest, "请确认永久删除操作")
+		return
+	}
+	if err := s.store.PermanentDeleteChapter(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

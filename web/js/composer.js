@@ -40,6 +40,17 @@ var Composer = {
     var swToggle = document.getElementById('skipWordCheck');
     if (swToggle) swToggle.checked = Store.state.composer.skipWordCheck || false;
     Store.state.composer.skipWordCheck = Store.state.composer.skipWordCheck || false;
+    // 深度思考：全局开关（一键全开/全关）+ 角色级开关（默认推荐配置：仅规划师开，写作/审稿/轻活关）
+    var thToggle = document.getElementById('thinkingToggle');
+    var rt = Store.state.composer.roleThinking;
+    if (!rt || typeof rt !== 'object') { rt = { thinker: true, worker: false, verifier: false, helper: false }; Store.state.composer.roleThinking = rt; }
+    var allOn = rt.thinker !== false && rt.worker !== false && rt.verifier !== false && rt.helper !== false;
+    if (thToggle) thToggle.checked = allOn;
+    var map = { thinker: 'thinkThinker', worker: 'thinkWorker', verifier: 'thinkVerifier', helper: 'thinkHelper' };
+    Object.keys(map).forEach(function (k) {
+      var el = document.getElementById(map[k]);
+      if (el) el.checked = rt[k] !== false;
+    });
     // 自动追加
     var aaToggle = document.getElementById('autoAppendToggle');
     if (aaToggle) aaToggle.checked = Store.state.composer.autoAppend !== false;
@@ -67,13 +78,41 @@ var Composer = {
     Store.state.composer.skipWordCheck = checked;
     Store.savePrefs();
   },
+  onThinkingChange: function (checked) {
+    // 全局开关：true=全部角色开启思考（全开模式）；false=全部关闭
+    var rt = Store.state.composer.roleThinking || {};
+    if (!checked) {
+      rt.thinker = false; rt.worker = false; rt.verifier = false; rt.helper = false;
+    } else {
+      rt.thinker = true; rt.worker = true; rt.verifier = true; rt.helper = true;
+    }
+    Store.state.composer.roleThinking = rt;
+    var map = { thinker: 'thinkThinker', worker: 'thinkWorker', verifier: 'thinkVerifier', helper: 'thinkHelper' };
+    Object.keys(map).forEach(function (k) {
+      var el = document.getElementById(map[k]);
+      if (el) el.checked = rt[k] !== false;
+    });
+    Store.savePrefs();
+    UI.toast(checked ? '🧠 深度思考已开启（全部角色，更慢但质量最稳）' : '⚡ 深度思考已全部关闭（最快）', '');
+  },
+  onRoleThinkingChange: function (role, checked) {
+    var rt = Store.state.composer.roleThinking || { thinker: true, worker: false, verifier: false, helper: false };
+    rt[role] = checked;
+    Store.state.composer.roleThinking = rt;
+    // 同步全局开关状态
+    var thToggle = document.getElementById('thinkingToggle');
+    if (thToggle) thToggle.checked = rt.thinker !== false && rt.worker !== false && rt.verifier !== false && rt.helper !== false;
+    Store.savePrefs();
+    var label = { thinker: '规划师', worker: '写作', verifier: '审稿', helper: '轻活' }[role] || role;
+    UI.toast((checked ? '🧠 ' : '⚡ ') + label + '角色' + (checked ? '已开启' : '已关闭') + '思考', '');
+  },
   onModeChange: function (mode, skipPersist) {
     Store.state.composer.runMode = mode;
     document.getElementById('modeSelect').value = mode;
     var hints = {
       auto: '智能协同：自动判定任务并匹配流水线',
       collab: '协同闭环：Thinker规划→Worker写作→Verifier审查→Thinker重规划→Worker重写',
-      orchestrated: '完整流水线·自选Agent模型：为每个角色手动指定模型，跑完整 Thinker→Worker→Verifier 流程',
+      orchestrated: '为每个角色手动指定模型，跑完整 Thinker→Worker→Verifier 流程',
       draft: '快速草稿：跳过 Thinker+Verifier，Worker 直出初稿（可后续深度优化）',
       strict: '严谨模式：Thinker 初稿 → Worker 润色 → Verifier 严校',
       art: '文艺创作：极简框架 → Worker 高度自由创作 → 宽松审查',
@@ -81,6 +120,10 @@ var Composer = {
       manual: '手动自选模型：跳过流水线，直接调用指定模型'
     };
     document.getElementById('modeHint').textContent = hints[mode] || '';
+    // 模式切换反馈：toast 提示（用户能感知切换成功）
+    if (typeof UI !== 'undefined' && UI.toast && !skipPersist) {
+      UI.toast('已切换：' + (hints[mode] || mode), 'info');
+    }
     var modelSel = document.getElementById('modelSelect');
     var orchPanel = document.getElementById('orchestratedModels');
     if (mode === 'orchestrated') {
@@ -133,7 +176,7 @@ var Composer = {
         { key: 'verifier', label: '🔍 品质审稿',  storeKey: 'orchVerifier' }
       ];
       var panel = document.getElementById('orchestratedModels');
-      panel.innerHTML = roles.map(function (r) {
+      var body = roles.map(function (r) {
         var cur = Store.state.composer[r.storeKey] || '';
         var opts = active.map(function (m) {
           return '<option value="' + esc(m.name) + '"' + (m.name === cur ? ' selected' : '') + '>' + esc(m.name) + '</option>';
@@ -143,14 +186,26 @@ var Composer = {
           '<span style="width:80px;color:var(--muted)">' + r.label + '</span>' +
           '<select id="orch-' + r.key + '" style="flex:1;font-size:11px;padding:3px 5px" onchange="Composer.onOrchModelChange()">' + opts + '</select></div>';
       }).join('');
-      // auto-select defaults
-      if (active.length) {
+      panel.innerHTML = '<div id="orchToggle" onclick="Composer.toggleOrchPanel(this)" style="cursor:pointer;font-size:11px;color:var(--accent);padding:2px 4px;user-select:none;white-space:nowrap" title="展开/收起各角色模型配置">⚙️ 模型配置 <span class="orch-arrow">▾</span></div>' +
+        '<div id="orchBody" style="display:none">' + body + '</div>';
+      // auto-select defaults (only once, avoid recursion)
+      if (active.length && !this._orchDefaultsSet) {
+        this._orchDefaultsSet = true;
         if (!Store.state.composer.orchThinker) { Store.state.composer.orchThinker = active[0].name; }
         if (!Store.state.composer.orchWorker) { Store.state.composer.orchWorker = active[0].name; }
         if (!Store.state.composer.orchVerifier) { Store.state.composer.orchVerifier = active.length > 1 ? active[1].name : active[0].name; }
-        this.refreshOrchestratedModels();
+        this._orchDefaultsSet = false;
       }
     } catch (e) { /* silent */ }
+  },
+  // 折叠/展开「指派Agent模型」的角色模型配置
+  toggleOrchPanel: function (el) {
+    var body = document.getElementById('orchBody');
+    if (!body) return;
+    var show = body.style.display !== 'block';
+    body.style.display = show ? 'block' : 'none';
+    var arrow = el.querySelector('.orch-arrow');
+    if (arrow) arrow.textContent = show ? '▴' : '▾';
   },
   onOrchModelChange: function () {
     Store.state.composer.orchThinker = document.getElementById('orch-thinker')?.value || '';
@@ -164,6 +219,13 @@ var Composer = {
     btn.textContent = g ? '⏳ 生成中…' : '✨ 生成';
     document.getElementById('genStatus').classList.toggle('show', g);
     document.getElementById('instructionInput').readOnly = g;
+    if (g) {
+      Editor.lock();
+      Sidebar.lock();
+    } else {
+      Editor.unlock();
+      Sidebar.unlock();
+    }
   },
   buildPayload: function () {
     var p = Store.state.currentProject;
@@ -220,7 +282,8 @@ var Composer = {
       no_rewrite: noRewrite,
       context_scope: scope,
       previous_summaries: summaries,
-      skip_word_check: Store.state.composer.skipWordCheck
+      skip_word_check: Store.state.composer.skipWordCheck,
+      role_thinking: Store.state.composer.roleThinking || { thinker: true, worker: false, verifier: false, helper: false }
     };
   },
   validate: function (payload) {
@@ -347,10 +410,63 @@ var Composer = {
     Store.state.composer.autoAppend = cb ? cb.checked : true;
     Store.savePrefs();
   },
+  toggleGenOptions: function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var box = document.getElementById('genOpts');
+    if (!box) return;
+    var show = box.style.display === 'none';
+    box.style.display = show ? 'flex' : 'none';
+    var btn = ev && ev.currentTarget;
+    if (btn) btn.classList.toggle('active', show);
+  },
+  previewRAG: async function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择项目', 'warn'); return; }
+    var box = document.getElementById('ragPreview');
+    var demand = (document.getElementById('instructionInput') || {}).value || '';
+    var demand2 = Store.state.composer && Store.state.composer.demand || '';
+    demand = demand || demand2 || '当前章节续写';
+    var chId = Store.state.currentChapter ? Store.state.currentChapter.id : '';
+    box.style.display = '';
+    box.innerHTML = '<div class="ragp-head">🧠 AI 将参考的相关记忆 <span class="ragp-load">检索中…</span></div>';
+    try {
+      var r = await fetch('/api/rag/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: p.id, chapter_id: chId, user_demand: demand, selected_text: '' })
+      });
+      var d = await r.json();
+      var chunks = (d && d.chunks) || [];
+      if (!chunks.length) {
+        box.innerHTML = '<div class="ragp-head">🧠 相关记忆</div><div class="ragp-empty">未检索到明显相关的历史章节，AI 将只参考最近章节。</div>';
+        return;
+      }
+      var html = '<div class="ragp-head">🧠 AI 将参考这些书中记忆 <button class="ragp-close" onclick="document.getElementById(\'ragPreview\').style.display=\'none\'">✕</button></div>';
+      chunks.forEach(function (c) {
+        var txt = c.text || '';
+        if (txt.length > 140) txt = txt.slice(0, 140) + '…';
+        html += '<div class="ragp-item"><div class="ragp-meta">第' + c.chapter_no + '章《' + (c.title || '未命名') + '》 <span class="ragp-score">' + Math.round((c.score || 0) * 100) + '%</span></div>' +
+          '<div class="ragp-text">' + esc(txt) + '</div></div>';
+      });
+      box.innerHTML = html;
+    } catch (e) {
+      box.innerHTML = '<div class="ragp-head">🧠 相关记忆</div><div class="ragp-empty">检索失败：' + esc(e.message) + '</div>';
+    }
+  },
   onOutlineChange: function () {
     var el = document.getElementById('genOutline');
     Store.state.composer.outline = el ? el.value.trim() : '';
     Store.savePrefs();
+    // 自动保存大纲到后端（2秒防抖）
+    if (this._outlineTimer) clearTimeout(this._outlineTimer);
+    var self = this;
+    this._outlineTimer = setTimeout(function () {
+      var p = Store.state.currentProject;
+      if (p && Store.state.composer.outline !== (p.outline || '')) {
+        API.updateProject(p.id, { outline: Store.state.composer.outline }).catch(function () {});
+      }
+    }, 2000);
   },
   autoTitle: function () {
     var ch = Store.state.currentChapter;

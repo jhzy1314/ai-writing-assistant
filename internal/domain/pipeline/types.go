@@ -21,6 +21,9 @@ const (
 // PipelineName 流水线名称
 type PipelineName string
 
+// ChapterBreakMarker 分章标记：后端分段生成时在段间插入，前端据此拆分为独立章节
+const ChapterBreakMarker = "\n\n[=====AI-NOVEL-CHAPTER-BREAK=====]\n\n"
+
 const (
     PipelineStandard    PipelineName = "standard"    // 标准通用创作
     PipelineDraft       PipelineName = "draft"       // 快速草稿（Worker直出）
@@ -52,6 +55,7 @@ type GenerateRequest struct {
 	PreviousSummaries string  `json:"previous_summaries"`
 	SkipWordCheck     bool              `json:"skip_word_check"`     // 用户临时关闭字数校验
 	RoleModels        map[string]string `json:"role_models"`         // orchestrated模式：手动指派每个Agent的模型（key:thinker/worker/verifier/helper, value:model_name）
+	RoleThinking      map[string]bool   `json:"role_thinking"`       // 每个角色是否开启深度思考（key:thinker/worker/verifier/helper；缺省/未指定=开）
 }
 
 // ContextBundle 注入到所有子任务的共享上下文（世界观/人物卡/前文/素材）
@@ -116,7 +120,8 @@ type ProgressEvent struct {
 	Iteration int       `json:"iteration,omitempty"`  // 迭代轮次
 	Issues    []string  `json:"issues,omitempty"`     // 校验问题清单
 	FinalText string    `json:"final_text,omitempty"` // 终稿（done 时）
-	Tokens    int       `json:"tokens,omitempty"`     // 预估/实际 token
+	WordCount  int       `json:"word_count,omitempty"`  // 终稿字数（done 时）
+	Tokens     int       `json:"tokens,omitempty"`      // 预估/实际 token
 	Degraded  bool      `json:"degraded,omitempty"`   // 是否发生降级
 	Reset       bool                `json:"reset,omitempty"`        // true=清空已渲染文本（微调重写前）
 	OutlineWords *OutlineWordEstimate `json:"outline_words,omitempty"` // 大纲字数校验结果

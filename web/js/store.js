@@ -27,7 +27,7 @@ var Store = {
     try { var v = localStorage.getItem(this.lsPrefix + key); return v === null ? def : JSON.parse(v); }
     catch (e) { return def; }
   },
-  set: function (key, val) { try { localStorage.setItem(this.lsPrefix + key, JSON.stringify(val)); } catch (e) { } },
+  set: function (key, val) { try { localStorage.setItem(this.lsPrefix + key, JSON.stringify(val)); } catch (e) { console.warn('[store] localStorage quota exceeded for key:', key, ' Consider clearing old drafts or trash.'); } },
   remove: function (key) { try { localStorage.removeItem(this.lsPrefix + key); } catch (e) { } },
   loadPrefs: function () {
     this.state.composer.runMode = this.get('runMode', 'auto');
@@ -37,10 +37,18 @@ var Store = {
     this.state.composer.skipWordCheck = this.get('skipWordCheck', false);
     this.state.composer.outline = this.get('outline', '');
     this.state.editor.mode = this.get('editorMode', 'rich');
-    var theme = this.get('theme', 'light');
-    document.documentElement.setAttribute('data-theme', theme);
-    var tg = document.getElementById('themeToggle');
-    if (tg) tg.textContent = theme === 'dark' ? '☀ 浅色' : '🌙 深色';
+    // 主题：多主题系统（themes.js），经典主题 id 保持 dark/light 兼容旧值
+    if (typeof Themes !== 'undefined' && Themes.loadSaved) {
+      Themes.loadSaved();
+      document.documentElement.setAttribute('data-theme', Themes.current);
+      var tg = document.getElementById('themeToggle');
+      if (tg) tg.textContent = Themes.get(Themes.current).icon + ' ' + Themes.get(Themes.current).name;
+    } else {
+      var theme = this.get('theme', 'dark');
+      document.documentElement.setAttribute('data-theme', theme);
+      var tg2 = document.getElementById('themeToggle');
+      if (tg2) tg2.textContent = theme === 'dark' ? '☀ 浅色' : '🌙 深色';
+    }
   },
   savePrefs: function () {
     this.set('runMode', this.state.composer.runMode);

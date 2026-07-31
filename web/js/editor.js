@@ -2,6 +2,7 @@
 var Editor = {
   tiptap: null,
   streaming: false,
+  _locked: false,
   mode: 'rich',
   preview: false,
   elRich: function () { return document.getElementById('editorRich'); },
@@ -10,8 +11,32 @@ var Editor = {
   elPreview: function () { return document.getElementById('previewPane'); },
   elPreviewInner: function () { return document.getElementById('previewInner'); },
 
+  lock: function () {
+    this._locked = true;
+    if (this.tiptap) this.tiptap.setEditable(false);
+    var mdEl = this.elMd();
+    if (mdEl) { mdEl.readOnly = true; mdEl.style.cursor = 'not-allowed'; }
+    // 禁止侧栏项目切换
+    var sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.style.pointerEvents = 'none';
+    var rightPanel = document.getElementById('rightPanel');
+    if (rightPanel) rightPanel.style.pointerEvents = 'none';
+  },
+
+  unlock: function () {
+    this._locked = false;
+    if (this.tiptap) this.tiptap.setEditable(true);
+    var mdEl = this.elMd();
+    if (mdEl) { mdEl.readOnly = false; mdEl.style.cursor = 'text'; }
+    var sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.style.pointerEvents = '';
+    var rightPanel = document.getElementById('rightPanel');
+    if (rightPanel) rightPanel.style.pointerEvents = '';
+  },
+
   init: function () {
     this.mode = Store.state.editor.mode;
+    this._idleDisabled = Store.get('idleHintsDisabled', false);
     this.applyModeUI();
     var self = this;
     if (window.initTiptap) {
@@ -20,15 +45,32 @@ var Editor = {
         self.loadLatest();
         editor.on('update', function () { self.onTiptapUpdate(); });
         editor.on('selectionUpdate', function () { self.onSelection(); });
+      }).catch(function (err) {
+        console.warn('[editor] Tiptap init failed, switching to markdown mode:', err && err.message);
+        self.fallbackToMarkdown('Tiptap 编辑器加载失败，已自动切换到 Markdown 模式。联网后刷新页面即可恢复富文本编辑。');
       });
     } else {
-      this.loadLatest();
+      this.fallbackToMarkdown('Tiptap 编辑器不可用（可能处于离线状态），已自动切换到 Markdown 模式。联网后刷新页面即可使用富文本编辑。');
     }
-    document.addEventListener('selectionchange', function () { if (self.mode === 'rich' && self.tiptap) self.onSelection(); });
+    document.addEventListener('selectionchange', function () {
+      if (self.mode === 'rich' && self.tiptap) {
+        if (self._selRAF) return;
+        self._selRAF = requestAnimationFrame(function () {
+          self._selRAF = null;
+          self.onSelection();
+        });
+      }
+    });
+  },
+  fallbackToMarkdown: function (msg) {
+    this.mode = 'markdown';
+    this.applyModeUI();
+    this.loadLatest();
+    if (typeof UI !== 'undefined') UI.toast(msg, 'warn');
   },
   onTiptapUpdate: function () {
-    this.updateWordCount();
-    this.refreshPreview();
+    this.updateWordCountThrottled();
+    this.refreshPreviewThrottled();
     this.autosaveDraft();
     this.scheduleDbSave();
     this.toggleEmptyState();
@@ -36,11 +78,22 @@ var Editor = {
     document.getElementById('draftSavedTag').style.display = 'none';
   },
   resetIdleTimer: function () {
+    if (this._idleDisabled) return;
     var self = this;
     if (this._idleTimer) clearTimeout(this._idleTimer);
     this._idleTimer = setTimeout(function () { self.showIdleHints(); }, 30000);
   },
+  // 真正关闭自动灵感提示（持久化，不再每 30 秒打扰）
+  closeIdleHints: function () {
+    this._idleDisabled = true;
+    Store.set('idleHintsDisabled', true);
+    if (this._idleTimer) { clearTimeout(this._idleTimer); this._idleTimer = null; }
+    var hintEl = document.getElementById('pipeIntro');
+    if (hintEl) hintEl.innerHTML = this._pipeIntroOriginal || '';
+    UI.toast('已关闭自动灵感提示', '');
+  },
   showIdleHints: function () {
+    if (this._idleDisabled) return;
     if (!Store.state.currentProject || !Store.state.currentChapter) return;
     if (SSE.active) return;
     var ch = Store.state.currentChapter;
@@ -53,26 +106,31 @@ var Editor = {
       '当前场景的紧张度够不够？是否需要加冲突？',
       '前方是否有未回收的伏笔可以呼应？'
     ];
-    var html = '<div style="font-weight:600;margin-bottom:4px;color:var(--accent)">💡 写作灵感</div>';
-    for (var i = 0; i < 3; i++) {
-      var h = hints[Math.floor(Math.random() * hints.length)];
-      html += '<div style="padding:4px 0;font-size:11px;color:var(--muted);cursor:pointer;border-radius:4px;margin-bottom:2px" onclick="document.getElementById(\'instructionInput\').value=\'' + esc(h) + '\';UI.toast(\'灵感已填入输入框\',\'\')">' + (i + 1) + '. ' + h + '</div>';
-    }
-    html += '<div style="font-size:9px;color:var(--faint);margin-top:4px;cursor:pointer" onclick="Editor.resetIdleTimer()">✕ 关闭自动提示</div>';
     var hintEl = document.getElementById('pipeIntro');
-    if (hintEl) hintEl.innerHTML = html;
+    if (hintEl) {
+      if (!this._pipeIntroOriginal) this._pipeIntroOriginal = hintEl.innerHTML;
+      var html = '<div style="font-weight:600;margin-bottom:4px;color:var(--accent)">💡 写作灵感</div>';
+      for (var i = 0; i < 3; i++) {
+        var h = hints[Math.floor(Math.random() * hints.length)];
+        html += '<div style="padding:4px 0;font-size:11px;color:var(--muted);cursor:pointer;border-radius:4px;margin-bottom:2px" onclick="document.getElementById(\'instructionInput\').value=\'' + esc(h) + '\';UI.toast(\'灵感已填入输入框\',\'\')">' + (i + 1) + '. ' + h + '</div>';
+      }
+      html += '<div style="font-size:9px;color:var(--faint);margin-top:4px;cursor:pointer" onclick="Editor.closeIdleHints()">✕ 关闭自动提示</div>';
+      hintEl.innerHTML = html;
+    }
     UI.toast('光标停留30秒，已推送灵感提示', '');
   },
   applyModeUI: function () {
     var rich = this.elRich(), md = this.elMd();
+    var richBtn = document.getElementById('modeRichBtn');
+    var mdBtn = document.getElementById('modeMdBtn');
     if (this.mode === 'rich') {
-      rich.style.display = ''; md.style.display = 'none';
-      document.getElementById('modeRichBtn').classList.add('on');
-      document.getElementById('modeMdBtn').classList.remove('on');
+      if (rich) rich.style.display = ''; if (md) md.style.display = 'none';
+      if (richBtn) richBtn.classList.add('on');
+      if (mdBtn) mdBtn.classList.remove('on');
     } else {
-      rich.style.display = 'none'; md.style.display = '';
-      document.getElementById('modeRichBtn').classList.remove('on');
-      document.getElementById('modeMdBtn').classList.add('on');
+      if (rich) rich.style.display = 'none'; if (md) md.style.display = '';
+      if (richBtn) richBtn.classList.remove('on');
+      if (mdBtn) mdBtn.classList.add('on');
     }
     Store.state.editor.mode = this.mode;
     Store.savePrefs();
@@ -95,7 +153,11 @@ var Editor = {
   togglePreview: function () {
     this.preview = !this.preview;
     this.elPreview().classList.toggle('show', this.preview);
-    document.getElementById('previewBtn').classList.toggle('on', this.preview);
+    // 顶栏与工具栏各有一个预览按钮，同步高亮态
+    var btn1 = document.getElementById('previewBtn');
+    if (btn1) btn1.classList.toggle('on', this.preview);
+    var btn2 = document.getElementById('previewBtn2');
+    if (btn2) btn2.classList.toggle('on', this.preview);
     // 阅读模式：自动折叠右面板 + 加大字体
     if (this.preview) {
       document.getElementById('rightPanel').classList.add('collapsed');
@@ -117,6 +179,46 @@ var Editor = {
     Store.set('focusMode', this.focusMode);
     if (this.focusMode) { UI.toast('专注模式已开启', ''); }
   },
+  // 去AI味：检测 AI 痕迹 + 文字层润色（替换全文，支持撤销）
+  deAIfy: async function () {
+    var text = this.getText();
+    if (!text || text.trim().length < 50) { UI.toast('正文太短（<50字），请先写一段内容', 'warn'); return; }
+    if (this._deAIing) return;
+    this._deAIing = true;
+    var btn = document.getElementById('deAIfyBtn');
+    if (btn) btn.disabled = true;
+    try {
+      UI.toast('🔍 正在检测 AI 味…', '');
+      var tells = null;
+      try { tells = await API.aiTells({ content: text }); } catch (e) { /* 检测失败不阻塞润色 */ }
+      UI.toast('✨ 正在去 AI 味润色（约 10-60 秒）…', '');
+      var r;
+      try { r = await API.aiPolish({ content: text, language: 'zh' }); }
+      catch (e) { UI.toast('润色失败：' + e.message, 'error'); return; }
+      if (!r || !r.text || !r.text.trim()) { UI.toast('润色结果为空，请重试', 'error'); return; }
+      // 撤销快照 + 替换全文
+      this.undoContent = text;
+      this.setContent(r.text);
+      UI.toast('✅ 已去 AI 味润色（' + (r.model || '') + '）', 'success');
+      // 展示检测报告（润色前检出问题才弹）
+      if (tells && tells.issues && tells.issues.length) {
+        var html = tells.issues.map(function (it) {
+          var color = it.severity === 'warning' ? '#e6a23c' : '#909399';
+          return '<div style="margin:5px 0;padding-left:4px;border-left:3px solid ' + color + '">' +
+            '<b style="color:' + color + '">【' + it.category + '】</b> ' + it.description +
+            '<div style="color:var(--muted);font-size:11px;margin:2px 0 0 10px">→ ' + (it.suggestion || '') + '</div></div>';
+        }).join('');
+        UI.modal({
+          title: '🔍 AI味检测报告（润色前检出 ' + tells.count + ' 项）',
+          body: '<div style="font-size:12px;line-height:1.7;max-height:300px;overflow:auto">' + html + '</div>',
+          actions: [{ id: 'close', label: '知道了' }]
+        });
+      }
+    } finally {
+      this._deAIing = false;
+      if (btn) btn.disabled = false;
+    }
+  },
   adjustFontSize: function (delta) {
     this._fs = Math.max(12, Math.min(28, (this._fs || Store.get('fontSize', 16)) + delta));
     var rich = document.querySelector('.editor-rich');
@@ -128,6 +230,15 @@ var Editor = {
   refreshPreview: function () {
     if (!this.preview) return;
     this.elPreviewInner().innerHTML = this.mdToHtml(this.getText());
+  },
+  refreshPreviewThrottled: function () {
+    if (!this.preview) return;
+    var self = this;
+    if (this._pvTimer) return;
+    this._pvTimer = setTimeout(function () {
+      self._pvTimer = null;
+      self.refreshPreview();
+    }, 500);
   },
   getRichHTML: function () {
     return this.tiptap ? this.tiptap.getHTML() : this.elRich().innerHTML;
@@ -161,6 +272,50 @@ var Editor = {
     this.refreshPreview();
     this.autosaveDraft();
     if (!hasText) this.toggleEmptyState();
+    this.updateEmptyGuide();
+  },
+  dismissGuide: function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var g = document.getElementById('emptyGuide');
+    if (g) g.classList.remove('show');
+    // 记住用户选择：本次会话不再自动弹出
+    this._guideDismissed = true;
+    try { sessionStorage.setItem('guideDismissed', '1'); } catch (e) {}
+    UI.toast('引导已关闭', 'info');
+  },
+  guideDismissed: function () {
+    if (this._guideDismissed) return true;
+    try { return sessionStorage.getItem('guideDismissed') === '1'; } catch (e) { return false; }
+  },
+  toggleMoreMenu: function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var menu = document.getElementById('moreMenu');
+    if (!menu) return;
+    var showing = menu.style.display !== 'none';
+    menu.style.display = showing ? 'none' : '';
+    if (!showing) {
+      var close = function (e) {
+        if (menu && !menu.contains(e.target) && e.target.id !== 'moreMenuWrap' && !e.target.closest('.more-menu-wrap')) {
+          menu.style.display = 'none';
+          document.removeEventListener('click', close, true);
+        }
+      };
+      setTimeout(function () { document.addEventListener('click', close, true); }, 0);
+    }
+  },
+  updateEmptyGuide: function () {
+    var g = document.getElementById('emptyGuide');
+    if (!g) return;
+    var ch = Store.state.currentChapter;
+    var hasText = false;
+    if (this.mode === 'rich' && this.tiptap) {
+      hasText = this.tiptap.state.doc.textContent.trim().length > 0;
+    } else {
+      hasText = this.getText().trim().length > 0;
+    }
+    // 无章节，或章节为空（无内容）时显示引导；用户主动关闭过则不显示
+    var showGuide = (!ch || !hasText) && !this.guideDismissed();
+    g.classList.toggle('show', showGuide);
   },
   toggleEmptyState: function () {
     var pane = document.querySelector('.editor-pane');
@@ -188,15 +343,19 @@ var Editor = {
   },
   getSelectedText: function () { return Store.state.editor.selectedText || ''; },
   onInput: function () {
-    this.updateWordCount();
-    this.refreshPreview();
+    this.updateWordCountThrottled();
+    this.refreshPreviewThrottled();
     this.autosaveDraft();
     this.scheduleDbSave();
     document.getElementById('draftSavedTag').style.display = 'none';
   },
   autosaveDraft: function () {
-    var p = Store.state.currentProject;
-    if (p) Store.saveDraft(p.id, this.getText());
+    var self = this;
+    if (this._draftTimer) clearTimeout(this._draftTimer);
+    this._draftTimer = setTimeout(function () {
+      var p = Store.state.currentProject;
+      if (p) Store.saveDraft(p.id, self.getText());
+    }, 1500);
   },
   // 5 秒防抖自动保存到数据库（localStorage 草稿仍每次输入即时写入，双保险）
   scheduleDbSave: function () {
@@ -206,16 +365,41 @@ var Editor = {
   },
   saveToDb: function () {
     var ch = Store.state.currentChapter;
-    if (!ch) return; // 未选中章节时仅保留 localStorage 草稿
+    if (!ch) return;
     var text = this.getText();
-    if (text === (ch.content || '')) return; // 内容未变化，不写库
+    if (text === (ch.content || '')) return;
+    // 多窗口冲突检测：加载时记下 updated_at，保存前比对
+    if (ch._saveVersion && this._conflictChecked !== ch.id) {
+      this._conflictChecked = ch.id;
+      var self = this;
+      API.getChapter(ch.id).then(function (latest) {
+        if (latest && latest.updated_at !== ch._saveVersion) {
+          UI.confirm('内容冲突', '该章节在另一窗口已被修改。\n\n选择「覆盖」将丢失另一窗口的修改，选择「刷新」将加载最新版本。', function () {
+            self._doSave(ch, text);
+          }, '覆盖', '刷新', function () {
+            var newText = latest.content || '';
+            self.setContent(newText);
+            if (ch) { ch.content = newText; ch.word_count = Array.from(newText).length; ch._saveVersion = latest.updated_at; }
+            self.updateWordCount();
+          });
+        } else {
+          self._doSave(ch, text);
+        }
+      }).catch(function () { self._doSave(ch, text); });
+      return;
+    }
+    this._doSave(ch, text);
+  },
+  _doSave: function (ch, text) {
     ch.content = text;
     ch.word_count = Array.from(text).length;
+    this._conflictChecked = null;
     var self = this;
-    API.updateChapter(ch.id, { content: text }).then(function () {
+    API.updateChapter(ch.id, { content: text, if_updated_at: ch._saveVersion }).then(function () {
+      if (ch.content === text) ch._saveVersion = new Date().toISOString();
       self.flashSaved();
       self.updateStatusBar();
-    }).catch(function () { /* 静默失败，草稿仍在 localStorage */ });
+    }).catch(function (e) { console.warn('[save] auto-save failed:', e && e.message); });
   },
   // 保存成功提示：字数统计旁 + 底部状态栏各闪一下
   flashSaved: function () {
@@ -248,6 +432,14 @@ var Editor = {
     document.getElementById('charNow').textContent = charCount(t).toLocaleString();
     this.updateStatusBar();
   },
+  updateWordCountThrottled: function () {
+    var self = this;
+    if (this._wcTimer) return;
+    this._wcTimer = setTimeout(function () {
+      self._wcTimer = null;
+      self.updateWordCount();
+    }, 500);
+  },
   syncInstructionHeight: function (ta) {
     ta.style.height = 'auto';
     ta.style.height = Math.min(Math.max(ta.scrollHeight, 38), 140) + 'px';
@@ -270,17 +462,48 @@ var Editor = {
     }, 150);
   },
   execFmt: function (cmd) {
-    if (this.mode !== 'rich' || !this.tiptap) return;
-    var chain = this.tiptap.chain().focus();
-    switch (cmd) {
-      case 'bold': chain.toggleBold().run(); break;
-      case 'italic': chain.toggleItalic().run(); break;
-      case 'underline': chain.toggleUnderline().run(); break;
+    if (this.mode === 'rich' && this.tiptap) {
+      var chain = this.tiptap.chain().focus();
+      switch (cmd) {
+        case 'bold': chain.toggleBold().run(); break;
+        case 'italic': chain.toggleItalic().run(); break;
+        case 'underline': chain.toggleUnderline().run(); break;
+      }
+      return;
+    }
+    // 修复：markdown 模式（离线/Tiptap 降级/手动切换）下格式按钮同样生效，直接包裹 Markdown 语法
+    if (this.mode === 'markdown') {
+      var ta = this.elMd();
+      if (!ta) return;
+      var start = ta.selectionStart, end = ta.selectionEnd;
+      var wrap = { bold: ['**', '**'], italic: ['*', '*'], underline: ['<u>', '</u>'] }[cmd];
+      if (!wrap) return;
+      var sel = ta.value.substring(start, end) || '加粗文字';
+      var newVal = ta.value.substring(0, start) + wrap[0] + sel + wrap[1] + ta.value.substring(end);
+      ta.value = newVal;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      ta.focus();
+      ta.selectionStart = start + wrap[0].length;
+      ta.selectionEnd = end + wrap[0].length + sel.length;
     }
   },
   insertH: function (prefix) {
-    if (this.mode !== 'rich' || !this.tiptap) return;
-    this.tiptap.chain().focus().toggleHeading({ level: prefix === '## ' ? 2 : 3 }).run();
+    if (this.mode === 'rich' && this.tiptap) {
+      this.tiptap.chain().focus().toggleHeading({ level: prefix === '## ' ? 2 : 3 }).run();
+      return;
+    }
+    // 修复：markdown 模式在光标所在行首插入标题前缀
+    if (this.mode === 'markdown') {
+      var ta = this.elMd();
+      if (!ta) return;
+      var start = ta.selectionStart;
+      var lineStart = ta.value.lastIndexOf('\n', start - 1) + 1;
+      var newVal = ta.value.substring(0, lineStart) + prefix + ta.value.substring(lineStart);
+      ta.value = newVal;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = lineStart + prefix.length;
+    }
   },
   getCursorPosition: function () {
     if (this.mode === 'rich' && this.tiptap) {
@@ -316,9 +539,18 @@ var Editor = {
   appendStream: function (text) {
     if (!this.streaming) { this.streaming = true; this.streamText = ''; this._streamBuf = ''; }
     this.streamText = (this.streamText || '') + text;
-    // 实时更新当前章节字数（与服务端 len([]rune(content)) 一致）
+    // 实时更新当前章节字数（节流：每 500ms 才重建章节树，避免每个 token 全量重绘）
     var ch = Store.state.currentChapter;
-    if (ch) { ch.word_count = Array.from(this.streamText).length; ChapterUI.renderTree(); }
+    if (ch && (!SSE._bindChapterId || ch.id === SSE._bindChapterId)) {
+      ch.word_count = this.streamText.length;
+      var self2 = this;
+      if (!this._wcTreeTimer) {
+        this._wcTreeTimer = setTimeout(function () {
+          self2._wcTreeTimer = null;
+          ChapterUI.renderTree();
+        }, 500);
+      }
+    }
     this._streamBuf = (this._streamBuf || '') + text;
     // 每攒够 80 字或最多 150ms 才刷新到编辑器，避免每个 token 创建独立 <p>
     var self = this;
@@ -330,8 +562,8 @@ var Editor = {
     this._streamTimer = setTimeout(function () {
       self._flushStreamBuf();
     }, 150);
-    this.updateWordCount();
-    this.refreshPreview();
+    this.updateWordCountThrottled();
+    this.refreshPreviewThrottled();
     var cursor = document.querySelector('.cursor');
     if (!cursor) {
       cursor = document.createElement('span'); cursor.className = 'cursor';
@@ -343,6 +575,9 @@ var Editor = {
     var text = this._streamBuf;
     this._streamBuf = '';
     if (this._streamTimer) { clearTimeout(this._streamTimer); this._streamTimer = null; }
+    // 生成中切换了章节：不写入当前 DOM，内容由 done 事件写入绑定章节
+    var curCh = Store.state.currentChapter;
+    if (SSE.active && SSE._bindChapterId && curCh && curCh.id !== SSE._bindChapterId) return;
     if (this.mode === 'rich' && this.tiptap) {
       // 首次插入：用 setContent 替换空文档，避免 insertContentAt 在空文档时创建多余 <p>
       var docSize = this.tiptap.state.doc.content.size;
@@ -503,15 +738,24 @@ var Editor = {
             return;
           }
           if (fmt === 'docx') {
-            // 纯 HTML 包装为 Word 可读的 .docx（浏览器原生支持打开）
-            var docxHTML = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><title>' + esc(p ? p.name : 'document') + '</title></head><body>' + Editor.mdToHtml(text) + '</body></html>';
-            var docxBlob = new Blob([docxHTML], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-            var dca = document.createElement('a'); dca.href = URL.createObjectURL(docxBlob); dca.download = (p ? p.name : 'output') + '.docx'; dca.click();
-            URL.revokeObjectURL(dca.href); ov.remove(); UI.toast('DOCX 已导出', 'success');
+            // 使用服务端真 OOXML 导出（正确的 Open XML 格式）
+            ov.remove();
+            var p = Store.state.currentProject;
+            if (p) {
+              var a = document.createElement('a');
+              a.href = '/api/export/docx?project_id=' + p.id;
+              a.download = (p.name || 'output') + '.docx';
+              a.click();
+              UI.toast('DOCX 导出中…', 'success');
+            }
             return;
           }
           if (fmt === 'pdf') {
             var w = window.open('', '_blank');
+            if (!w) {
+              UI.toast('浏览器拦截了弹窗，请允许本站弹出窗口后重试导出 PDF', 'error');
+              return;
+            }
             w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + esc(p ? p.name : 'document') + '</title><style>body{max-width:760px;margin:40px auto;font-size:16px;line-height:2.1;font-family:"PingFang SC","Microsoft YaHei",sans-serif}p{margin:.4em 0}h1,h2,h3{margin:.6em 0 .3em}</style></head><body>' + Editor.mdToHtml(text) + '</body></html>');
             w.document.close(); setTimeout(function () { w.print(); }, 500); ov.remove();
             return;

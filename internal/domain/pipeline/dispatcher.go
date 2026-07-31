@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/ai-novel/studio/internal/domain/roles"
 	"github.com/ai-novel/studio/internal/infrastructure/database"
 	"github.com/ai-novel/studio/internal/infrastructure/llm"
 	"github.com/ai-novel/studio/internal/infrastructure/quota"
+	"github.com/ai-novel/studio/internal/infrastructure/rag"
 )
 
 // Dispatcher 调度中枢 Agent：
@@ -20,11 +22,12 @@ type Dispatcher struct {
 	registry *llm.Registry
 	store    *database.Store
 	limiter  *quota.Limiter
+	rag      *rag.Service
 }
 
 // NewDispatcher 构造调度中枢
 func NewDispatcher(registry *llm.Registry, store *database.Store, limiter *quota.Limiter) *Dispatcher {
-	return &Dispatcher{registry: registry, store: store, limiter: limiter}
+	return &Dispatcher{registry: registry, store: store, limiter: limiter, rag: rag.NewService(store)}
 }
 
 // Run 执行创作请求，返回进度事件通道（SSE 处理方读取后即推送前端）。
@@ -66,8 +69,8 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 		estTokens := quota.EstimateRequestTokens(ctxText, req.TargetWord)
 		emit(ProgressEvent{Type: EventEstimate, Tokens: estTokens})
 		// 预检：单模型上下文窗口上限约65536 tokens（deepseek），超过则警告
-		perReqLimit := d.store.GetConfigInt(ctx, "per_request_token_limit", 8000)
-		if estTokens > perReqLimit {
+		perReqLimit := d.store.GetConfigInt(ctx, "per_request_token_limit", 32000)
+		if perReqLimit > 0 && estTokens > perReqLimit {
 			emit(ProgressEvent{Type: EventWarning, Text: fmt.Sprintf("上下文约 %d tokens，已超单请求上限 %d，已自动截断", estTokens, perReqLimit)})
 		}
 
@@ -113,7 +116,7 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 		}
 
 		// 6. 汇总终稿
-		emit(ProgressEvent{Type: EventDone, Pipeline: string(pl), FinalText: finalText})
+		emit(ProgressEvent{Type: EventDone, Pipeline: string(pl), FinalText: finalText, WordCount: countWords(finalText)})
 	}()
 	return out
 }
@@ -164,8 +167,19 @@ func pipelineTitle(pl PipelineName) string {
 	}
 }
 
+// thinkingEnabled 判断某角色是否开启深度思考：roleThinking 中显式指定则用指定值；
+// 未指定时走推荐配置：仅规划师动脑（thinker 开），写作/审稿/轻活不动脑（实测审稿思考开销极大，不划算）
+func thinkingEnabled(role llm.Role, roleThinking map[string]bool) bool {
+	if roleThinking != nil {
+		if v, ok := roleThinking[string(role)]; ok {
+			return v
+		}
+	}
+	return role == llm.RoleThinker
+}
+
 // callRole 非流式调用某角色（含备用模型降级 + 调用日志 + 用量记录 + 超时保护）
-func (d *Dispatcher) callRole(ctx context.Context, role llm.Role, pl PipelineName, projectID, userPrompt string) (string, llm.Usage, string, bool, error) {
+func (d *Dispatcher) callRole(ctx context.Context, role llm.Role, pl PipelineName, projectID, userPrompt string, roleThinking map[string]bool) (string, llm.Usage, string, bool, error) {
 	adapters, err := d.registry.AdaptersForRole(ctx, role)
 	if err != nil {
 		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」无可用模型：%w", roleLabel(role), err)
@@ -175,13 +189,15 @@ func (d *Dispatcher) callRole(ctx context.Context, role llm.Role, pl PipelineNam
 	degraded := false
 	// 每次调用独立超时（防止 API 挂死）
 	timeout := 5 * time.Minute
-	if role == llm.RoleVerifier || role == llm.RoleHelper {
-		timeout = 3 * time.Minute
+	// 审稿开思考时推理链很长，放宽到 10 分钟避免误杀；其余保持 5 分钟
+	if role == llm.RoleVerifier && thinkingEnabled(role, roleThinking) {
+		timeout = 10 * time.Minute
 	}
 	for _, ad := range adapters {
 		if ctx.Err() != nil {
 			return "", llm.Usage{}, "", degraded, ctx.Err()
 		}
+		ad.SetThinking(thinkingEnabled(role, roleThinking))
 		roleCtx, cancel := context.WithTimeout(ctx, timeout)
 		start := time.Now()
 		text, usage, gErr := agent.Generate(roleCtx, ad, userPrompt)
@@ -207,7 +223,7 @@ func (d *Dispatcher) isRateLimit(err error) bool {
 
 // callRoleStream 流式调用某角色（备用模型降级仅在流启动前生效 + 超时保护）
 // textCB 接收每个增量分片（用于实时推送给前端与累积终稿）
-func (d *Dispatcher) callRoleStream(ctx context.Context, role llm.Role, pl PipelineName, projectID, userPrompt string, textCB func(string)) (string, llm.Usage, string, bool, error) {
+func (d *Dispatcher) callRoleStream(ctx context.Context, role llm.Role, pl PipelineName, projectID, userPrompt string, textCB func(string), roleThinking map[string]bool) (string, llm.Usage, string, bool, error) {
 	adapters, err := d.registry.AdaptersForRole(ctx, role)
 	if err != nil {
 		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」无可用模型：%w", roleLabel(role), err)
@@ -221,6 +237,7 @@ func (d *Dispatcher) callRoleStream(ctx context.Context, role llm.Role, pl Pipel
 		if ctx.Err() != nil {
 			return "", llm.Usage{}, "", degraded, ctx.Err()
 		}
+		ad.SetThinking(thinkingEnabled(role, roleThinking))
 		roleCtx, cancel := context.WithTimeout(ctx, timeout)
 		start := time.Now()
 		ch, sErr := agent.Stream(roleCtx, ad, userPrompt)
@@ -253,6 +270,14 @@ func (d *Dispatcher) callRoleStream(ctx context.Context, role llm.Role, pl Pipel
 		}
 		dur := time.Since(start)
 		text := string(buf)
+		// 修复：流正常结束但没有任何正文输出（推理模型思考占满预算/偶发空响应）→ 视为失败并降级到备用模型
+		if streamErr == nil && text == "" {
+			cancel()
+			d.logCall(ctx, projectID, role, ad.Name(), llm.Usage{}, dur.Milliseconds(), "error", ad.Name()+" 返回空响应")
+			lastErr = fmt.Errorf("%s 返回空响应", ad.Name())
+			degraded = true
+			continue
+		}
 		if streamErr != nil && len(buf) == 0 {
 			cancel()
 			// 无任何输出且出错 → 降级到下一备用
@@ -308,14 +333,15 @@ func errStr(e error) string {
 }
 
 // callRoleWithModel 使用指定模型名调用某角色（orchestrated 模式用，不走 registry 多级备用）
-func (d *Dispatcher) callRoleWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string) (string, llm.Usage, string, bool, error) {
+func (d *Dispatcher) callRoleWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string, roleThinking map[string]bool) (string, llm.Usage, string, bool, error) {
 	ad, err := d.registry.AdapterByName(ctx, modelName)
 	if err != nil {
 		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」模型 %s 不可用：%w", roleLabel(role), modelName, err)
 	}
+	ad.SetThinking(thinkingEnabled(role, roleThinking))
 	agent := roles.NewRoleAgent(role, string(pl))
 	timeout := 5 * time.Minute
-	if role == llm.RoleVerifier || role == llm.RoleHelper { timeout = 3 * time.Minute }
+	if role == llm.RoleVerifier || role == llm.RoleHelper { timeout = 5 * time.Minute }
 	roleCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	start := time.Now()
@@ -331,11 +357,12 @@ func (d *Dispatcher) callRoleWithModel(ctx context.Context, role llm.Role, pl Pi
 }
 
 // callRoleStreamWithModel 使用指定模型名流式调用某角色
-func (d *Dispatcher) callRoleStreamWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string, textCB func(string)) (string, llm.Usage, string, bool, error) {
+func (d *Dispatcher) callRoleStreamWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string, textCB func(string), roleThinking map[string]bool) (string, llm.Usage, string, bool, error) {
 	ad, err := d.registry.AdapterByName(ctx, modelName)
 	if err != nil {
 		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」模型 %s 不可用：%w", roleLabel(role), modelName, err)
 	}
+	ad.SetThinking(thinkingEnabled(role, roleThinking))
 	agent := roles.NewRoleAgent(role, string(pl))
 	roleCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
@@ -364,4 +391,23 @@ func (d *Dispatcher) callRoleStreamWithModel(ctx context.Context, role llm.Role,
 	d.logCall(ctx, projectID, role, modelName, u, dur.Milliseconds(), "ok", "")
 	_ = d.store.IncrUsage(ctx, modelName, 1, u.Total())
 	return text, u, modelName, false, nil
+}
+
+func countWords(s string) int {
+	count := 0
+	inWord := false
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) {
+			count++
+			inWord = false
+		} else if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			if !inWord {
+				count++
+				inWord = true
+			}
+		} else {
+			inWord = false
+		}
+	}
+	return count
 }

@@ -4,11 +4,64 @@ var ProjectUI = {
     try {
       Store.state.projects = await API.listProjects();
       this.renderList();
+      this.renderArchived();
     } catch (e) { UI.toast('加载项目失败：' + e.message, 'error'); }
+  },
+  getArchived: function () {
+    try { return JSON.parse(localStorage.getItem('archivedProjects') || '[]'); } catch (e) { return []; }
+  },
+  isArchived: function (id) {
+    return this.getArchived().indexOf(id) >= 0;
+  },
+  archive: function (id) {
+    var list = this.getArchived();
+    if (list.indexOf(id) < 0) list.push(id);
+    try { localStorage.setItem('archivedProjects', JSON.stringify(list)); } catch (e) {}
+    // 如果归档的是当前项目，清空编辑器
+    if (Store.state.currentProject && Store.state.currentProject.id === id) {
+      Store.state.currentProject = null;
+      Store.state.chapters = [];
+      Store.state.currentChapter = null;
+      Editor.setContent('');
+      document.getElementById('docTitle').textContent = '未选择稿件';
+      if (Editor.updateEmptyGuide) Editor.updateEmptyGuide();
+    }
+    UI.toast('已归档，可在底部「📦 已归档」中恢复', 'info');
+    this.renderList();
+    this.renderArchived();
+  },
+  unarchive: function (id) {
+    var list = this.getArchived().filter(function (x) { return x !== id; });
+    try { localStorage.setItem('archivedProjects', JSON.stringify(list)); } catch (e) {}
+    UI.toast('已恢复', 'success');
+    this.renderList();
+    this.renderArchived();
+  },
+  renderArchived: function () {
+    var box = document.getElementById('archivedBox');
+    if (!box) return;
+    var ids = this.getArchived();
+    var items = (Store.state.projects || []).filter(function (p) { return ids.indexOf(p.id) >= 0; });
+    if (!items.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = '';
+    box.innerHTML = '<div class="arch-head" onclick="ProjectUI.toggleArchived()">📦 已归档（' + items.length + '）<span class="arch-arrow">▾</span></div>' +
+      '<div class="arch-body" id="archBody">' +
+      items.map(function (p) {
+        return '<div class="arch-item"><span class="arch-name" title="' + esc(p.name) + '">' + esc(p.name) + '</span>' +
+          '<span class="arch-acts"><button class="tool-btn" style="font-size:10px;padding:1px 6px" onclick="event.stopPropagation();ProjectUI.unarchive(\'' + p.id + '\')">恢复</button></span></div>';
+      }).join('') +
+      '</div>';
+  },
+  toggleArchived: function () {
+    var b = document.getElementById('archBody');
+    if (b) b.style.display = b.style.display === 'none' ? '' : 'none';
   },
   renderList: function (filter) {
     var list = document.getElementById('novelList');
     var items = Store.state.projects;
+    // 过滤已归档
+    var archivedIds = this.getArchived();
+    items = items.filter(function (p) { return archivedIds.indexOf(p.id) < 0; });
     if (filter) {
       var f = filter.toLowerCase();
       items = items.filter(function (p) { return (p.name || '').toLowerCase().includes(f); });
@@ -55,6 +108,13 @@ var ProjectUI = {
       var d = await API.getProject(id);
       Store.state.currentProject = d.item;
       Store.set('lastProjectId', d.item.id);
+      // 恢复大纲
+      if (d.item.outline) {
+        Store.state.pipeline.outline = d.item.outline;
+        Store.state.composer.outline = d.item.outline;
+        var genOutline = document.getElementById('genOutline');
+        if (genOutline && !genOutline.value) genOutline.value = d.item.outline;
+      }
       Store.loadSelection(id);
       var results = await Promise.all([
         API.listVersions(id),
@@ -86,6 +146,11 @@ var ProjectUI = {
       PipelineUI.reset();
       document.getElementById('docTitle').textContent = d.item.name;
       this.updateMeta();
+      // 刷新当前路由页面
+      if (Router.current === 'characters' && typeof CharacterPage !== 'undefined') CharacterPage.load();
+      if (Router.current === 'worldbuilding' && typeof WorldPage !== 'undefined') WorldPage.load();
+      if (Router.current === 'outline' && typeof OutlinePage !== 'undefined') OutlinePage.load();
+      if (Router.current === 'dashboard' && typeof DashboardPage !== 'undefined') DashboardPage.refresh();
       this._loading = null;
     } catch (e) { this._loading = null; UI.toast('加载项目失败：' + e.message, 'error'); }
   },
@@ -157,30 +222,56 @@ var ProjectUI = {
   },
   showCreate: function () {
     var idn = 'n_' + uid();
+    var cats = ['玄幻','仙侠','都市','校园','言情','科幻','奇幻','历史','悬疑','轻小说','武侠','同人','短篇','其他'];
+    var body = '<div style="text-align:center;margin-bottom:16px">';
+    body += '<div style="font-size:40px;margin-bottom:8px">📖</div>';
+    body += '<div style="font-size:13px;color:var(--muted)">创建新项目，开始你的创作之旅</div>';
+    body += '</div>';
+    body += '<div class="form-group"><label>📛 项目名称 <span style="color:var(--danger)">*</span></label><input id="' + idn + '_name" placeholder="例如：风起西陵" autofocus></div>';
+    body += '<div class="form-group"><label>📂 作品类型</label><div class="create-cat-grid" id="' + idn + '_catGrid">';
+    cats.forEach(function (cat) {
+      body += '<span class="create-cat-chip" data-cat="' + cat + '" onclick="ProjectUI.selectCat(this)">' + cat + '</span>';
+    });
+    body += '</div><input type="hidden" id="' + idn + '_type" value=""></div>';
+    body += '<div class="form-group"><label>📝 创作大纲（选填，AI 将协助完善）</label><textarea id="' + idn + '_outline" rows="4" placeholder="输入初始灵感或大纲，留空将由 AI 辅助构思..."></textarea></div>';
+    body += '<div style="background:var(--accent-soft);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--muted);margin-top:8px">💡 创建后可在编辑器中与 AI 协作，或前往「章节大纲」面板管理结构。</div>';
     UI.modal({
-      title: '新建项目',
-      body: '<div class="form-group"><label>项目名称 *</label><input id="' + idn + '_name" placeholder="例如：风起西陵"></div>' +
-        '<div class="form-group"><label>类型（可选）</label><select id="' + idn + '_type"><option value="">选择类型</option><option>玄幻</option><option>仙侠</option><option>都市</option><option>校园</option><option>言情</option><option>科幻</option><option>奇幻</option><option>历史</option><option>悬疑</option><option>轻小说</option><option>武侠</option><option>同人</option><option>短篇</option><option>其他</option></select></div>',
+      title: '✦ 新建项目',
+      body: body,
+      width: '520px',
       actions: [
         { id: 'cancel', label: '取消' },
         {
-          id: 'ok', label: '创建', cls: 'btn-primary', onClick: function (m, ov) {
+          id: 'ok', label: '✦ 创建项目', cls: 'btn-primary', onClick: function (m, ov) {
             var name = document.getElementById(idn + '_name').value.trim();
             var type = document.getElementById(idn + '_type').value;
             if (!name) { UI.toast('请输入项目名称', 'warn'); return; }
+            var outline = (document.getElementById(idn + '_outline') || {}).value || '';
             ov.remove();
-            ProjectUI.create(name, type);
+            ProjectUI.create(name, type).then(function () {
+              if (outline) {
+                Editor.setContent(outline);
+                UI.toast('大纲已写入编辑器', 'success');
+              }
+            });
           }
         }
       ]
     });
+  },
+  selectCat: function (el) {
+    var grid = el.parentElement;
+    grid.querySelectorAll('.create-cat-chip').forEach(function (c) { c.classList.remove('active'); });
+    el.classList.add('active');
+    var input = grid.nextElementSibling;
+    if (input) input.value = el.getAttribute('data-cat');
   },
   create: async function (name, type) {
     try {
       var p = await API.createProject(name, type);
       Store.state.projects.unshift(p);
       UI.toast('项目已创建', 'success');
-      this.select(p.id);
+      return this.select(p.id);
     } catch (e) { UI.toast('创建失败：' + e.message, 'error'); }
   },
   ctxMenu: function (e, id) {
@@ -192,6 +283,7 @@ var ProjectUI = {
       { id: 'duplicate', label: '📋 复制项目', onClick: function () { ProjectUI.duplicate(id); } },
       { id: 'cover', label: '🎨 生成封面', onClick: function () { ProjectUI.generateCover(id); } },
       { divider: true },
+      { id: 'archive', label: '📦 归档（隐藏）', onClick: function () { ProjectUI.archive(id); } },
       { id: 'del', label: '🗑 删除', danger: true, onClick: function () { ProjectUI.remove(id); } }
     ]);
   },
@@ -254,6 +346,7 @@ var ProjectUI = {
           Store.state.latestVersion = null;
           Editor.setContent('');
           document.getElementById('docTitle').textContent = '未选择稿件';
+          if (Editor.updateEmptyGuide) Editor.updateEmptyGuide();
           document.getElementById('docMeta').textContent = '';
           document.getElementById('resourceSection').classList.remove('show');
         }

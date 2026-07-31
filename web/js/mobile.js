@@ -225,8 +225,16 @@ var MobileUI = {
     var self = this;
     if (typeof ModelSettings !== 'undefined') {
       ModelSettings.loadAll().then(function () {
+        // 确保 page-models 已渲染完整内容（loadAll 内部 render 可能因时序未刷新）
         var pcPage = document.getElementById('page-models');
-        if (pcPage) { body.innerHTML = pcPage.innerHTML; }
+        if (pcPage) {
+          // 若仍是占位符/加载中则强制重新渲染一次
+          var txt = (pcPage.innerText || '').trim();
+          if (!txt || txt.indexOf('加载中') >= 0) {
+            try { ModelSettings.render(); } catch (e) {}
+          }
+          body.innerHTML = pcPage.innerHTML;
+        }
       }).catch(function () {
         body.innerHTML = '<div class="res-check-empty">加载失败</div>';
       });

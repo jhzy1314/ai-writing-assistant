@@ -47,8 +47,18 @@ var API = {
   listProjects: function () { return this.get('/api/projects').then(function (d) { return d.items || []; }); },
   createProject: function (name, type) { return this.post('/api/projects', { name: name, type: type }).then(function (d) { return d.item; }); },
   getProject: function (id) { return this.get('/api/projects/' + id); },
-  updateProject: function (id, name, type) { return this.put('/api/projects/' + id, { name: name, type: type }).then(function (d) { return d.item; }); },
+  updateProject: function (id, nameOrObj, type) {
+    // 兼容两种调用方式: (id, name, type) 或 (id, { name, type, outline })
+    var body;
+    if (typeof nameOrObj === 'object') {
+      body = nameOrObj;
+    } else {
+      body = { name: nameOrObj, type: type };
+    }
+    return this.put('/api/projects/' + id, body).then(function (d) { return d.item; });
+  },
   deleteProject: function (id) { return this.del('/api/projects/' + id); },
+  duplicateProject: function (id) { return this.post('/api/projects/' + id + '/duplicate'); },
   // 版本
   listVersions: function (pid) { return this.get('/api/projects/' + pid + '/versions').then(function (d) { return d.items || []; }); },
   saveVersion: function (pid, title, content) { return this.post('/api/versions', { project_id: pid, title: title, content: content }).then(function (d) { return d.item; }); },
@@ -79,6 +89,14 @@ var API = {
   deleteModel: function (id) { return this.del('/api/models/' + id); },
   testModel: function (id) { return this.post('/api/models/' + id + '/test'); },
   setDefaultModel: function (id) { return this.put('/api/models/' + id + '/default').then(function (d) { return d.item; }); },
+  // 网页AI模型
+  createWebAIModel: function (m) { return this.post('/api/webai/models', m).then(function (d) { return d.item; }); },
+  updateWebAIModel: function (id, m) { return this.put('/api/webai/models/' + id, m).then(function (d) { return d.item; }); },
+  testWebAIModel: function (cfg) { return this.post('/api/webai/test', cfg); },
+  listWebAIProviders: function () { return this.get('/api/webai/providers').then(function (d) { return d.providers || {}; }); },
+  autoCookieStart: function (provider) { return this.post('/api/webai/auto-cookie', { provider: provider }); },
+  autoCookiePoll: function (sessionId) { return this.get('/api/webai/auto-cookie/' + sessionId); },
+  autoCookieCancel: function (sessionId) { return this.del('/api/webai/auto-cookie/' + sessionId); },
   // 卷
   listVolumes: function (pid) { return this.get('/api/projects/' + pid + '/volumes').then(function (d) { return d.items || []; }); },
   createVolume: function (v) { return this.post('/api/volumes', v).then(function (d) { return d.item; }); },
@@ -104,13 +122,26 @@ var API = {
   mergeChapters: function (ids, title) { return this.post('/api/chapters/merge', { chapter_ids: ids, title: title }).then(function (d) { return d.item; }); },
   splitChapterAtCursor: function (id, cursorPos) { return this.post('/api/chapters/' + id + '/split', { cursor_pos: cursorPos }).then(function (d) { return d.items; }); },
   getProjectStats: function (pid) { return this.get('/api/projects/' + pid + '/stats').then(function (d) { return d.item; }); },
+  // 回收站
+  listTrashChapters: function (pid) { return this.get('/api/chapters/trash?project_id=' + (pid || '')).then(function (d) { return d.items || []; }); },
+  restoreChapter: function (id) { return this.post('/api/chapters/' + id + '/restore'); },
+  permanentDeleteChapter: function (id, confirm) { return this.post('/api/chapters/' + id + '/permanent-delete', { confirm: confirm }); },
   // 用量
   getUsage: function () { return this.get('/api/usage'); },
   // 逻辑自检
   verify: function (content, world, character) {
-    return this.post('/api/verify', { content: content, world_setting: world, character_setting: character });
+    return this.post('/api/verify', { content: content, world_setting: world || '', character_setting: character || '' });
   },
+  aiTells: function (payload) { return this.post('/api/ai-tells', payload); },
+  aiPolish: function (payload) { return this.post('/api/ai-polish', payload); },
   // 角色-模型映射
   getRoleModels: function (role) { return this.get('/api/roles/' + role + '/models'); },
-  setRoleModels: function (role, modelIds) { return this.put('/api/roles/' + role + '/models', { model_ids: modelIds }); }
+  setRoleModels: function (role, modelIds) { return this.put('/api/roles/' + role + '/models', { model_ids: modelIds }); },
+  // 背景外观
+  getBackgrounds: function () { return this.get('/api/appearance/backgrounds'); },
+  setBackground: function (type, theme, file) { return this.post('/api/appearance/backgrounds/set', { type: type, theme: theme, file: file }); },
+  uploadBackground: function (fd) { return this.post('/api/appearance/backgrounds/upload', fd); },
+  generateBackground: function (type, theme, prompt) { return this.post('/api/appearance/backgrounds/generate', { type: type, theme: theme, prompt: prompt }); },
+  randomBackground: function (type, theme) { return this.post('/api/appearance/backgrounds/random?type=' + type + '&theme=' + theme); },
+  resetBackgrounds: function () { return this.post('/api/appearance/backgrounds/reset', {}); }
 };

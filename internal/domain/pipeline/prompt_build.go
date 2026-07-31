@@ -41,12 +41,14 @@ func buildThinkerUserPrompt(req GenerateRequest, bundle ContextBundle, pl Pipeli
 	default:
 		b.WriteString("【模式要求】标准创作。请输出完整章节大纲、关键剧情节点、角色行为动机。\n")
 	}
+	b.WriteString("【审稿清单要求】在创作框架末尾必须追加一段「【审稿清单】」：结合本篇具体内容列出 3-6 条审查要点，供校验官逐项核对（如：某角色行为必须符合其人设、某伏笔必须在结尾呼应、节奏不能拖沓、字数必须接近目标等）。要点要具体到本篇剧情，不要泛泛而谈。\n")
+	b.WriteString("【输出要求】直接输出创作框架本身，不要任何开场白、解释或多余说明。\n")
 	b.WriteString("\n请直接输出创作框架：")
 	return b.String()
 }
 
 // buildWorkerUserPrompt 构造创作者的用户提示词
-func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline string, segIdx, segTotal int) string {
+func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline string, segIdx, segTotal int, prevSegContent string) string {
 	var b strings.Builder
 	if bundle.HasContext() {
 		b.WriteString(bundle.AssembledText())
@@ -70,11 +72,18 @@ func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline st
 	}
 	// 分段撰写指令
 	if segTotal > 1 {
-		b.WriteString(fmt.Sprintf("【分段撰写】当前撰写 第%d/%d 段，约 %d 字。", segIdx, segTotal, segmentSize))
-		b.WriteString("严格依据框架中对应段落的内容撰写，保持与前文衔接、文风统一。仅返回本段正文。\n\n")
+		b.WriteString(fmt.Sprintf("【分段撰写】当前撰写 第%d/%d 段，约 %d 字（严禁超过 %d 字，宁短勿长）。", segIdx, segTotal, segmentSize, segmentSize+500))
+		b.WriteString("严格依据框架中对应段落的内容撰写，保持与前文衔接、文风统一。仅返回本段正文。\n")
+		if prevSegContent != "" {
+			b.WriteString("【前段已写内容（请严格衔接到此内容之后继续写，不要重复也不要跳跃）】\n")
+			b.WriteString(prevSegContent)
+			b.WriteString("\n")
+		}
+		b.WriteString("\n")
 	} else if req.TargetWord > 0 {
-		b.WriteString(fmt.Sprintf("【字数要求】约 %d 字。这是硬性要求，输出正文必须接近此字数，不可明显偏少。\n\n", req.TargetWord))
+		b.WriteString(fmt.Sprintf("【字数要求】约 %d 字，完成后需经审稿校验，请尽量接近目标。\n\n", req.TargetWord))
 	}
+	b.WriteString("【输出要求】直接输出正文本身：不要任何开场白、标题、思考过程、解释或多余说明，从故事正文第一句开始写。\n")
 	b.WriteString("请撰写正文：")
 	return b.String()
 }
@@ -94,22 +103,36 @@ func buildReviseUserPrompt(req GenerateRequest, bundle ContextBundle, review, cu
 	if req.NoRewrite {
 		b.WriteString("【重要约束：禁止改写已有前文】微调时不得修改已有文字，仅在文末根据修改意见追加补充内容。\n\n")
 	}
+	// 字数硬约束：修正后全文不得超过目标字数，已超则必须精简（修复“5000字目标生成2万字”的膨胀问题）
+	if req.TargetWord > 0 {
+		curLen := len([]rune(currentText))
+		b.WriteString(fmt.Sprintf("【字数硬约束】当前正文 %d 字，目标 %d 字。修正后的完整正文总字数必须控制在目标字数的 80%%~110%% 之间（即 %d~%d 字）：若当前超出，必须删减冗余段落/描写以达标；若不足，可适度补充。禁止大幅扩写。\n\n", curLen, req.TargetWord, int(float64(req.TargetWord)*0.8), int(float64(req.TargetWord)*1.1)))
+	}
 	b.WriteString("请根据修改意见对正文进行微调（仅针对问题修改，保留可用内容与核心剧情），输出修改后的完整正文：")
 	return b.String()
 }
 
 // buildVerifierUserPrompt 构造校验官的用户提示词
-func buildVerifierUserPrompt(req GenerateRequest, bundle ContextBundle, content string, pl PipelineName) string {
+func buildVerifierUserPrompt(req GenerateRequest, bundle ContextBundle, content string, pl PipelineName, outline string) string {
 	var b strings.Builder
 	if bundle.HasContext() {
 		b.WriteString(bundle.AssembledText())
 		b.WriteString("\n")
+	}
+	if strings.TrimSpace(outline) != "" {
+		b.WriteString("【创作框架与审稿清单（来自规划师，请逐项核对）】\n")
+		b.WriteString(truncateOutline(outline, 4000))
+		b.WriteString("\n\n")
 	}
 	b.WriteString("【用户原始需求】\n")
 	b.WriteString(req.UserDemand)
 	b.WriteString("\n\n【待校验正文】\n")
 	b.WriteString(content)
 	b.WriteString("\n\n")
+	// 字数校验项：校验官必须检查字数是否达标
+	if req.TargetWord > 0 {
+		b.WriteString(fmt.Sprintf("【字数校验】目标 %d 字，请统计待校验正文的实际字数。若超出目标 20%% 以上或不足目标 70%% 以上，必须标注为缺陷项。\n", req.TargetWord))
+	}
 	switch pl {
 	case PipelineStrict:
 		b.WriteString("【审查标准】严谨模式，高标准核查逻辑漏洞、事实错误、框架偏移。\n")
@@ -118,6 +141,11 @@ func buildVerifierUserPrompt(req GenerateRequest, bundle ContextBundle, content 
 	default:
 		b.WriteString("【审查标准】标准审查，逐项核查角色一致性、世界观冲突、剧情逻辑、文字质量、需求匹配。\n")
 	}
+	b.WriteString("\n【硬性输出格式】必须逐条输出，禁止省略：\n")
+	b.WriteString("1. 先输出【清单核对】：若提供了审稿清单，对每一条单独输出一行「条目N：已执行/未执行 —— 证据（引用正文原文）」；无清单则按审查标准逐项输出结论；\n")
+	b.WriteString("2. 再输出【缺陷清单】：有缺陷逐条列出（问题位置 + 类型 + 精准修改建议）；全部通过才输出【校验通过】；\n")
+	b.WriteString("3. 禁止只输出【校验通过】四个字而不给出核对过程；\n")
+	b.WriteString("4. 最后必须单独一行输出【评分】N/100（0-100 整数），85 分及以上才可通过。\n")
 	b.WriteString("\n请输出校验结果：")
 	return b.String()
 }
@@ -161,10 +189,19 @@ func buildManualUserPrompt(req GenerateRequest, bundle ContextBundle) string {
 		b.WriteString("\n\n")
 	}
 	if req.TargetWord > 0 {
-		b.WriteString(fmt.Sprintf("【字数要求】约 %d 字。\n\n", req.TargetWord))
+		b.WriteString(fmt.Sprintf("【字数要求】约 %d 字，请尽量接近。\n\n", req.TargetWord))
 	}
 	b.WriteString("【需求】\n")
 	b.WriteString(req.UserDemand)
 	b.WriteString("\n\n请生成内容：")
 	return b.String()
+}
+
+// truncateOutline 截断创作框架（含审稿清单）到指定字数，防止校验官输入过长
+func truncateOutline(s string, maxRunes int) string {
+	r := []rune(s)
+	if len(r) > maxRunes {
+		return string(r[:maxRunes]) + "\n……（后文略）"
+	}
+	return s
 }

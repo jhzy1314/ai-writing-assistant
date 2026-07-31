@@ -30,6 +30,10 @@ var UI = {
   },
   modal: function (opts) {
     var root = document.getElementById('modalRoot');
+    // 单例守卫：已有弹窗则先关闭（防止快速双击叠加多个重叠弹窗）
+    if (root) {
+      while (root.firstChild) root.removeChild(root.firstChild);
+    }
     var ov = document.createElement('div');
     ov.className = 'modal-overlay';
     var m = document.createElement('div');
@@ -53,7 +57,8 @@ var UI = {
         btn.onclick = function () {
           var a = opts.actions.find(function (x) { return x.id === btn.dataset.act; });
           if (a && a.onClick) { a.onClick(m, ov); }
-          else if (a && a.id === 'cancel') { ov.remove(); }
+          // 没有自定义逻辑的按钮（取消/关闭等）默认关闭弹窗
+          else { ov.remove(); }
         };
       });
     }
@@ -93,12 +98,37 @@ var UI = {
     Store.set('rightCollapsed', right.classList.contains('collapsed'));
   },
   toggleTheme: function () {
+    // 快捷切换：经典深色 <-> 经典浅色（多主题系统由 Themes 接管）
+    if (typeof Themes !== 'undefined' && Themes.toggle) { Themes.toggle(); return; }
     var cur = document.documentElement.getAttribute('data-theme');
     var next = cur === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     var btn = document.getElementById('themeToggle');
     if (btn) btn.textContent = next === 'dark' ? '☀ 浅色' : '◑ 深色';
     Store.set('theme', next);
+  },
+  initTheme: function () {
+    if (typeof Themes !== 'undefined' && Themes.init) { Themes.init(); return; }
+    var saved = Store.get('theme', 'light');
+    if (saved === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      var btn = document.getElementById('themeToggle');
+      if (btn) btn.textContent = '☀ 浅色';
+    }
+  },
+  setFontSize: function (size) {
+    document.documentElement.style.setProperty('--font-size', size + 'px');
+    var lbl = document.getElementById('fontSizeLabel');
+    if (lbl) lbl.textContent = size;
+    Store.set('fontSize', size);
+  },
+  initFontSize: function () {
+    var size = Store.get('fontSize', '15');
+    var slider = document.getElementById('fontSizeSlider');
+    if (slider) slider.value = size;
+    document.documentElement.style.setProperty('--font-size', size + 'px');
+    var lbl = document.getElementById('fontSizeLabel');
+    if (lbl) lbl.textContent = size;
   },
   toggleClean: function () {
     var body = document.body;
@@ -142,43 +172,59 @@ var UI = {
       {el:'#searchInput', tip:'🔍 在这里搜索项目、章节和资源', pos:'bottom'},
       {el:'#instructionInput', tip:'💡 输入创作需求，Ctrl+Enter 即可启动 AI 生成', pos:'top'},
       {el:'#modeSelect', tip:'⚙️ 选择创作模式：智能协同适合95%的场景', pos:'bottom'},
-      {el:'#page-pipeline .pipe-intro', tip:'📊 右侧面板实时展示AI流水线进度、大纲和审核结果', pos:'left'},
+      {el:'#pipeIntro', tip:'📊 右侧面板实时展示AI流水线进度、大纲和审核结果', pos:'left'},
       {el:'#contextScope', tip:'📖 调整上下文范围：当前章/最近内容/含摘要', pos:'bottom'},
       {el:'#quotaTokens', tip:'📈 悬停查看各角色（构思/写作/审稿）的 Token 消耗明细', pos:'bottom'},
       {el:'button[title~="专注模式"]', tip:'🎯 专注模式：折叠侧边栏，全屏沉浸创作', pos:'bottom'}
     ];
     var idx = 0;
     var self = this;
+    var tipEl = null;
+    function dismiss() {
+      Store.set('onboarded', true);
+      if (tipEl) { tipEl.remove(); tipEl = null; }
+    }
     function showStep() {
       if (idx >= steps.length) { Store.set('onboarded', true); return; }
       var s = steps[idx];
       var el = document.querySelector(s.el);
       if (!el) { idx++; showStep(); return; }
+      if (tipEl) tipEl.remove();
       var rect = el.getBoundingClientRect();
-      var tip = document.createElement('div');
-      tip.className = 'onboard-tip';
-      tip.textContent = s.tip;
-      tip.style.left = rect.left + 'px';
-      tip.style.top = (s.pos === 'top' ? rect.top - 40 : rect.bottom + 8) + 'px';
-      tip.onclick = function () { tip.remove(); idx++; showStep(); };
-      document.body.appendChild(tip);
+      tipEl = document.createElement('div');
+      tipEl.className = 'onboard-tip';
+      var stepNum = (idx + 1) + '/' + steps.length;
+      tipEl.innerHTML = '<span class="ob-step">' + stepNum + '</span> ' + s.tip +
+        '<span class="ob-skip" style="display:block;margin-top:6px;font-size:10px;opacity:0.7;text-decoration:underline;cursor:pointer">不再提示</span>';
+      tipEl.querySelector('.ob-skip').onclick = function (e) { e.stopPropagation(); dismiss(); };
+      tipEl.style.left = rect.left + 'px';
+      tipEl.style.top = (s.pos === 'top' ? rect.top - 60 : rect.bottom + 8) + 'px';
+      tipEl.onclick = function () { idx++; showStep(); };
+      document.body.appendChild(tipEl);
     }
     setTimeout(showStep, 800);
   },
   showKeyboardRef: function () {
     UI.modal({
       title: '⌨️ 快捷键参考',
-      wide: '480px',
-      body: '<table style="width:100%;font-size:11px;line-height:2"><tr><td style="width:40%"><kbd>Ctrl+Enter</kbd></td><td>从当前光标位置续写</td></tr>' +
-        '<tr><td><kbd>Ctrl+Shift+Enter</kbd></td><td>重新生成全文</td></tr>' +
-        '<tr><td><kbd>Ctrl+Shift+P</kbd></td><td>专注模式（全屏创作）</td></tr>' +
-        '<tr><td><kbd>Ctrl+S</kbd></td><td>保存当前章节</td></tr>' +
+      wide: '520px',
+      body: '<table style="width:100%;font-size:11px;line-height:2.1">' +
+        '<tr style="color:var(--accent)"><td colspan="2"><b>🚀 创作</b></td></tr>' +
+        '<tr><td style="width:45%"><kbd>Ctrl+Enter</kbd></td><td>发送创作需求 / 开始生成</td></tr>' +
+        '<tr><td><kbd>Esc</kbd></td><td>终止生成 / 关闭弹窗</td></tr>' +
+        '<tr style="color:var(--accent)"><td colspan="2"><b>💾 保存与管理</b></td></tr>' +
+        '<tr><td><kbd>Ctrl+S</kbd></td><td>保存当前章节到数据库</td></tr>' +
         '<tr><td><kbd>Ctrl+Shift+S</kbd></td><td>另存为版本快照</td></tr>' +
+        '<tr style="color:var(--accent)"><td colspan="2"><b>✏️ 编辑</b></td></tr>' +
         '<tr><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td><td>撤销 / 重做</td></tr>' +
-        '<tr><td><kbd>Ctrl+B</kbd> / <kbd>Ctrl+I</kbd> / <kbd>Ctrl+U</kbd></td><td>粗体 / 斜体 / 下划线</td></tr>' +
+        '<tr><td><kbd>Ctrl+B</kbd> / <kbd>I</kbd> / <kbd>U</kbd></td><td>粗体 / 斜体 / 下划线</td></tr>' +
+        '<tr style="color:var(--accent)"><td colspan="2"><b>🔍 导航</b></td></tr>' +
+        '<tr><td><kbd>Ctrl+F</kbd></td><td>全文搜索章节</td></tr>' +
         '<tr><td><kbd>Ctrl+Shift+F</kbd></td><td>选中文字一键润色</td></tr>' +
-        '<tr><td><kbd>?</kbd></td><td>显示此快捷键参考</td></tr>' +
-        '<tr><td><kbd>Esc</kbd></td><td>关闭弹窗 / 取消选中</td></tr></table>',
+        '<tr style="color:var(--accent)"><td colspan="2"><b>🎨 界面</b></td></tr>' +
+        '<tr><td><kbd>Ctrl+Shift+P</kbd></td><td>专注模式（折叠侧栏）</td></tr>' +
+        '<tr><td><kbd>?</kbd></td><td>显示此快捷键参考</td></tr></table>' +
+        '<div style="margin-top:8px;font-size:10px;color:var(--muted);text-align:center">💡 更多功能请查看右侧工具面板</div>',
       actions: [{ id: 'close', label: '关闭' }]
     });
   }

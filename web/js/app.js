@@ -8,7 +8,13 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function initApp() {
+  // 无障碍增强：纯图标按钮用 title 兜底 aria-label；div/span 点击支持键盘操作
+  enhanceA11y();
   Store.loadPrefs();
+  UI.initTheme();
+  UI.initFontSize();
+  // 1.5 初始化路由
+  Router.init();
   // 2. 初始化编辑器
   Editor.init();
   // 3. 初始化创作模式选择器
@@ -16,41 +22,57 @@ function initApp() {
   // 4. 渲染流水线初始态
   PipelineUI.render();
   // 5. 加载项目列表，加载完成后自动打开上次项目
-  console.log('[init] Starting project load...');
+  console.log('[init] Starting...');
   ProjectUI.loadAll().then(function () {
-    console.log('[init] Projects loaded: ' + Store.state.projects.length);
-    // 自动打开上次选中的项目
+    // Auto-open last project
     var lastId = Store.get('lastProjectId', '');
     if (lastId && Store.state.projects.some(function (p) { return p.id === lastId; })) {
-      console.log('[init] Auto-opening last project: ' + lastId);
       ProjectUI.select(lastId);
     }
-  }).catch(function (e) {
-    console.error('[init] loadAll failed: ' + (e && e.message));
-  });
+  }).catch(function (e) { /* silent */ });
   // 兜底轮询
   var pollCount = 0;
   var pollInterval = setInterval(function () {
     pollCount++;
-    if (Store.state.projects.length > 0) { console.log('[init] Poll success at ' + pollCount); clearInterval(pollInterval); return; }
-    if (pollCount >= 10) { console.log('[init] Poll exhausted'); clearInterval(pollInterval); return; }
-    if (pollCount % 2 === 0) ProjectUI.loadAll().catch(function (e) { console.error('[init] Retry ' + pollCount + ' failed: ' + (e && e.message)); });
+    if (Store.state.projects.length > 0) { clearInterval(pollInterval); return; }
+    if (pollCount >= 10) { clearInterval(pollInterval); return; }
+    if (pollCount % 2 === 0) ProjectUI.loadAll().catch(function () {});
   }, 300);
+  // 5.5 初始化外观设置
+  Appearance.init();
   // 6. 加载模板（后端 + 内置）
   loadTemplates();
   // 7. 刷新额度
   Usage.refresh();
   // 8. 启动 30 秒自动草稿
   ManualSave.startAutosave();
-  // 9. 主题切换
-  document.getElementById('themeToggle').onclick = function () { UI.toggleTheme(); };
+  // 9. 主题切换（多主题系统）
+  if (typeof Themes !== 'undefined' && Themes.init) {
+    Themes.init();
+    document.getElementById('themeToggle').onclick = function (e) { Themes.toggleMenu(e); };
+  } else {
+    document.getElementById('themeToggle').onclick = function () { UI.toggleTheme(); };
+  }
   // 10. 阻止鼠标侧键导致页面跳出（必须在异步请求前设置）
   if (history && history.replaceState) history.replaceState('novel', '', '/');
+  window.__appInternalNav = false;
+  // 鼠标侧键（XButton1=3 后退 / XButton2=4 前进）在 mousedown 阶段直接拦截，不触发 popstate
+  window.addEventListener('mousedown', function (e) {
+    if (e.button === 3 || e.button === 4) {
+      e.preventDefault();
+      var txt = Editor.getText();
+      if (txt && txt.trim()) {
+        UI.toast('已拦截鼠标侧键的前进/后退（避免丢失未保存内容）', 'warn');
+      }
+    }
+  });
   window.addEventListener('popstate', function (e) {
+    // 应用自身的 hash 导航（侧栏/页面切换）不是浏览器前进/后退：放行并保留 hash
+    if (window.__appInternalNav) { window.__appInternalNav = false; return; }
     if (history && history.replaceState) history.replaceState('novel', '', '/');
     var txt = Editor.getText();
     if (txt && txt.trim()) {
-      UI.toast('页面跳转已被拦截（侧键导致），请勿使用浏览器前进/后退', 'warn');
+      UI.toast('页面跳转已被拦截（浏览器前进/后退），请勿离开当前页面', 'warn');
     }
   });
   // 11. 全局快捷键
@@ -62,6 +84,14 @@ function initApp() {
         document.querySelectorAll('.modal-overlay').forEach(function (m) { m.remove(); });
         UI.closeCtx();
         Editor.hideSelToolbar();
+      }
+    }
+    // ? 显示快捷键参考
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      var activeEl = document.activeElement;
+      if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA')) {
+        e.preventDefault();
+        UI.showKeyboardRef();
       }
     }
     // Ctrl+S 保存版本
@@ -95,6 +125,18 @@ function initApp() {
       }
     }
   });
+  // 13. 首次启动新手引导（仅显示一次）
+  UI.showOnboarding();
+  // 14. 离线状态监听
+  function updateOfflineBar() {
+    var bar = document.getElementById('offlineBar');
+    if (bar) bar.style.display = navigator.onLine ? 'none' : '';
+  }
+  window.addEventListener('online', updateOfflineBar);
+  window.addEventListener('offline', updateOfflineBar);
+  updateOfflineBar();
+  // 15. 设计模式（按需在 DesignMode 定义后调用）
+  if (typeof DesignMode !== 'undefined') DesignMode.init();
 }
 
 
@@ -104,3 +146,49 @@ async function loadTemplates() {
   } catch (e) { /* 静默：内置模板仍可用 */ }
   TemplateUI.init();
 }
+
+// ============ 无障碍增强 ============
+// 1) 纯图标按钮（文字<=2字符）若无 aria-label，用 title 兜底
+// 2) 带 onclick 的 div/span 模拟按钮：补 role/tabindex + Enter/Space 键盘触发
+function enhanceA11y() {
+  try {
+    // 图标按钮兜底：仅处理无可见文字（纯图标/空）且无 aria-label 的按钮
+    document.querySelectorAll('button').forEach(function (b) {
+      var text = (b.innerText || '').trim();
+      // 有可见文字（含 emoji/短中文）则不算缺失；纯图标（无文字）才需要 title 兜底
+      var visibleText = text.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, '').trim();
+      if (visibleText.length === 0 && !b.getAttribute('aria-label')) {
+        var t = b.getAttribute('title');
+        if (t) b.setAttribute('aria-label', t);
+      }
+    });
+    // div/span 模拟按钮键盘化
+    document.querySelectorAll('[onclick]').forEach(function (el) {
+      if (el.tagName !== 'DIV' && el.tagName !== 'SPAN') return;
+      if (el.getAttribute('role') === 'button') return;
+      if (el.closest('[contenteditable]')) return; // 编辑区内不处理
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      if (!el.getAttribute('aria-label')) {
+        var t = el.getAttribute('title') || (el.innerText || '').trim().slice(0, 20);
+        if (t) el.setAttribute('aria-label', t);
+      }
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          el.click();
+        }
+      });
+    });
+  } catch (e) { /* 无障碍增强失败不影响主流程 */ }
+}
+// 动态渲染的内容也会产生新按钮，用 MutationObserver 兜底
+var _a11yObserved = false;
+function watchA11y() {
+  if (_a11yObserved) return;
+  _a11yObserved = true;
+  var tgt = document.getElementById('modalRoot') || document.body;
+  var mo = new MutationObserver(function () { enhanceA11y(); });
+  mo.observe(document.body, { childList: true, subtree: true });
+}
+document.addEventListener('DOMContentLoaded', function () { setTimeout(watchA11y, 500); });

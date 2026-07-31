@@ -119,6 +119,12 @@ var PipelineUI = {
       document.getElementById('pipeOutlineContent').textContent = p.outline;
       var genOutline = document.getElementById('genOutline');
       if (genOutline && !genOutline.value.trim()) genOutline.value = p.outline;
+      // 自动保存 Thinker 大纲到后端
+      var proj = Store.state.currentProject;
+      if (proj && p.outline !== (proj.outline || '')) {
+        proj.outline = p.outline;
+        API.updateProject(proj.id, { outline: p.outline }).catch(function () {});
+      }
     } else if (outlineEl) {
       outlineEl.style.display = 'none';
     }

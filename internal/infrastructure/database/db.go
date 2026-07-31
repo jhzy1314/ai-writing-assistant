@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/ai-novel/studio/internal/infrastructure/config"
 	_ "modernc.org/sqlite"
@@ -24,7 +27,7 @@ func Open(ctx context.Context, sqlitePath string) (*DB, error) {
 		}
 	}
 
-	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(10000)&_pragma=synchronous(NORMAL)", sqlitePath)
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(10000)&_pragma=synchronous(NORMAL)&_pragma=wal_autocheckpoint(1000)", sqlitePath)
 	sqlDB, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("打开 SQLite 失败: %w", err)
@@ -58,19 +61,36 @@ func (db *DB) migrate(ctx context.Context) error {
 	if err := db.migrateChaptersColumns(ctx); err != nil {
 		return fmt.Errorf("章节表列迁移失败: %w", err)
 	}
+	if err := db.migrateCharset(ctx); err != nil {
+		return fmt.Errorf("字符集修复迁移失败: %w", err)
+	}
+	if err := db.migrateChaptersSoftDelete(ctx); err != nil {
+		return fmt.Errorf("章节软删除迁移失败: %w", err)
+	}
+	if err := db.migrateProjectsOutline(ctx); err != nil {
+		return fmt.Errorf("项目大纲列迁移失败: %w", err)
+	}
 	return nil
 }
 
 // migrateModelsColumns 为 models 表补充新增列（SQLite 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS，通过 PRAGMA 检测后添加）
 func (db *DB) migrateModelsColumns(ctx context.Context) error {
 	cols := map[string]string{
-		"is_custom":      "INTEGER NOT NULL DEFAULT 0",
-		"context_limit":  "INTEGER NOT NULL DEFAULT 4096",
-		"support_stream": "INTEGER NOT NULL DEFAULT 1",
-		"is_default":     "INTEGER NOT NULL DEFAULT 0",
-		"description":    "TEXT NOT NULL DEFAULT ''",
-		"temperature":    "REAL NOT NULL DEFAULT 0.7",
-		"top_p":          "REAL NOT NULL DEFAULT 0.9",
+		"is_custom":       "INTEGER NOT NULL DEFAULT 0",
+		"context_limit":   "INTEGER NOT NULL DEFAULT 4096",
+		"support_stream":  "INTEGER NOT NULL DEFAULT 1",
+		"is_default":      "INTEGER NOT NULL DEFAULT 0",
+		"description":     "TEXT NOT NULL DEFAULT ''",
+		"temperature":     "REAL NOT NULL DEFAULT 0.7",
+		"top_p":           "REAL NOT NULL DEFAULT 0.9",
+		"model_type":      "TEXT NOT NULL DEFAULT 'api'",
+		"provider":        "TEXT NOT NULL DEFAULT ''",
+		"cookie":          "TEXT NOT NULL DEFAULT ''",
+		"session_token":   "TEXT NOT NULL DEFAULT ''",
+		"request_url":     "TEXT NOT NULL DEFAULT ''",
+		"max_tokens":      "INTEGER NOT NULL DEFAULT 4000",
+		"timeout_seconds": "INTEGER NOT NULL DEFAULT 300",
+		"status_message":  "TEXT NOT NULL DEFAULT ''",
 	}
 	rows, err := db.QueryContext(ctx, "PRAGMA table_info(models)")
 	if err != nil {
@@ -128,12 +148,116 @@ func (db *DB) migrateChaptersColumns(ctx context.Context) error {
 	}
 	return nil
 }
+// migrateChaptersSoftDelete 为 chapters 表补充 is_deleted、deleted_at 列
+func (db *DB) migrateChaptersSoftDelete(ctx context.Context) error {
+	cols := map[string]string{
+		"is_deleted": "INTEGER NOT NULL DEFAULT 0",
+		"deleted_at": "TEXT NOT NULL DEFAULT ''",
+	}
+	rows, err := db.QueryContext(ctx, "PRAGMA table_info(chapters)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	existing := map[string]bool{}
+	for rows.Next() {
+		var cid int; var name, typ string; var notnull int; var dflt sql.NullString; var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		existing[name] = true
+	}
+	for col, def := range cols {
+		if existing[col] { continue }
+		if _, err := db.ExecContext(ctx, "ALTER TABLE chapters ADD COLUMN "+col+" "+def); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// migrateProjectsOutline 为 projects 表补充 outline 列
+func (db *DB) migrateProjectsOutline(ctx context.Context) error {
+	cols := map[string]string{
+		"outline": "TEXT NOT NULL DEFAULT ''",
+	}
+	rows, err := db.QueryContext(ctx, "PRAGMA table_info(projects)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	existing := map[string]bool{}
+	for rows.Next() {
+		var cid int; var name, typ string; var notnull int; var dflt sql.NullString; var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		existing[name] = true
+	}
+	for col, def := range cols {
+		if existing[col] { continue }
+		if _, err := db.ExecContext(ctx, "ALTER TABLE projects ADD COLUMN "+col+" "+def); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// migrateCharset 扫描所有文本字段，修复因编码错误入库的无效 UTF-8 字符
+func (db *DB) migrateCharset(ctx context.Context) error {
+	tables := []struct {
+		name    string
+		columns []string
+	}{
+		{"projects", []string{"name", "type"}},
+		{"documents", []string{"title", "content"}},
+		{"chapters", []string{"title", "content", "tags", "synopsis"}},
+		{"characters", []string{"name", "description"}},
+		{"world_settings", []string{"name", "description"}},
+		{"materials", []string{"title", "content"}},
+		{"templates", []string{"name", "content"}},
+		{"models", []string{"model_type", "provider", "cookie", "session_token", "request_url", "status_message"}},
+	}
+	fixed := 0
+	for _, t := range tables {
+		for _, col := range t.columns {
+			query := fmt.Sprintf("SELECT rowid, %s FROM %s WHERE %s IS NOT NULL", col, t.name, col)
+			rows, err := db.QueryContext(ctx, query)
+			if err != nil {
+				continue
+			}
+			for rows.Next() {
+				var rowid int64
+				var val string
+				if err := rows.Scan(&rowid, &val); err != nil {
+					continue
+				}
+				if utf8.ValidString(val) {
+					continue
+				}
+				cleaned := strings.ToValidUTF8(val, "")
+				update := fmt.Sprintf("UPDATE %s SET %s = ? WHERE rowid = ?", t.name, col)
+				if _, err := db.ExecContext(ctx, update, cleaned, rowid); err != nil {
+					return fmt.Errorf("修复 %s.%s rowid=%d 失败: %w", t.name, col, rowid, err)
+				}
+				fixed++
+			}
+			rows.Close()
+		}
+	}
+	if fixed > 0 {
+		log.Printf("[migrateCharset] 已修复 %d 处无效 UTF-8 字符", fixed)
+	}
+	return nil
+}
+
 // schemaDDL 数据库表结构 DDL（对应规格第六章）
 const schemaDDL = `
 CREATE TABLE IF NOT EXISTS projects (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
     type        TEXT NOT NULL DEFAULT '',
+    outline     TEXT NOT NULL DEFAULT '',
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -228,6 +352,19 @@ CREATE TABLE IF NOT EXISTS generation_logs (
 CREATE INDEX IF NOT EXISTS idx_logs_created ON generation_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_logs_model ON generation_logs(model_name, created_at);
 
+CREATE TABLE IF NOT EXISTS rag_chunks (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    chapter_id  TEXT NOT NULL DEFAULT '',
+    chapter_no  INTEGER NOT NULL DEFAULT 0,
+    title       TEXT NOT NULL DEFAULT '',
+    text        TEXT NOT NULL DEFAULT '',
+    vector      TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ragchunks_project ON rag_chunks(project_id);
+CREATE INDEX IF NOT EXISTS idx_ragchunks_chapter ON rag_chunks(chapter_id);
+
 CREATE TABLE IF NOT EXISTS configs (
     id          TEXT PRIMARY KEY,
     key         TEXT NOT NULL UNIQUE,
@@ -278,6 +415,16 @@ CREATE TABLE IF NOT EXISTS chapter_versions (
     FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_chapter_versions ON chapter_versions(chapter_id);
+
+CREATE TABLE IF NOT EXISTS background_schemes (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    type       TEXT NOT NULL,
+    theme      TEXT NOT NULL DEFAULT 'dark',
+    file       TEXT NOT NULL,
+    data       BLOB,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `
 
 // Seed 从配置种子初始化 configs / models / role_models（幂等：存在则跳过/更新）
@@ -311,14 +458,29 @@ func (db *DB) Seed(ctx context.Context, cfg *config.Config) error {
 		if status == "" {
 			status = "active"
 		}
-		if _, err := db.ExecContext(ctx,
-			`INSERT INTO models(id, name, vendor, api_endpoint, api_key, status, daily_limit, is_custom, context_limit, support_stream, is_default, description, temperature, top_p)
-			 VALUES(?,?,?,?,?,?,?,1,65536,1,0,'',0.7,0.9)
-			 ON CONFLICT(name) DO UPDATE SET vendor=excluded.vendor, api_endpoint=excluded.api_endpoint,
-			 api_key=excluded.api_key, status=excluded.status, daily_limit=excluded.daily_limit,
-			 context_limit=excluded.context_limit`,
-			m.Name, m.Name, m.Vendor, m.APIEndpoint, m.APIKey, status, m.DailyLimit); err != nil {
-			return fmt.Errorf("seed model %s: %w", m.Name, err)
+		// 跳过占位符 Key，不覆盖数据库中的真实 Key
+		apiKey := m.APIKey
+		skipKeyUpdate := strings.HasPrefix(apiKey, "sk-your-") || apiKey == ""
+		if skipKeyUpdate {
+			if _, err := db.ExecContext(ctx,
+				`INSERT INTO models(id, name, vendor, api_endpoint, api_key, status, daily_limit, is_custom, context_limit, support_stream, is_default, description, temperature, top_p)
+				 VALUES(?,?,?,?,?,?,?,1,65536,1,0,'',0.7,0.9)
+				 ON CONFLICT(name) DO UPDATE SET vendor=excluded.vendor, api_endpoint=excluded.api_endpoint,
+				 status=excluded.status, daily_limit=excluded.daily_limit,
+				 context_limit=excluded.context_limit`,
+				m.Name, m.Name, m.Vendor, m.APIEndpoint, apiKey, status, m.DailyLimit); err != nil {
+				return fmt.Errorf("seed model %s: %w", m.Name, err)
+			}
+		} else {
+			if _, err := db.ExecContext(ctx,
+				`INSERT INTO models(id, name, vendor, api_endpoint, api_key, status, daily_limit, is_custom, context_limit, support_stream, is_default, description, temperature, top_p)
+				 VALUES(?,?,?,?,?,?,?,1,65536,1,0,'',0.7,0.9)
+				 ON CONFLICT(name) DO UPDATE SET vendor=excluded.vendor, api_endpoint=excluded.api_endpoint,
+				 api_key=excluded.api_key, status=excluded.status, daily_limit=excluded.daily_limit,
+				 context_limit=excluded.context_limit`,
+				m.Name, m.Name, m.Vendor, m.APIEndpoint, apiKey, status, m.DailyLimit); err != nil {
+				return fmt.Errorf("seed model %s: %w", m.Name, err)
+			}
 		}
 	}
 

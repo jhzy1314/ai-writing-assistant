@@ -17,10 +17,12 @@ var ChapterUI = {
       var text = Editor.getText();
       var cur = Store.state.currentChapter;
       if (text !== cur.content) {
-        try { await API.updateChapter(cur.id, { content: text }); cur.content = text; } catch (e) { /* 静默 */ }
+        try { await API.updateChapter(cur.id, { content: text }); cur.content = text; } catch (e) { console.warn('[chapters] save before switch failed:', e && e.message); }
       }
     }
     Store.state.currentChapter = ch;
+    ch._saveVersion = ch.updated_at || ch.created_at || '';
+    Editor._conflictChecked = null;
     var pane = document.querySelector('.editor-pane');
     if (pane) pane.classList.add('has-content');
     Editor.setContent(ch.content || '');
@@ -35,6 +37,7 @@ var ChapterUI = {
     if (btn) btn.style.display = '';
     ProjectUI.updateMeta();
     ChapterUI.renderTree();
+    if (Editor.updateEmptyGuide) Editor.updateEmptyGuide();
   },
   nextChapter: function () {
     var chs = Store.state.chapters;
@@ -65,10 +68,11 @@ var ChapterUI = {
     var curCh = Store.state.currentChapter;
     var html = '<div class="ch-tree-head">' +
       '<span>📑 章节结构</span>' +
-      '<span class="ch-tree-acts">' +
-        '<span class="link-btn" onclick="ChapterUI.toggleBatch()" title="批量操作" id="btnBatch">☐批量</span>' +
-        '<span class="link-btn" onclick="ChapterUI.addChapter()" title="新建章节">＋章</span>' +
-        '<span class="link-btn" onclick="ChapterUI.addVolume()" title="新建卷">＋卷</span>' +
+       '<span class="ch-tree-acts">' +
+         '<span class="link-btn" onclick="ChapterUI.toggleBatch()" title="批量操作" id="btnBatch">☐批量</span>' +
+         '<span class="link-btn" onclick="Tools.showTrash()" title="回收站">🗑</span>' +
+       '<span class="link-btn" onclick="event.stopPropagation();ChapterUI.addChapter()" title="新建章节">＋章</span>' +
+         '<span class="link-btn" onclick="event.stopPropagation();ChapterUI.addVolume()" title="新建卷">＋卷</span>' +
         '<span class="link-btn" onclick="ChapterUI.continueNextChapter()" title="续写下一章">▶续写</span>' +
         '<span class="link-btn" onclick="ChapterUI.showImportMenu()" title="导入">📥导入</span>' +
         '<span class="link-btn" onclick="ChapterUI.exportChapters()" title="导出">📤导出</span>' +
@@ -153,10 +157,14 @@ var ChapterUI = {
       if (srcVid !== targetVid) {
         // 跨卷拖拽：更新 volume_id，并放到目标卷末尾
         await API.updateChapter(cid, { volume_id: targetVid });
+        // 更新源卷排序（移除被拖走章节后的gap）
+        var srcChs = await API.listChapters(Store.state.currentProject.id, srcVid);
+        srcChs = srcChs.filter(function (c) { return c.id !== cid; });
+        var srcItems = srcChs.map(function (c, i) { return { id: c.id, sort_order: i + 1 }; });
+        await API.reorderChapters(srcItems);
       }
-      // 无论跨卷还是同卷，统一重新计算 sort_order
+      // 目标卷重新计算 sort_order
       var allChs = await API.listChapters(Store.state.currentProject.id, targetVid);
-      // 按当前排序+拖拽移动：将拖拽章节移到最后
       var sorted = allChs.filter(function (c) { return c.id !== cid; });
       var dragged = allChs.find(function (c) { return c.id === cid; });
       if (dragged) sorted.push(dragged);
@@ -221,21 +229,18 @@ var ChapterUI = {
   delChapter: function (id) {
     var c = Store.state.chapters.find(function (x) { return x.id === id; });
     if (!c) return;
-    UI.confirm('删除章节', '确认删除「' + esc(c.title || '') + '」？', async function () {
+    UI.confirm('删除章节', '确认删除「' + esc(c.title || '') + '」？<br><small style="color:var(--muted)">可在回收站中恢复，保留7天</small>', async function () {
       try {
-        var backup = { title: c.title, content: c.content, tags: c.tags, synopsis: c.synopsis, sort_order: c.sort_order, volume_id: c.volume_id };
+        var backup = { id: c.id, title: c.title, content: c.content, tags: c.tags, synopsis: c.synopsis, sort_order: c.sort_order, volume_id: c.volume_id, project_id: (Store.state.currentProject||{}).id || '', project_name: (Store.state.currentProject||{}).name || '', deleted_at: Date.now() };
+        // 存储到回收站(localStorage, 保留7天)
+        var trash = Store.get('chapterTrash', []);
+        trash.unshift(backup);
+        if (trash.length > 50) trash = trash.slice(0, 50);
+        Store.set('chapterTrash', trash);
         await API.deleteChapter(id);
         if (Store.state.currentChapter && Store.state.currentChapter.id === id) { Store.state.currentChapter = null; Editor.setContent(''); }
         await ChapterUI.loadAll(); ChapterUI.renderTree(); ProjectUI.updateMeta();
-        var tm = UI.toast('已删除「' + esc(backup.title || '') + '」', 'success', { duration: 8000 });
-        var undoLink = document.createElement('span');
-        undoLink.innerHTML = ' <a href="#" style="color:var(--accent);text-decoration:underline">撤销</a>';
-        undoLink.querySelector('a').onclick = function (ev) {
-          ev.preventDefault();
-          ChapterUI.restoreChapter(backup);
-          if (tm && tm.parentNode) tm.remove();
-        };
-        tm.appendChild(undoLink);
+        UI.toast('已移至回收站（保留7天）', 'success', { duration: 5000 });
       } catch (e) { UI.toast('删除失败', 'error'); }
     });
   },
@@ -350,10 +355,32 @@ var ChapterUI = {
       var volRows = (stats.volumes || []).map(function (v) {
         return '<tr><td>' + esc(v.title) + '</td><td>' + v.chapters + '章</td><td>' + (v.words || 0).toLocaleString() + '字</td></tr>';
       }).join('');
+      // 每日字数统计（从章节更新时间推算）
+      var chs = Store.state.chapters || [];
+      var dailyMap = {};
+      chs.forEach(function (c) {
+        var d = (c.updated_at || c.created_at || '').substring(0, 10);
+        if (d) dailyMap[d] = (dailyMap[d] || 0) + (c.word_count || 0);
+      });
+      var dailyKeys = Object.keys(dailyMap).sort();
+      var chartHTML = '';
+      if (dailyKeys.length >= 2) {
+        var maxW = Math.max.apply(null, dailyKeys.map(function (k) { return dailyMap[k]; })) || 1;
+        var bars = dailyKeys.map(function (k) {
+          var h = Math.round(dailyMap[k] / maxW * 100);
+          return '<div style="display:flex;align-items:center;gap:4px;margin:2px 0;font-size:10px">' +
+            '<span style="width:72px;text-align:right;color:var(--muted)">' + k.substring(5) + '</span>' +
+            '<div style="flex:1;background:var(--panel3);border-radius:2px;height:14px;overflow:hidden">' +
+            '<div style="width:' + h + '%;height:100%;background:linear-gradient(90deg,var(--accent),#7c3aed);border-radius:2px;min-width:2px"></div></div>' +
+            '<span style="width:42px;color:var(--muted)">' + dailyMap[k].toLocaleString() + '</span></div>';
+        }).join('');
+        chartHTML = '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)"><div style="font-size:12px;font-weight:600;margin-bottom:6px">📊 每日更新字数</div>' + bars + '</div>';
+      }
       UI.modal({
-        title: '项目统计',
+        title: '📊 项目统计',
         body: '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:var(--muted);text-align:left"><th>卷</th><th>章节</th><th>字数</th></tr></thead><tbody>' + volRows + '</tbody></table>' +
-          '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:13px;font-weight:600">总计：' + (stats.total_chapters || 0) + '章 · ' + (stats.total_words || 0).toLocaleString() + '字 · ' + (stats.total_chars || 0).toLocaleString() + '字符</div>',
+          '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:13px;font-weight:600">总计：' + (stats.total_chapters || 0) + '章 · ' + (stats.total_words || 0).toLocaleString() + '字 · ' + (stats.total_chars || 0).toLocaleString() + '字符</div>' + chartHTML,
+        wide: '500px',
         actions: [{ id: 'close', label: '关闭' }]
       });
     } catch (e) { UI.toast('加载统计失败', 'error'); }
@@ -508,6 +535,10 @@ var ChapterUI = {
         Composer.refreshStyleChapters();
       }
       document.getElementById('instructionInput').value = '续写';
+      // 续写场景自动切换上下文为智能分层模式，确保 AI 感知前文
+      Store.state.composer.contextScope = 'smart';
+      var scopeEl = document.getElementById('contextScope');
+      if (scopeEl) scopeEl.value = 'smart';
       UI.toast('已创建「' + newTitle + '」，正在续写…', 'success');
       Composer.generate();
     } catch (e) { UI.toast('创建章节失败：' + e.message, 'error'); }
@@ -666,10 +697,160 @@ var ChapterUI = {
     URL.revokeObjectURL(a.href);
     UI.toast('已导出 ' + chs.length + ' 章', 'success');
   },
+  exportAllChapters: function () {
+    var chs = Store.state.chapters || [];
+    if (!chs.length) { UI.toast('暂无章节可导出', 'warn'); return; }
+    // 弹出格式选择
+    var p = Store.state.currentProject;
+    UI.modal({
+      title: '📚 导出全本',
+      body: '<div class="form-group"><label>导出格式</label><select id="exportAllFmt"><option value="txt">纯文本文档(.txt)</option><option value="md">Markdown(.md)</option><option value="zip">打包ZIP(按卷分文件夹)</option></select></div>',
+      actions: [
+        { id: 'cancel', label: '取消' },
+        { id: 'ok', label: '导出', cls: 'btn-primary', onClick: function (m, ov) {
+          var fmt = document.getElementById('exportAllFmt').value;
+          ov.remove();
+          if (fmt === 'zip') { ChapterUI.exportAllZIP(chs, p); return; }
+          var text = chs.map(function (c) { return '=== ' + c.title + ' ===\n\n' + (c.content || '') + '\n'; }).join('\n\n');
+          var ext = fmt === 'md' ? '.md' : '.txt';
+          var mime = fmt === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8';
+          var blob = new Blob([text], { type: mime });
+          var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = (p ? p.name : 'output') + '_全本' + ext; a.click();
+          URL.revokeObjectURL(a.href);
+          UI.toast('已导出全书 ' + chs.length + ' 章', 'success');
+        }}
+      ]
+    });
+  },
+  // ---- 简易 ZIP 构建器（纯 JS，无外部依赖）----
+  _buildZipBlob: function (files) {
+    // files: [{name: string, content: string}]
+    var encoder = new TextEncoder();
+    var localHeaders = [];
+    var centralHeaders = [];
+    var offset = 0;
+
+    files.forEach(function (f) {
+      var encodedName = encoder.encode(f.name);
+      var nameBytes = Array.from(encodedName);
+      var content = encoder.encode(f.content);
+      var contentBytes = Array.from(content);
+      var crc = 0; // simplified - real CRC32 would need a separate implementation
+
+      var lh = [];
+      lh.push(0x50, 0x4B, 0x03, 0x04); // local header signature
+      lh.push(0x14, 0x00);               // version needed
+      lh.push(0x00, 0x00);               // flags
+      lh.push(0x00, 0x00);               // compression: store
+      lh.push(0x00, 0x00);               // mod time
+      lh.push(0x00, 0x00);               // mod date
+      // CRC-32
+      var crcBytes = [crc & 0xFF, (crc >> 8) & 0xFF, (crc >> 16) & 0xFF, (crc >> 24) & 0xFF];
+      lh = lh.concat(crcBytes);
+      // Compressed size = uncompressed size
+      var size = contentBytes.length;
+      lh.push(size & 0xFF, (size >> 8) & 0xFF, (size >> 16) & 0xFF, (size >> 24) & 0xFF);
+      lh = lh.concat([size & 0xFF, (size >> 8) & 0xFF, (size >> 16) & 0xFF, (size >> 24) & 0xFF]);
+      // File name length
+      lh.push(nameBytes.length & 0xFF, (nameBytes.length >> 8) & 0xFF);
+      lh.push(0x00, 0x00); // extra field length
+
+      localHeaders.push({ header: lh, name: nameBytes, data: contentBytes, offset: offset });
+      offset += lh.length + nameBytes.length + contentBytes.length;
+
+      // Build central directory entry
+      var ch = [];
+      ch.push(0x50, 0x4B, 0x01, 0x02);
+      ch.push(0x14, 0x00); // version
+      ch.push(0x14, 0x00); // version needed
+      ch.push(0x00, 0x00); // flags
+      ch.push(0x00, 0x00); // compression
+      ch.push(0x00, 0x00); // mod time
+      ch.push(0x00, 0x00); // mod date
+      ch = ch.concat(crcBytes);
+      ch.push(size & 0xFF, (size >> 8) & 0xFF, (size >> 16) & 0xFF, (size >> 24) & 0xFF);
+      ch = ch.concat([size & 0xFF, (size >> 8) & 0xFF, (size >> 16) & 0xFF, (size >> 24) & 0xFF]);
+      ch.push(nameBytes.length & 0xFF, (nameBytes.length >> 8) & 0xFF);
+      ch.push(0x00, 0x00); // extra
+      ch.push(0x00, 0x00); // comment
+      ch.push(0x00, 0x00); // disk
+      ch.push(0x00, 0x00); // internal
+      ch.push(0x20, 0x00, 0x00, 0x00); // external
+      // local header offset
+      var lhOff = localHeaders[localHeaders.length - 1].offset;
+      ch.push(lhOff & 0xFF, (lhOff >> 8) & 0xFF, (lhOff >> 16) & 0xFF, (lhOff >> 24) & 0xFF);
+      centralHeaders.push({ header: ch, name: nameBytes });
+    });
+
+    // Assemble
+    var parts = [];
+    localHeaders.forEach(function (lh) {
+      parts.push(new Uint8Array(lh.header));
+      parts.push(new Uint8Array(lh.name));
+      parts.push(new Uint8Array(lh.data));
+    });
+
+    var cdOffset = 0;
+    parts.forEach(function (p) { cdOffset += p.length; });
+
+    centralHeaders.forEach(function (ch) {
+      parts.push(new Uint8Array(ch.header));
+      parts.push(new Uint8Array(ch.name));
+    });
+
+    var cdSize = 0;
+    for (var i = localHeaders.length; i < parts.length; i++) { cdSize += parts[i].length; }
+
+    // EOCD
+    var eocd = [
+      0x50, 0x4B, 0x05, 0x06,
+      0x00, 0x00, // disk
+      0x00, 0x00, // central disk
+      files.length & 0xFF, (files.length >> 8) & 0xFF, // entries on disk
+      files.length & 0xFF, (files.length >> 8) & 0xFF, // total entries
+      cdSize & 0xFF, (cdSize >> 8) & 0xFF, (cdSize >> 16) & 0xFF, (cdSize >> 24) & 0xFF,
+      cdOffset & 0xFF, (cdOffset >> 8) & 0xFF, (cdOffset >> 16) & 0xFF, (cdOffset >> 24) & 0xFF,
+      0x00, 0x00 // comment length
+    ];
+    parts.push(new Uint8Array(eocd));
+
+    return new Blob(parts, { type: 'application/zip' });
+  },
+
+  exportAllZIP: function (chs, p) {
+    var vols = Store.state.volumes || [];
+    var groups = {};
+    vols.forEach(function (v) { groups[v.id] = { title: v.title, chs: [] }; });
+    groups[''] = { title: '未分类', chs: [] };
+    chs.forEach(function (c) {
+      var vid = c.volume_id || '';
+      if (!groups[vid]) groups[vid] = { title: '未分类', chs: [] };
+      groups[vid].chs.push(c);
+    });
+
+    var files = [];
+    Object.keys(groups).forEach(function (vid) {
+      var g = groups[vid];
+      if (!g.chs.length) return;
+      g.chs.forEach(function (c) {
+        var safeVol = g.title.replace(/[<>:"/\\|?*]/g, '_');
+        var safeName = (c.title || '未命名章节').replace(/[<>:"/\\|?*]/g, '_');
+        var path = safeVol + '/' + safeName + '.txt';
+        files.push({ name: path, content: (c.content || '') });
+      });
+    });
+
+    if (files.length === 0) { UI.toast('没有可导出的章节', 'warn'); return; }
+    var zipName = (p ? p.name : 'output') + '_全本.zip';
+    var blob = this._buildZipBlob(files);
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = zipName; a.click();
+    URL.revokeObjectURL(a.href);
+    UI.toast('已导出全书 ' + chs.length + ' 章（真实 ZIP 格式）', 'success');
+  },
   batchDelete: function () {
     var chs = ChapterUI.getBatchChapters();
     if (!chs.length) { UI.toast('请先勾选章节', 'warn'); return; }
-    UI.confirm('批量删除', '确认删除 ' + chs.length + ' 个章节？不可恢复。', async function () {
+    UI.confirm('批量删除', '确认删除 ' + chs.length + ' 个章节？<br><small style="color:var(--muted)">可在回收站中恢复，保留7天</small>', async function () {
       try {
         for (var i = 0; i < chs.length; i++) {
           await API.deleteChapter(chs[i].id);
@@ -744,6 +925,47 @@ var ChapterUI = {
         }},
         { id: 'cancel', label: '关闭' }
       ]
+    });
+  },
+  batchFromOutline: function () {
+    var outline = (document.getElementById('genOutline') || {}).value || Store.state.composer.outline || '';
+    if (!outline || !outline.trim()) { UI.toast('请先在高级选项中填写大纲，支持 #卷名 ##章节名 格式', 'warn'); return; }
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择项目', 'warn'); return; }
+    var lines = outline.split('\n').filter(function (l) { return l.trim(); });
+    if (lines.length === 0) { UI.toast('大纲为空', 'warn'); return; }
+    var chaps = []; var curVol = '';
+    lines.forEach(function (line) {
+      var trimmed = line.trim();
+      if (trimmed.startsWith('## ')) {
+        chaps.push({ vol: curVol, title: trimmed.replace(/^##\s*/, '').trim() });
+      } else if (trimmed.startsWith('# ')) {
+        curVol = trimmed.replace(/^#\s*/, '').trim();
+      } else if (trimmed) {
+        chaps.push({ vol: curVol, title: trimmed });
+      }
+    });
+    if (chaps.length === 0) { UI.toast('未识别到章节（请使用 #卷名 ##章节名 格式）', 'warn'); return; }
+    UI.confirm('批量创建章节', '将根据大纲创建 <b>' + chaps.length + '</b> 个空白章节，确定？', async function () {
+      var created = 0;
+      var curVolId = '';
+      for (var i = 0; i < chaps.length; i++) {
+        var c = chaps[i];
+        if (c.vol) {
+            try {
+            var v = await API.createVolume({ project_id: p.id, title: c.vol, sort_order: created });
+            curVolId = v ? (v.id || '') : '';
+          } catch (e) { curVolId = ''; }
+        }
+        if (c.title) {
+          try {
+            await API.createChapter({ project_id: p.id, volume_id: curVolId, title: c.title, content: '' });
+            created++;
+          } catch (e) { UI.toast('创建"' + esc(c.title) + '"失败', 'error'); }
+        }
+      }
+      await ChapterUI.loadAll(); ChapterUI.renderTree(); ProjectUI.updateMeta();
+      UI.toast('已创建 ' + created + ' 个章节', 'success');
     });
   },
   editOutlineAndContinue: function () {

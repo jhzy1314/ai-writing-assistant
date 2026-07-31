@@ -13,8 +13,13 @@ var SELECTION_TEMPLATES = {
 var SelectionActions = {
   fillTemplate: function (key, extra) {
     var sel = Editor.getSelectedText();
+    if (!sel || !sel.trim()) {
+      UI.toast('请先选中需要处理的文字', 'warn');
+      Editor.hideSelToolbar();
+      return;
+    }
     var tpl = SELECTION_TEMPLATES[key];
-    var content = tpl.replace(/\{selected_text\}/g, sel || '');
+    var content = tpl.replace(/\{selected_text\}/g, sel);
     if (extra) {
       content = content.replace(/\{style_input\}/g, extra.style || '')
         .replace(/\{atmosphere_input\}/g, extra.atmosphere || '');
@@ -22,10 +27,9 @@ var SelectionActions = {
     document.getElementById('instructionInput').value = content;
     Editor.syncInstructionHeight(document.getElementById('instructionInput'));
     Editor.hideSelToolbar();
-    if (sel && Array.from(sel).length > 500 && Store.state.composer.runMode === 'light') {
+    if (Array.from(sel).length > 500 && Store.state.composer.runMode === 'light') {
       UI.toast('选中文本超过 500 字，建议切换为「智能协同」模式', 'warn');
     }
-    // 自动切换到轻量模式并触发生成
     Store.state.composer.runMode = 'light';
     document.getElementById('modeSelect').value = 'light';
     Composer.onModeChange('light', true);

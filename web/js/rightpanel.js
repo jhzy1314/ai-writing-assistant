@@ -8,13 +8,33 @@ var RightPanel = {
       p.classList.toggle('show', p.id === 'page-' + page);
     });
     if (page === 'templates') TemplateUI.render();
-    if (page === 'models') ModelSettings.loadAll();
+    if (page === 'models') {
+      ModelSettings.loadAll();
+      setTimeout(function () {
+        var pageEl = document.getElementById('page-models');
+        if (pageEl && typeof SkillsPanel !== 'undefined') {
+          var existing = document.getElementById('skillsPanelContainer');
+          if (!existing) {
+            var div = document.createElement('div');
+            div.id = 'skillsPanelContainer';
+            div.style.cssText = 'margin-top:18px;border-top:1px solid var(--border);padding-top:10px';
+            pageEl.appendChild(div);
+          }
+          SkillsPanel.renderTo('skillsPanelContainer');
+        }
+      }, 300);
+    }
+    if (page === 'appearance') Appearance.load();
+    if (page === 'forecast') { if (typeof ForecastPanel !== 'undefined') ForecastPanel.render(); }
+    if (page === 'state') { if (typeof StateViewer !== 'undefined') StateViewer.render(); }
   },
   renderContext: function () {
     // 人物卡
     var cEl = document.getElementById('ctxCharacters');
     if (!Store.state.characters.length) {
-      cEl.innerHTML = '<div class="ghead">人物卡</div><div class="res-check-empty" style="cursor:pointer" onclick="ResourceUI.editCharacter()">暂无人物卡，点击此处创建或使用【工具→自动提取人物卡】</div>';
+      cEl.innerHTML = '<div class="ghead">人物卡</div><div class="res-check-empty" style="cursor:pointer;padding:12px;border:1px dashed var(--border);border-radius:8px;margin:4px 8px" onclick="ResourceUI.editCharacter()">' +
+        '<div style="font-weight:600;margin-bottom:2px">👤 暂无人物卡</div>' +
+        '<div style="font-size:10px;color:var(--muted)">点击此处新建人物，或在工具面板使用 AI 提取</div></div>';
     } else {
       cEl.innerHTML = '<div class="ghead">人物卡</div>' + Store.state.characters.map(function (c) {
         var checked = Store.state.selection.characters.has(c.id);
@@ -29,7 +49,9 @@ var RightPanel = {
     // 世界观
     var wEl = document.getElementById('ctxWorld');
     if (!Store.state.worldSettings.length) {
-      wEl.innerHTML = '<div class="ghead">世界观设定</div><div class="res-check-empty" style="cursor:pointer" onclick="ResourceUI.editWorld()">暂无世界观，点击此处创建</div>';
+      wEl.innerHTML = '<div class="ghead">世界观设定</div><div class="res-check-empty" style="cursor:pointer;padding:12px;border:1px dashed var(--border);border-radius:8px;margin:4px 8px" onclick="ResourceUI.editWorld()">' +
+        '<div style="font-weight:600;margin-bottom:2px">🌍 暂无世界观</div>' +
+        '<div style="font-size:10px;color:var(--muted)">点击此处新建设定，定义你的小说世界规则</div></div>';
     } else {
       wEl.innerHTML = '<div class="ghead">世界观设定</div>' + Store.state.worldSettings.map(function (w) {
         var checked = Store.state.selection.worldSettings.has(w.id);

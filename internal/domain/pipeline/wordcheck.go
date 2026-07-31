@@ -8,8 +8,6 @@ import (
 )
 
 // CheckOutlineWordCount 从 Thinker 产出的大纲中提取各节点预估字数，与目标对比做±30%阈值校验。
-// 返回 nil 表示：未解析到汇总 / 差值在±30%以内 / 用户关闭了校验（skipCheck）。
-// 调用点：各流水线 runStandard / runStrict / runArt 中，Thinker 完成后、Worker 执行前。
 func CheckOutlineWordCount(outline string, targetWord int, skipCheck bool) *OutlineWordEstimate {
 	if skipCheck || targetWord <= 0 || outline == "" {
 		return nil
@@ -27,7 +25,6 @@ func CheckOutlineWordCount(outline string, targetWord int, skipCheck bool) *Outl
 		}
 	}
 	if suggested <= 0 {
-		// 次选：累加各节点"预估字数：XXX"标记
 		nodeRe := regexp.MustCompile(`预估.数[：:]*\s*(\d+)`)
 		matches := nodeRe.FindAllStringSubmatch(outline, -1)
 		for _, m := range matches {
@@ -47,7 +44,7 @@ func CheckOutlineWordCount(outline string, targetWord int, skipCheck bool) *Outl
 		delta = 1 / delta
 	}
 	if delta <= 1.3 {
-		return nil // ±30% 以内，无需提醒
+		return nil
 	}
 	oe := &OutlineWordEstimate{
 		SuggestedTotal: suggested,
@@ -63,4 +60,36 @@ func CheckOutlineWordCount(outline string, targetWord int, skipCheck bool) *Outl
 			suggested, targetWord, ratio*100)
 	}
 	return oe
+}
+
+// TruncateBySentence 在目标字数附近按句子边界截断文本，保持句子完整不从中切断。
+func TruncateBySentence(text string, maxLen int) string {
+	if maxLen <= 0 || len([]rune(text)) <= maxLen {
+		return text
+	}
+	runes := []rune(text)
+	endMarks := []rune{'。', '！', '？', '…', '\n', '」', '.', '!', '?', '，', ','}
+	cutPos := maxLen
+	searchStart := maxLen - 80
+	if searchStart < 0 {
+		searchStart = 0
+	}
+	for i := maxLen - 1; i >= searchStart; i-- {
+		for _, m := range endMarks {
+			if runes[i] == m {
+				cutPos = i + 1
+				goto found
+			}
+		}
+	}
+	for i := maxLen; i < len(runes) && i < maxLen+150; i++ {
+		for _, m := range endMarks {
+			if runes[i] == m {
+				cutPos = i + 1
+				goto found
+			}
+		}
+	}
+found:
+	return string(runes[:cutPos])
 }

@@ -1,6 +1,25 @@
 /* ============ tools.js：Helper 工具辅助操作（录音转写 / 清洗 / 排序 / 提取 / 转换 / 统计） ============ */
 var Tools = {
 
+  /* ---- 文字校对 ---- */
+  proofreadText: async function () {
+    var text = Editor.getSelectedText();
+    if (!text || !text.trim()) { text = Editor.getText(); }
+    if (!text.trim()) { UI.toast('编辑器内容为空', 'warn'); return; }
+    RightPanel.switch('tools');
+    var el = document.getElementById('toolOutput');
+    el.innerHTML = '<div class="res-check-empty"><span class="loading">正在进行文字校对…</span></div>';
+    try {
+      var r = await API.post('/api/tools/execute', { tool: 'proofread', content: text });
+      var result = r.result || '';
+      el.innerHTML = '<div class="ghead">🔍 文字校对结果</div>' +
+        '<div class="result-box" style="font-size:12px;line-height:1.8;white-space:pre-wrap">' + esc(result) + '</div>';
+      UI.toast('校对完成', 'success');
+    } catch (e) {
+      el.innerHTML = '<div class="res-check-empty" style="color:var(--danger)">校对失败：' + esc(e.message) + '</div>';
+    }
+  },
+
   /* ---- 一键逻辑自检 ---- */
   verify: async function () {
     var content = Editor.getText();
@@ -352,26 +371,49 @@ var Tools = {
     if (!chs.length) { UI.toast('暂无章节', 'warn'); return; }
     RightPanel.switch('tools');
     var resultEl = document.getElementById('verifyResult');
-    resultEl.innerHTML = '<div class="res-check-empty">⏳ 逐章校对中…（共 ' + chs.length + ' 章）</div>';
+    var total = chs.filter(function(c){return c.content && c.content.trim();}).length;
+    if (!total) { resultEl.innerHTML = '<div class="res-check-empty">所有章节内容为空</div>'; return; }
+    resultEl.innerHTML = '<div class="res-check-empty">⏳ 逐章校对中…（共 ' + total + ' 章）</div>';
+    var chapterResults = [];
     var allIssues = [];
     for (var i = 0; i < chs.length; i++) {
       var c = chs[i];
       if (!c.content || !c.content.trim()) continue;
-      resultEl.innerHTML = '<div class="res-check-empty">⏳ 校对 ' + (i + 1) + '/' + chs.length + '：「' + esc(c.title) + '」</div>';
+      resultEl.innerHTML = '<div class="res-check-empty">⏳ 校对 ' + (i + 1) + '/' + total + '：「' + esc(c.title) + '」</div>';
       try {
         var r = await API.verify(c.content, Context.worldSetting(), Context.characters());
-        if (r.issues && r.issues.length) {
-          allIssues.push({ chapter: c.title, issues: r.issues });
-          resultEl.innerHTML += '<div style="font-size:10px;color:var(--warning)">⚠ ' + esc(c.title) + '：' + r.issues.length + ' 条问题</div>';
+        var passed = r.passed || !(r.issues && r.issues.length);
+        chapterResults.push({ title: c.title, passed: passed, issues: r.issues || [], review: r.review || '' });
+        if (!passed) {
+          allIssues.push({ chapter: c.title, issues: r.issues || [] });
         }
-      } catch (e) { allIssues.push({ chapter: c.title, issues: ['校对失败: ' + e.message] }); }
+      } catch (e) {
+        chapterResults.push({ title: c.title, passed: false, issues: ['校对失败: ' + e.message] });
+        allIssues.push({ chapter: c.title, issues: ['校对失败: ' + e.message] });
+      }
     }
-    if (!allIssues.length) { resultEl.innerHTML = '<div class="pass">✓ 全文校验通过</div>'; return; }
-    var html = '<div class="pass">⚠ 发现 ' + allIssues.reduce(function(s,x){return s+x.issues.length;},0) + ' 条问题</div>';
-    allIssues.forEach(function(group) {
-      group.issues.forEach(function(iss) {
-        html += '<div class="verify-issue"><b>' + esc(group.chapter) + '</b> · ' + esc(iss) + '</div>';
-      });
+    // 汇总展示
+    var passedCount = chapterResults.filter(function(x){return x.passed;}).length;
+    var failedCount = chapterResults.filter(function(x){return !x.passed;}).length;
+    var html = '<div class="ghead">📋 全书逐章校验结果</div>' +
+      '<div style="padding:6px 8px;font-size:12px;margin-bottom:8px;background:var(--panel2);border-radius:7px">' +
+      '<span style="color:var(--success)">✓ 通过 ' + passedCount + '</span> · ' +
+      '<span style="color:var(--warning)">⚠ 问题 ' + failedCount + '</span> · ' +
+      '总计 ' + allIssues.reduce(function(s,x){return s+x.issues.length;},0) + ' 条</div>';
+    // 按章节折叠展示
+    chs.forEach(function(c) {
+      var cr = chapterResults.find(function(x){return x.title === c.title;});
+      if (!cr) return;
+      var cls = cr.passed ? 'pass' : 'verify-issue';
+      var icon = cr.passed ? '✓' : '⚠';
+      var issuesHTML = '';
+      if (!cr.passed) {
+        issuesHTML = '<div style="margin:4px 0 4px 20px;font-size:11px;line-height:1.6">' +
+          cr.issues.map(function(iss){return '<div>· ' + esc(iss) + '</div>';}).join('') + '</div>';
+      }
+      html += '<div class="' + cls + '" style="margin-bottom:2px;cursor:pointer" onclick="var n=this.nextElementSibling;if(n)n.style.display=n.style.display===\'none\'?\'\':\'none\'">' +
+        icon + ' ' + esc(c.title) + ' <span style="color:var(--muted);font-size:10px">(' + (cr.issues.length || 0) + '条)</span></div>' +
+        '<div style="display:' + (cr.passed ? 'none' : '') + '">' + issuesHTML + '</div>';
     });
     resultEl.innerHTML = html;
   },
@@ -489,13 +531,33 @@ var Tools = {
     RightPanel.switch('tools');
     var resultEl = document.getElementById('verifyResult');
     resultEl.innerHTML = '<div class="res-check-empty">⏳ 跨章节一致性审计中…（共 ' + chs.length + ' 章）</div>';
-    // 拼接所有章节作为上下文
-    var allText = chs.map(function(c,i){return '【第'+(i+1)+'章.'+c.title+'】\n'+c.content;}).join('\n\n');
-    var prompt = '你是一部小说的跨章节审计官。请逐项检查以下全文的一致性：\n1.人名一致性（同一人物前后名字/称呼是否统一）\n2.世界观一致性（设定、规则前后是否矛盾）\n3.时间线（事件时序是否合理）\n4.未回收伏笔（前面提到但后面没交代的线索）\n5.人物关系逻辑（关系变化是否有铺垫）\n逐条列出问题，标注所在章节和问题类型。无问题输出"未发现一致性问题"。\n全文：\n' + allText.slice(0, 15000);
-    try {
-      var report = await Tools.generateOneSummary({ title: '跨章审计', content: prompt });
-      resultEl.innerHTML = '<div class="ghead">📋 跨章一致性审计报告</div><div class="result-box" style="font-size:12px;white-space:pre-wrap">' + esc(report || '审计未完成') + '</div>';
-    } catch (e) { resultEl.innerHTML = '<div class="res-check-empty" style="color:var(--danger)">审计失败</div>'; }
+    // 分批审计：每批最多3000字符，避免截断
+    var batchSize = 3000;
+    var chunks = [];
+    var current = '你是一部小说的跨章节审计官。请逐项检查以下全文的一致性：\n1.人名一致性\n2.世界观一致性\n3.时间线\n4.未回收伏笔\n5.人物关系逻辑\n逐条列出问题，标注章节。无问题输出"未见异常"。\n';
+    var chTexts = chs.map(function(c,i){return '【第'+(i+1)+'章.'+c.title+'】\n'+c.content;});
+    for (var j = 0; j < chTexts.length; j++) {
+      if ((current + '\n' + chTexts[j]).length > batchSize && current.length > 100) {
+        chunks.push(current);
+        current = ''; // 重新检查前面的bug行
+      }
+      current += '\n\n' + chTexts[j];
+    }
+    if (current && current.length > 150) chunks.push(current);
+    // 逐批审计
+    var allReports = [];
+    for (var k = 0; k < chunks.length; k++) {
+      var label = chunks.length > 1 ? '（批次 ' + (k+1) + '/' + chunks.length + '）' : '';
+      resultEl.innerHTML = '<div class="res-check-empty">⏳ 跨章审计中…' + label + '</div>';
+      try {
+        var report = await Tools.generateOneSummary({ title: '跨章审计批'+(k+1), content: chunks[k] });
+        if (report && report.indexOf('未见异常') === -1 && report.indexOf('未发现') === -1) {
+          allReports.push(report);
+        }
+      } catch (e) { /* 单批失败跳过 */ }
+    }
+    var final = allReports.length ? allReports.join('\n\n---\n\n') : '✅ 未发现跨章节一致性问题';
+    resultEl.innerHTML = '<div class="ghead">📋 跨章一致性审计报告</div><div class="result-box" style="font-size:12px;white-space:pre-wrap;max-height:400px;overflow-y:auto">' + esc(final) + '</div>';
   },
 
   /* ---- 写作风格基因组 ---- */
@@ -703,5 +765,187 @@ var Tools = {
           '<div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px"></div></div>'+
           '<span style="width:30px;color:var(--muted);font-size:10px">'+pct+'%</span></div>';
       }).join('');
+  },
+
+  ragMemory: function () {
+    var chs = Store.state.chapters || [];
+    if (!chs.length) { UI.toast('章节', 'warn'); return; }
+    RightPanel.switch('tools');
+    var resultEl = document.getElementById('verifyResult');
+    resultEl.innerHTML = '<div class="res-check-empty"> 全书...' + chs.length + ' 章</div>';
+    var idx = {};
+    chs.forEach(function (c) {
+      var text = c.content || '';
+      var named = text.match(/[《》]+?[》]/g) || [];
+      named.forEach(function (n) { var w = n.replace(/[《》]/g,''); idx[w] = (idx[w]||0)+1; });
+    });
+    var chars = Store.state.characters || [];
+    chs.forEach(function (c) {
+      chars.forEach(function (ch) {
+        if ((c.content||'').indexOf(ch.name) >= 0) idx[ch.name] = (idx[ch.name]||0)+1;
+      });
+    });
+    var terms = Object.keys(idx).sort(function(a,b){return idx[b]-idx[a];}).slice(0, 50);
+    if (!terms.length) { resultEl.innerHTML = '<div class="res-check-empty">- (先创建人物卡)</div>'; return; }
+    var html = '<div class="ghead">   (' + chs.length + ', ' + terms.length + ')</div>' +
+      '<div style="font-size:11px;padding:8px;line-height:2">';
+    terms.forEach(function (t) {
+      var bar = Math.min(100, idx[t] * 5);
+      html += '<div style="display:flex;align-items:center;gap:6px;margin:1px 0">' +
+        '<span style="width:80px;text-align:right;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t.substring(0,8)) + '</span>' +
+        '<div style="flex:1;background:var(--panel3);border-radius:2px;height:10px;overflow:hidden"><div style="width:' + bar + '%;height:100%;background:linear-gradient(90deg,var(--accent),#7c3aed);border-radius:2px"></div></div>' +
+        '<span style="width:24px;color:var(--muted);font-size:10px">' + idx[t] + '</span></div>';
+    });
+    html += '</div><div style="margin-top:8px;padding:8px;background:var(--panel3);border-radius:6px;font-size:10px;color:var(--muted)">' +
+      'Ctrl+F </div>';
+    resultEl.innerHTML = html;
+  },
+
+  showTrash: async function () {
+    var pid = Store.state.currentProject ? Store.state.currentProject.id : '';
+    var active = [];
+    try {
+      active = await API.listTrashChapters(pid);
+    } catch (e) { /* fallback to localStorage */ }
+    // 如果后端返回为空或出错，回退到 localStorage
+    if (!active || !active.length) {
+      var trash = Store.get('chapterTrash', []);
+      var now = Date.now();
+      var sevenDays = 7 * 86400000;
+      active = trash.filter(function (t) { return now - (t.deleted_at || 0) < sevenDays; });
+      Store.set('chapterTrash', active);
+    }
+    if (!active.length) { UI.toast('回收站为空（仅保留7天内删除的章节）', ''); return; }
+    var rows = active.map(function (t) {
+      var deletedAt = t.deleted_at || '';
+      var timeLabel = deletedAt ? deletedAt.substring(0, 10) : '未知';
+      return '<tr><td>' + esc(t.title || '无标题') + '</td><td>' + esc(t.project_name || t.project_id || '') + '</td><td>' + timeLabel + '</td><td>' +
+        '<button class="tool-btn" style="font-size:10px;padding:1px 8px" onclick="Tools.restoreFromTrash(\'' + t.id + '\')">恢复</button> ' +
+        '<button class="tool-btn" style="font-size:10px;padding:1px 8px;color:var(--danger)" onclick="Tools.confirmPermanentDelete(\'' + t.id + '\')">永久删除</button></td></tr>';
+    }).join('');
+    UI.modal({
+      title: '🗑 回收站（保留7天）',
+      sub: active.length + ' 个已删除章节',
+      body: '<table style="width:100%;font-size:12px"><tr style="text-align:left;color:var(--muted)"><th>章节</th><th>原项目</th><th>删除时间</th><th>操作</th></tr>' + rows + '</table>' +
+        '<button class="btn btn-ghost btn-block btn-sm" style="margin-top:10px" onclick="Tools.emptyTrash()">🗑 清空回收站</button>',
+      wide: '600px',
+      actions: [{ id: 'close', label: '关闭' }]
+    });
+  },
+
+  confirmPermanentDelete: function (id) {
+    UI.confirm('永久删除', '确认永久删除该章节？此操作不可恢复，内容将从数据库中彻底移除。', async function () {
+      try {
+        await API.permanentDeleteChapter(id, true);
+        UI.toast('已永久删除', 'success');
+        document.querySelectorAll('.modal-overlay').forEach(function (m) { m.remove(); });
+        Tools.showTrash();
+      } catch (e) { UI.toast('删除失败：' + e.message, 'error'); }
+    });
+  },
+
+  restoreFromTrash: function (id) {
+    // 先尝试后端恢复
+    API.restoreChapter(id).then(function () {
+      UI.toast('章节已恢复', 'success');
+      // 重新加载章节列表
+      if (Store.state.currentProject) {
+        ChapterUI.loadAll();
+        ChapterUI.renderTree();
+      }
+      document.querySelectorAll('.modal-overlay').forEach(function (m) { m.remove(); });
+    }).catch(function () {
+      // 回退到 localStorage 方式
+      var trash = Store.get('chapterTrash', []);
+      var item = trash.find(function (t) { return t.id === id; });
+      if (!item) { UI.toast('该条目已过期或不存在', 'warn'); return; }
+      var proj = Store.state.projects.find(function (p) { return p.id === item.project_id; });
+      if (!proj) { UI.toast('原项目已不存在，无法恢复', 'error'); return; }
+      ProjectUI.select(item.project_id).then(async function () {
+        try {
+          await API.createChapter({
+            project_id: item.project_id, volume_id: item.volume_id || '',
+            title: item.title || '已恢复章节', content: item.content || '',
+            tags: item.tags || '', synopsis: item.synopsis || '', sort_order: item.sort_order || 0
+          });
+          var trash2 = Store.get('chapterTrash', []);
+          Store.set('chapterTrash', trash2.filter(function (t) { return t.id !== id; }));
+          await ChapterUI.loadAll(); ChapterUI.renderTree(); ProjectUI.updateMeta();
+          UI.toast('已恢复「' + item.title + '」', 'success');
+        } catch (e) { UI.toast('恢复失败：' + e.message, 'error'); }
+      });
+    });
+  },
+
+  emptyTrash: function () {
+    UI.confirm('清空回收站', '确认永久清空回收站中所有章节？此操作不可恢复，内容将从数据库中彻底移除。', function () {
+      Store.set('chapterTrash', []);
+      UI.toast('回收站已清空', 'success');
+      document.querySelectorAll('.modal-overlay').forEach(function (m) { m.remove(); });
+    });
+  },
+
+  detectAIGC: function () {
+    var content = Editor.getText();
+    if (!content.trim()) { UI.toast('编辑器内容为空', 'warn'); return; }
+    var btn = document.getElementById('btnDetectAIGC');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 检测中...'; }
+    if (typeof EinoAPI === 'undefined') {
+      UI.toast('Eino 后端未连接（端口 8082）', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '🔎 AI 味检测'; }
+      return;
+    }
+    var self = this;
+    EinoAPI.detectAIGC(content).then(function (result) {
+      if (btn) { btn.disabled = false; btn.textContent = '🔎 AI 味检测'; }
+      if (!result) { UI.toast('检测服务无响应', 'error'); return; }
+      self.showDetectionResult(result, content);
+    }).catch(function () {
+      if (btn) { btn.disabled = false; btn.textContent = '🔎 AI 味检测'; }
+      UI.toast('检测失败，确认 Eino 后端已启用', 'error');
+    });
+  },
+
+  showDetectionResult: function (result, content) {
+    var prob = (result.aiProbability || result.aiProbability === 0) ? result.aiProbability : 0;
+    var pct = (prob * 100).toFixed(0);
+    var flags = result.flags || [];
+    var summary = result.summary || '';
+    var color = '#6ee7b7';
+    var label = '极少 AI 痕迹';
+    if (prob >= 0.7) { color = '#f87171'; label = '大量 AI 痕迹'; }
+    else if (prob >= 0.5) { color = '#fb923c'; label = '明显 AI 痕迹'; }
+    else if (prob >= 0.3) { color = '#facc15'; label = '中等 AI 痕迹'; }
+    else if (prob >= 0.15) { color = '#67e8f9'; label = '轻微 AI 痕迹'; }
+
+    var flagsHtml = '';
+    flags.forEach(function (f) {
+      flagsHtml += '<div style="display:flex;justify-content:space-between;padding:4px 8px;margin:2px 0;border-left:3px solid ' + color + ';font-size:10px;background:var(--panel3);border-radius:2px">' +
+        '<span>' + esc(f.rule || f.ruleName || '') + '</span>' +
+        '<span style="color:var(--muted)">' + esc(f.desc || '').substring(0, 30) + '</span>' +
+        '<span>' + ((f.confidence || 0) * 100).toFixed(0) + '%</span>' +
+        '</div>';
+    });
+
+    var wc = Array.from(content).length;
+
+    var body = '<div style="text-align:center;padding:12px">' +
+      '<div style="font-size:48px">' + pct + '%</div>' +
+      '<div style="font-size:14px;color:' + color + ';font-weight:600;margin:8px 0">' + label + '</div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-bottom:12px">' + esc(summary) + ' · 共 ' + wc + ' 字</div>' +
+      '</div>';
+    if (flags.length > 0) {
+      body += '<div style="border-top:1px solid var(--border);padding-top:8px"><div style="font-size:11px;font-weight:600;margin-bottom:6px">命中规则 (' + flags.length + '条)</div>' + flagsHtml + '</div>';
+    } else {
+      body += '<div style="text-align:center;padding:10px;color:var(--success)">✓ 未命中任何规则，文本风格自然</div>';
+    }
+
+    UI.modal({
+      title: 'AI 写作痕迹检测',
+      body: body,
+      actions: [
+        { id: 'close', label: '关闭' }
+      ]
+    });
   }
 };

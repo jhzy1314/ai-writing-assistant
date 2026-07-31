@@ -16,6 +16,8 @@ type ModelAdapter interface {
 	Generate(ctx context.Context, systemPrompt, userPrompt string) (text string, usage Usage, err error)
 	// Stream 流式生成，返回文本分片通道；通道关闭表示结束
 	Stream(ctx context.Context, systemPrompt, userPrompt string) (<-chan StreamChunk, error)
+	// SetThinking 设置本次调用是否启用深度思考（仅推理类模型生效；不支持的模型忽略）
+	SetThinking(enabled bool)
 }
 
 // Usage 模型调用 token 用量

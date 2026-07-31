@@ -45,3 +45,69 @@ log/
 
 # System
 .DS_Store
+
+# ===== v1.2 整理：根目录垃圾/构建产物/临时文件 =====
+# 备份与旧版 exe
+server.exe.bak
+server.exe.pre_designfix
+server.exe~
+server_new_new.exe
+server_new_new.exe~
+server_test
+ai-novel.exe
+server_build_err.txt
+server_build_out.txt
+server_err.txt
+server_err2.txt
+server_out.txt
+server_out2.txt
+server_test.log
+server_test_err.log
+temp.txt
+shot.png
+
+# 测试/部署脚本（历史遗留）
+test_*.ps1
+test_final.ps1
+pack.ps1
+run.ps1
+start_all.ps1
+start_local.ps1
+stop_all.ps1
+verify_fixes.ps1
+setup.ps1
+setup.bat
+run.bat
+
+# 历史报告/文档（保留 git 里已有的，忽略新生成的）
+*报告*.md
+*报告*.html
+*评测*.md
+*评测*.html
+*测试*.md
+*测试*.html
+AI生成样章_*.md
+前端主题切换_*.md
+测试Agent提示词_*.md
+github-credentials.html
+*.zip
+
+# 其他
+package-lock.json
+.DS_Store
+
+# ===== v1.2 补充：第三方参考/备份/临时 =====
+# 第三方参考项目（inkos-master 等，非本项目代码）
+同类型产品/
+前端ui设计图/
+新建文件夹/
+
+# 备份文件
+*.bak
+*.bak_*
+*.bak3
+*.bak-theme
+*.bak2
+
+# vendor/临时目录
+vendor/

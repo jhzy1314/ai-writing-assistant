@@ -1,16 +1,87 @@
-database:
-  postgres:
-    host: "localhost"
-    port: 5432
-    user: "postgres"
-    password: ""
-    dbname: "ai_novel"
-    sslmode: "disable"
+# ============================================================
+#  AI Novel Studio · 配置文件模板
+#  复制为 config.yaml 并修改即可使用
+# ============================================================
 
-llm:
-  openai:
-    api_key: "你的Key"
-    base_url: "https://api.deepseek.com"
-    model: "deepseek-chat"
-    embedding_model: "text-embedding-3-small"
-    max_tokens: 2048
+# ---- 外观/背景 ----
+appearance:
+    allowed_types:
+        - png
+        - jpg
+        - jpeg
+        - webp
+    backgrounds_dir: static/backgrounds
+    current_empty_bg: empty-state.svg
+    current_sider_bg: sider-texture.svg
+    current_sider_light_bg: sider-texture-light-2.svg
+    library:
+        - file: sider-texture.svg
+          name: 深色质感纹理
+          theme: dark
+          type: sider
+        - file: sider-texture-2.svg
+          name: 科技六边格
+          theme: dark
+          type: sider
+        - file: sider-texture-light.svg
+          name: 浅色质感纹理
+          theme: light
+          type: sider
+        - file: sider-texture-light-2.svg
+          name: 暖色波纹
+          theme: light
+          type: sider
+        - file: empty-state.svg
+          name: 极简空状态
+          theme: light
+          type: empty
+        - file: empty-state-2.svg
+          name: 文档卡片
+          theme: light
+          type: empty
+        - file: empty-state-3.svg
+          name: 禅意菱形
+          theme: light
+          type: empty
+    max_file_size: 5242880
+
+# ---- 模型配置（至少配一个付费API Key才能用AI生成） ----
+# 免费网页AI无需API Key，在软件内粘贴Cookie即可
+models:
+    - api_endpoint: https://api.deepseek.com
+      api_key: sk-your-deepseek-key-here    # 替换为你的真实Key
+      daily_limit: 0
+      name: deepseek-v4-pro
+      status: active
+      vendor: DeepSeek
+
+# ---- 配额与限制（可根据需要调整） ----
+quotas:
+    daily_call_limit: 500          # 每日最大调用次数
+    daily_token_limit: 2000000     # 每日最大Token消耗
+    light_input_char_limit: 500    # 轻量模式输入上限
+    max_concurrent: 5              # 最大并发请求
+    max_iterations: 3              # 校验修正最大轮数
+    per_request_token_limit: 32000 # 单请求上下文上限（0=不限制）
+    rate_limit_per_minute: 20      # 每分钟限流
+    warn_ratio: 0.8                # 预警比例
+
+# ---- 角色模型绑定（规划师/创作者/校验官/轻助手各自用哪个模型） ----
+role_models:
+    helper:
+        - deepseek-v4-pro
+    thinker:
+        - deepseek-v4-pro
+    verifier:
+        - deepseek-v4-pro
+    worker:
+        - deepseek-v4-pro
+
+# ---- 服务器配置 ----
+server:
+    auth_password: ""                    # 访问密码（留空=本机免密访问）
+    cookie_encrypt_key: ""              # Cookie加密密钥（留空自动生成）
+    listen_addr: 127.0.0.1              # 监听地址（仅本机）
+    log_dir: log                         # 日志目录
+    port: 8081                           # 服务端口
+    sqlite_path: data/ai-novel.db        # 数据库路径

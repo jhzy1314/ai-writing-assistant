@@ -30,7 +30,7 @@ func (s *Server) HandleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SSE 响应头
-	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	flusher, ok := w.(http.Flusher)

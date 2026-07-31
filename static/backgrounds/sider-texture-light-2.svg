@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f5f0eb"/>
+      <stop offset="50%" stop-color="#faf7f2"/>
+      <stop offset="100%" stop-color="#efe8e0"/>
+    </linearGradient>
+    <pattern id="waves" width="80" height="40" patternUnits="userSpaceOnUse">
+      <path d="M0 20 Q20 5 40 20 Q60 35 80 20" fill="none" stroke="rgba(180,150,120,0.05)" stroke-width="0.8"/>
+    </pattern>
+    <pattern id="cross" width="30" height="30" patternUnits="userSpaceOnUse">
+      <line x1="15" y1="0" x2="15" y2="30" stroke="rgba(200,170,140,0.025)" stroke-width="0.5"/>
+      <line x1="0" y1="15" x2="30" y2="15" stroke="rgba(200,170,140,0.025)" stroke-width="0.5"/>
+    </pattern>
+    <radialGradient id="glow" cx="70%" cy="20%" r="50%">
+      <stop offset="0%" stop-color="rgba(200,160,120,0.06)"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <rect width="100%" height="100%" fill="url(#waves)"/>
+  <rect width="100%" height="100%" fill="url(#cross)"/>
+  <rect width="100%" height="100%" fill="url(#glow)"/>
+</svg>

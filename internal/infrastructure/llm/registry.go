@@ -101,7 +101,7 @@ func (r *Registry) adapterForName(ctx context.Context, name string) (ModelAdapte
 	if m.Status != "active" {
 		return nil, fmt.Errorf("模型 %s 已停用", name)
 	}
-	a, err := NewOpenAICompatible(ctx, m.Vendor, m.APIKey, m.APIEndpoint, m.Name)
+	a, err := NewOpenAICompatible(ctx, m.Vendor, m.APIKey, m.APIEndpoint, m.Name, m.MaxTokens)
 	if err != nil {
 		return nil, err
 	}

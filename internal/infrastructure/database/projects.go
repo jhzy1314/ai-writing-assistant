@@ -11,26 +11,44 @@ type Project struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Type      string `json:"type"`
+	Outline   string `json:"outline"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
 
 // CreateProject 新建项目
 func (s *Store) CreateProject(ctx context.Context, name, typ string) (*Project, error) {
-	p := &Project{ID: newID(), Name: name, Type: typ, CreatedAt: now(), UpdatedAt: now()}
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO projects(id, name, type, created_at, updated_at) VALUES(?,?,?,?,?)`,
-		p.ID, p.Name, p.Type, p.CreatedAt, p.UpdatedAt)
+	exists, err := s.ProjectNameExists(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, fmt.Errorf("已存在同名项目「%s」，请更换名称", name)
+	}
+	p := &Project{ID: newID(), Name: name, Type: typ, Outline: "", CreatedAt: now(), UpdatedAt: now()}
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO projects(id, name, type, outline, created_at, updated_at) VALUES(?,?,?,?,?,?)`,
+		p.ID, p.Name, p.Type, p.Outline, p.CreatedAt, p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return p, nil
 }
 
+// ProjectNameExists 检查项目名称是否已存在
+func (s *Store) ProjectNameExists(ctx context.Context, name string) (bool, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM projects WHERE name=?`, name).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // ListProjects 列出全部项目（按更新时间倒序）
 func (s *Store) ListProjects(ctx context.Context) ([]Project, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, type, created_at, updated_at FROM projects ORDER BY updated_at DESC`)
+		`SELECT id, name, type, outline, created_at, updated_at FROM projects ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +56,7 @@ func (s *Store) ListProjects(ctx context.Context) ([]Project, error) {
 	out := []Project{}
 	for rows.Next() {
 		var p Project
-		if err := rows.Scan(&p.ID, &p.Name, &p.Type, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Type, &p.Outline, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -50,8 +68,8 @@ func (s *Store) ListProjects(ctx context.Context) ([]Project, error) {
 func (s *Store) GetProject(ctx context.Context, id string) (*Project, error) {
 	var p Project
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, type, created_at, updated_at FROM projects WHERE id=?`, id).
-		Scan(&p.ID, &p.Name, &p.Type, &p.CreatedAt, &p.UpdatedAt)
+		`SELECT id, name, type, outline, created_at, updated_at FROM projects WHERE id=?`, id).
+		Scan(&p.ID, &p.Name, &p.Type, &p.Outline, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -62,8 +80,8 @@ func (s *Store) GetProject(ctx context.Context, id string) (*Project, error) {
 }
 
 // UpdateProject 更新项目（nil 字段表示不更新）
-func (s *Store) UpdateProject(ctx context.Context, id string, name *string, typ *string) (*Project, error) {
-	if name == nil && typ == nil {
+func (s *Store) UpdateProject(ctx context.Context, id string, name *string, typ *string, outline *string) (*Project, error) {
+	if name == nil && typ == nil && outline == nil {
 		return s.GetProject(ctx, id)
 	}
 	setParts := []string{}
@@ -75,6 +93,10 @@ func (s *Store) UpdateProject(ctx context.Context, id string, name *string, typ 
 	if typ != nil {
 		setParts = append(setParts, "type=?")
 		args = append(args, *typ)
+	}
+	if outline != nil {
+		setParts = append(setParts, "outline=?")
+		args = append(args, *outline)
 	}
 	setParts = append(setParts, "updated_at=?")
 	args = append(args, now())

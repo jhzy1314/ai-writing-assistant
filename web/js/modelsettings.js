@@ -23,20 +23,204 @@ var ModelSettings = {
     return obj;
   })(),
   syncOnlineModels: null,
+  _tab: 'api',
   render: function () {
     var page = document.getElementById('page-models');
     if (!page) return;
+    var self = this;
     var models = Store.state.models || [];
-    page.innerHTML = '<div class="ghead" style="display:flex;align-items:center;gap:8px">' +
-      '模型配置列表' +
-      '<span class="link-btn" onclick="ModelSettings.showCreate()" title="新增自定义模型">＋ 新增</span>' +
+    page.innerHTML = '<div class="model-tabs" style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid var(--border)">' +
+      '<span class="model-tab" id="tabApi" style="padding:6px 16px;cursor:pointer;border-bottom:2px solid ' + (self._tab === 'api' ? 'var(--accent)' : 'transparent') + ';margin-bottom:-2px;font-weight:' + (self._tab === 'api' ? '600' : '400') + ';color:' + (self._tab === 'api' ? 'var(--accent)' : 'var(--text2)') + '" onclick="ModelSettings.switchTab(\'api\')">🔑 付费API</span>' +
+      '<span class="model-tab" id="tabWebai" style="padding:6px 16px;cursor:pointer;border-bottom:2px solid ' + (self._tab === 'webai' ? 'var(--accent)' : 'transparent') + ';margin-bottom:-2px;font-weight:' + (self._tab === 'webai' ? '600' : '400') + ';color:' + (self._tab === 'webai' ? 'var(--accent)' : 'var(--text2)') + '" onclick="ModelSettings.switchTab(\'webai\')">🌐 免费网页AI</span>' +
       '</div>' +
-      '<div class="model-list" id="modelList">' +
-      (models.length ? models.map(function (m) { return ModelSettings.modelCard(m); }).join('') : '<div class="res-check-empty">暂无模型，点击上方"新增"添加自定义 API 配置</div>') +
-      '</div>' +
+      '<div id="modelTabContent"></div>' +
       '<div class="ghead" style="margin-top:20px">Agent 角色模型分配</div>' +
       '<div class="role-assign-list" id="roleAssignList">加载中…</div>';
     ModelSettings.loadRoleAssignments();
+    self.switchTab(self._tab);
+  },
+  switchTab: function (tab) {
+    this._tab = tab;
+    var tabApi = document.getElementById('tabApi');
+    var tabWebai = document.getElementById('tabWebai');
+    if (tabApi) {
+      tabApi.style.borderBottomColor = tab === 'api' ? 'var(--accent)' : 'transparent';
+      tabApi.style.fontWeight = tab === 'api' ? '600' : '400';
+      tabApi.style.color = tab === 'api' ? 'var(--accent)' : 'var(--text2)';
+    }
+    if (tabWebai) {
+      tabWebai.style.borderBottomColor = tab === 'webai' ? 'var(--accent)' : 'transparent';
+      tabWebai.style.fontWeight = tab === 'webai' ? '600' : '400';
+      tabWebai.style.color = tab === 'webai' ? 'var(--accent)' : 'var(--text2)';
+    }
+    var ct = document.getElementById('modelTabContent');
+    if (!ct) return;
+    if (tab === 'api') { this.renderApiTab(ct); }
+    else { this.renderWebaiTab(ct); }
+  },
+  renderApiTab: function (ct) {
+    var models = Store.state.models || [];
+    ct.innerHTML = '<div class="ghead" style="display:flex;align-items:center;gap:8px">' +
+      '付费API模型' +
+      '<span class="link-btn" onclick="ModelSettings.showCreate()" title="新增自定义API模型">＋ 新增</span>' +
+      '</div>' +
+      '<div class="model-list" id="modelList">' +
+      (models.length ? models.map(function (m) { return ModelSettings.modelCard(m); }).join('') : '<div class="res-check-empty">暂无模型，点击"新增"添加 API 配置。或者切换到「免费网页AI」标签使用免费通道。</div>') +
+      '</div>';
+  },
+  renderWebaiTab: function (ct) {
+    var self = this;
+    ct.innerHTML = '<div class="ghead" style="display:flex;align-items:center;gap:8px">' +
+      '免费网页AI通道 <span style="font-size:10px;color:var(--muted)">（粘贴Cookie即可使用，零成本）</span>' +
+      '<span class="link-btn" onclick="ModelSettings.showWebaiCreate()" title="新增网页AI">＋ 新增</span>' +
+      '</div>' +
+      '<div style="font-size:10.5px;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:6px 8px;margin-bottom:6px">🪄 点下方模板的「自动获取」按钮，会自动打开浏览器窗口 → 你在窗口里登录网站 → Cookie 自动抓取并保存，全程无需手动复制。</div>' +
+      '<div id="webaiList" style="margin-top:8px"><div class="res-check-empty">加载中…</div></div>';
+    this.loadWebaiList();
+  },
+  loadWebaiList: async function () {
+    var el = document.getElementById('webaiList');
+    if (!el) return;
+    try {
+      var providers = await API.listWebAIProviders();
+      var models = Store.state.models || [];
+      var webaiModels = models.filter(function (m) { return m.model_type === 'webai' || m.vendor === 'webai' || (m.provider && m.provider.length > 0); });
+      // Also show models that are webai type
+      var html = '';
+      // Show built-in provider templates
+      var provKeys = Object.keys(providers);
+      if (provKeys.length > 0) {
+        html += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">内置免费模板（选择一个粘贴Cookie即可使用）：</div>';
+        provKeys.forEach(function (key) {
+          var p = providers[key];
+          html += '<div class="webai-provider-card" style="background:var(--panel2);border:1px solid var(--border);border-radius:7px;padding:10px;margin-bottom:8px">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between">' +
+            '<div><b style="color:var(--accent)">' + esc(p.name || key) + '</b>' +
+            '<div style="font-size:10px;color:var(--muted)">端点：' + esc(p.baseURL || '') + '</div></div>' +
+            '<div style="display:flex;gap:6px">' +
+            '<button class="btn btn-primary btn-sm" onclick="ModelSettings.autoCookie(\'' + key + '\',\'' + esc(p.name) + '\',\'' + esc(p.baseURL || '') + '\')" style="font-size:11px">🪄 自动获取</button>' +
+            '<button class="btn btn-ghost btn-sm" onclick="ModelSettings.showWebaiQuickSetup(\'' + key + '\',\'' + esc(p.name) + '\',\'' + esc(p.baseURL || '') + '\')" style="font-size:11px">✍️ 手动填写</button>' +
+            '</div></div></div>';
+        });
+      }
+      // Show existing webai models
+      var wmodels = Store.state.models.filter(function (m) { return m.vendor === 'kimi' || m.vendor === 'doubao' || m.provider; });
+      if (wmodels.length > 0) {
+        html += '<div style="font-size:11px;color:var(--muted);margin:10px 0 4px">已配置的网页AI：</div>';
+        wmodels.forEach(function (m) {
+          html += '<div class="model-card" style="margin-bottom:6px">' +
+            '<div class="mc-head"><span class="mc-name">' + esc(m.name) + '</span><span class="mc-vendor">' + esc(m.vendor || '') + '</span></div>' +
+            '<div class="mc-acts">' +
+            '<button class="tool-btn" onclick="ModelSettings.testWebaiConnect(\'' + m.id + '\')">🔗 测试</button>' +
+            '<button class="tool-btn danger" onclick="ModelSettings.delModel(\'' + m.id + '\')">🗑 删除</button>' +
+            '</div></div>';
+        });
+      }
+      if (!provKeys.length && !wmodels.length) {
+        html += '<div class="res-check-empty">加载免费AI模板失败，请检查网络或服务状态。</div>';
+      }
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = '<div class="res-check-empty">加载失败：' + esc(e.message) + '</div>';
+    }
+  },
+  showWebaiQuickSetup: function (providerKey, name, baseURL) {
+    var idn = 'wa_' + uid();
+    UI.modal({
+      title: '配置免费网页AI：' + name,
+      body: '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">在浏览器中打开 ' + esc(name) + ' 网站，按F12打开开发者工具→应用→Cookies→复制对应Cookie值</div>' +
+        '<div class="form-group"><label>模型名称</label><input id="' + idn + '_name" value="' + esc(name) + '免费版" placeholder="模型名称"></div>' +
+        '<div class="form-group"><label>Cookie值 *</label><input id="' + idn + '_cookie" type="password" placeholder="粘贴从浏览器复制的Cookie"></div>' +
+        '<div class="form-group"><label>请求地址</label><input id="' + idn + '_url" value="' + esc(baseURL) + '" placeholder="网页AI接口地址"></div>' +
+        '<div class="form-group"><label>模型标识</label><input id="' + idn + '_model" placeholder="网页AI内部模型名（可选）"></div>',
+      actions: [
+        { id: 'cancel', label: '取消' },
+        { id: 'ok', label: '保存', cls: 'btn-primary', onClick: async function (m, ov) {
+          var cname = document.getElementById(idn + '_name').value.trim();
+          var cookie = document.getElementById(idn + '_cookie').value.trim();
+          var url = document.getElementById(idn + '_url').value.trim();
+          var model = document.getElementById(idn + '_model').value.trim();
+          if (!cname || !cookie) { UI.toast('模型名称和Cookie必填', 'warn'); return; }
+          try {
+            await API.createWebAIModel({ name: cname, provider: providerKey, cookie: cookie, request_url: url, model_type: 'webai', vendor: providerKey, model_name: model });
+            ov.remove();
+            await ModelSettings.loadAll();
+            ModelSettings._tab = 'webai';
+            ModelSettings.render();
+            UI.toast('网页AI已配置', 'success');
+          } catch (e) { UI.toast('保存失败：' + e.message, 'error'); }
+        }}
+      ]
+    });
+  },
+  testWebaiConnect: async function (id) {
+    var m = Store.state.models.find(function (x) { return x.id === id; });
+    UI.toast('正在测试「' + (m ? m.name : id) + '」…', 'info');
+    try {
+      var r = await API.testWebAIModel({ provider: m ? m.vendor : '', cookie: m ? m.api_key : '', request_url: m ? m.api_endpoint : '' });
+      UI.toast('连接成功', 'success');
+    } catch (e) { UI.toast('连接失败：' + e.message, 'error'); }
+  },
+  // 自动抓取网页AI Cookie：启动浏览器 → 用户登录 → 轮询抓取 → 自动保存模型
+  autoCookie: async function (providerKey, name, baseURL) {
+    var self = this;
+    if (this._cookieBusy) { UI.toast('已有抓取任务进行中', 'warn'); return; }
+    this._cookieBusy = true;
+    try {
+      var s = await API.autoCookieStart(providerKey);
+    } catch (e) { this._cookieBusy = false; UI.toast('启动浏览器失败：' + e.message, 'error'); return; }
+    var sid = s.session_id;
+    var t0 = Date.now();
+    var m = UI.modal({
+      title: '🪄 自动获取 Cookie：' + name,
+      body: '<div style="font-size:12px;line-height:1.8">' +
+        '<div>1️⃣ 系统已打开 <b>' + esc(name) + '</b> 的浏览器窗口</div>' +
+        '<div>2️⃣ 请在窗口中<b>登录你的账号</b>（登录后会自动跳转回聊天页）</div>' +
+        '<div>3️⃣ 登录成功后 Cookie 将<b>自动抓取并保存</b>，无需手动操作</div>' +
+        '<div style="color:var(--muted);font-size:11px;margin-top:6px" id="acStatus">⏳ 等待登录…（10分钟内有效）</div>' +
+        '<div style="color:#e6a23c;font-size:11px;margin-top:4px">⚠️ 若窗口意外消失：直接点下方「关闭窗口」再重新点「自动获取」即可</div></div>',
+      actions: [{ id: 'close', label: '关闭窗口（取消）' }]
+    });
+    var iv = setInterval(async function () {
+      try {
+        var r = await API.autoCookiePoll(sid);
+        if (r.status === 'completed' && r.cookie) {
+          clearInterval(iv);
+          self._cookieBusy = false;
+          m.overlay.remove();
+          try {
+            await API.createWebAIModel({ name: name, provider: providerKey, cookie: r.cookie, request_url: baseURL, model_type: 'webai', vendor: providerKey });
+            await ModelSettings.loadAll();
+            UI.toast('✅ Cookie 抓取成功，已保存「' + name + '」', 'success');
+          } catch (e2) { UI.toast('保存失败：' + e2.message, 'error'); }
+        } else if (r.status === 'failed') {
+          clearInterval(iv);
+          self._cookieBusy = false;
+          UI.toast('抓取失败：' + (r.error || '未知错误'), 'error');
+        } else if (r.status === 'pending' || r.status === 'running') {
+          // 实时更新等待状态：已用时间 + 检测到的 Cookie 数
+          var el = document.getElementById('acStatus');
+          if (el) {
+            var sec = Math.floor((Date.now() - t0) / 1000);
+            var mm = Math.floor(sec / 60), ss = sec % 60;
+            var det = (r.detected_cookies != null && r.detected_cookies > 0)
+              ? ' · 已检测到 ' + r.detected_cookies + ' 个 Cookie（等待登录态）' : '';
+            el.textContent = '⏳ 等待登录… 已等待 ' + mm + '分' + (ss < 10 ? '0' : '') + ss + '秒' + det + '（10分钟内有效）';
+          }
+        }
+      } catch (e) { /* 轮询中，忽略瞬时错误 */ }
+    }, 2000);
+    // 窗口关闭时取消
+    m.overlay.querySelector('[data-act]').onclick = function () {
+      clearInterval(iv);
+      API.autoCookieCancel(sid).catch(function () {});
+      self._cookieBusy = false;
+      m.overlay.remove();
+      UI.toast('已取消抓取', 'warn');
+    };
+  },
+  showWebaiCreate: function () {
+    this.showCreate();
   },
   modelCard: function (m) {
     var isCustom = m.is_custom === 1;
@@ -333,8 +517,10 @@ var ModelSettings = {
   showQuickKey: function () {
     var models = Store.state.models || [];
     var active = models.filter(function (m) { return m.status === 'active'; });
-    var dsModel = models.find(function (m) { return m.name === 'deepseek-v4-pro'; }) || {};
-    var maskedKey = dsModel.api_key ? (dsModel.api_key.substring(0, 5) + '…' + dsModel.api_key.slice(-4)) : '未设置';
+    // 查找任意已配置 key 的模型（不限于 deepseek-v4-pro），用于展示密钥状态
+    var keyedModel = models.find(function (m) { return m.api_key && m.api_key.length >= 8; }) || {};
+    var maskedKey = keyedModel.api_key ? (keyedModel.api_key.substring(0, 5) + '…' + keyedModel.api_key.slice(-4)) : '未设置（请在下方面板配置）';
+    var keyModelName = keyedModel.name || '';
 
     var idn = 'qk_' + uid();
     UI.modal({

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0ece8"/>
+      <stop offset="100%" stop-color="#e8e2da"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(160,140,120,0.04)" stroke-width="0.5"/>
+    </pattern>
+    <radialGradient id="glow" cx="50%" cy="50%" r="45%">
+      <stop offset="0%" stop-color="rgba(200,170,140,0.05)"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+  <rect width="100%" height="100%" fill="url(#glow)"/>
+  <g opacity="0.08" transform="translate(400,280)">
+    <rect x="-140" y="-100" width="280" height="200" rx="16" fill="none" stroke="#8a7a6a" stroke-width="1.5"/>
+    <rect x="-100" y="-70" width="200" height="16" rx="4" fill="#8a7a6a"/>
+    <rect x="-100" y="-44" width="160" height="8" rx="4" fill="#8a7a6a"/>
+    <rect x="-100" y="-28" width="120" height="8" rx="4" fill="#8a7a6a"/>
+    <rect x="-100" y="-12" width="180" height="8" rx="4" fill="#8a7a6a"/>
+    <circle cx="100" cy="-70" r="10" fill="none" stroke="#8a7a6a" stroke-width="1.2"/>
+  </g>
+</svg>

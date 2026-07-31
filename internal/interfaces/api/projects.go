@@ -27,12 +27,27 @@ func (s *Server) HandleCreateProject(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if strings.TrimSpace(req.Name) == "" {
-		writeError(w, http.StatusBadRequest, "name 不能为空")
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "项目名称不能为空")
 		return
 	}
-	p, err := s.store.CreateProject(r.Context(), strings.TrimSpace(req.Name), strings.TrimSpace(req.Type))
+	if len([]rune(name)) > 100 {
+		writeError(w, http.StatusBadRequest, "项目名称不能超过100字")
+		return
+	}
+	name = sanitizeName(name)
+	typ := strings.TrimSpace(req.Type)
+	if len([]rune(typ)) > 50 {
+		typ = string([]rune(typ)[:50])
+	}
+	p, err := s.store.CreateProject(r.Context(), name, typ)
 	if err != nil {
+		// 修复：重名等业务性错误应返回 400（客户端可处理），而非 500（服务器错误）
+		if strings.Contains(err.Error(), "已存在同名项目") {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -71,14 +86,23 @@ func (s *Server) HandleGetProject(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleUpdateProject(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var req struct {
-		Name *string `json:"name"`
-		Type *string `json:"type"`
+		Name    *string `json:"name"`
+		Type    *string `json:"type"`
+		Outline *string `json:"outline"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	p, err := s.store.UpdateProject(r.Context(), id, req.Name, req.Type)
+	if req.Name != nil {
+		n := sanitizeName(strings.TrimSpace(*req.Name))
+		if len([]rune(n)) > 100 {
+			writeError(w, http.StatusBadRequest, "项目名称不能超过100字")
+			return
+		}
+		req.Name = &n
+	}
+	p, err := s.store.UpdateProject(r.Context(), id, req.Name, req.Type, req.Outline)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

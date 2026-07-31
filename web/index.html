@@ -1,10 +1,16 @@
-<!DOCTYPE html>
+?<!DOCTYPE html>
 <html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="UTF-8">
+<script>/* 首屏防闪烁：绘制前恢复已保存主题（默认经典深色） */
+(function(){try{var _t=localStorage.getItem('aiNovel.theme');if(_t==='dark'||_t==='light'||_t==='ink-study'||_t==='gold'||_t==='focus'||_t==='paper-ink'){document.documentElement.setAttribute('data-theme',_t);}}catch(e){}})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Novel Studio v1.1 · 多模型协同创作</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="/static/css/beautify.css">
+<link rel="stylesheet" href="/static/css/themes.css">
+<link rel="stylesheet" href="/static/css/polish.css">
 <script type="importmap">
 {
   "imports": {
@@ -29,7 +35,7 @@ window.initTiptap = async function () {
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Underline,
-      Placeholder.configure({ placeholder: '开始创作...' })
+      Placeholder.configure({ placeholder: '📝 开始创作...' })
     ],
     content: '',
     editorProps: { attributes: { class: 'editor-rich', spellcheck: 'false' } }
@@ -42,26 +48,29 @@ window.initTiptap = async function () {
 </script>
 </head>
 <body>
-
+<div id="offlineBar" style="display:none;background:#b45309;color:#fff;text-align:center;padding:4px;font-size:12px">🌐 网络已断开 —— AI生成和在线背景不可用，本地写作和数据保存正常</div>
 <!-- ============ Top quota bar ============ -->
 <div class="quota-bar">
   <div class="brand"><span class="logo">✦</span><span>AI Novel Studio</span></div>
-  <div class="quota-usage" id="quotaCalls">
-    <span>今日调用</span><b id="qCalls">0</b><span>/</span><span id="qCallsLimit">500</span>
-    <div class="quota-meter" id="qCallsMeter"><i style="width:0%"></i></div>
+  <div class="quota-usage quota-mini" id="quotaCalls" title="今日调用额度（悬停查看）">
+    <span style="font-size:9px;opacity:.7">调用</span> <b id="qCalls">0</b>/<span id="qCallsLimit">500</span>
   </div>
-  <div class="quota-usage" id="quotaTokens" title="悬停查看各角色Token消耗明细">
-    <span>Token</span><b id="qTokens">0</b><span>/</span><span id="qTokensLimit">2,000,000</span>
-    <div class="quota-meter" id="qTokensMeter"><i style="width:0%"></i></div>
+  <div class="quota-usage quota-mini" id="quotaTokens" title="悬停查看各角色Token消耗明细">
+    <span style="font-size:9px;opacity:.7">Token</span> <b id="qTokens">0</b>/<span id="qTokensLimit">2,000,000</span>
     <div class="quota-role-breakdown" id="quotaRoleBreakdown" style="display:none;position:absolute;top:100%;right:0;background:var(--panel2);border-radius:6px;padding:6px 10px;font-size:10px;white-space:nowrap;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
   </div>
   <div class="spacer"></div>
   <span class="tool" id="usageHint"></span>
   <span class="tool" onclick="ModelSettings.showQuickKey()" title="配置 API 密钥和模型" style="color:var(--accent);font-weight:600">🔑 API</span>
   <span class="tool" onclick="UI.showToastHistory()" title="通知历史">🔔</span>
-  <div class="tool" id="themeToggle" title="切换主题" onclick="UI.toggleTheme()">🌙 深色</div>
+  <div class="tool" id="themeToggle" title="切换主题" onclick="Themes.toggleMenu(event)">🌙 深色</div>
+  <span class="tool" title="字体大小">
+    <input type="range" id="fontSizeSlider" min="12" max="22" value="15" style="width:60px;height:16px;cursor:pointer;vertical-align:middle" oninput="UI.setFontSize(this.value)">
+    <span id="fontSizeLabel" style="font-size:10px;vertical-align:middle">15</span>
+  </span>
   <div class="tool" id="cleanToggle" title="纯净模式" onclick="UI.toggleClean()">🧼 纯净</div>
 </div>
+
 
 <div class="app">
 
@@ -73,10 +82,20 @@ window.initTiptap = async function () {
       <div class="collapse-btn" onclick="UI.toggleSidebar()" title="折叠">◀</div>
     </div>
     <div class="side-search">
-      <input type="text" id="searchInput" placeholder="🔍 搜索项目或资源…" oninput="Sidebar.filter(this.value)">
+      <input type="text" id="searchInput" placeholder="🔍 搜索项目或资源" oninput="Sidebar.filter(this.value)">
     </div>
     <div class="side-new">
       <button class="btn btn-primary btn-block" onclick="ProjectUI.showCreate()">＋ 新建项目</button>
+    </div>
+
+    <!-- Page navigation -->
+    <div class="side-nav">
+      <a class="nav-link active" data-page="editor" onclick="Router.navigate('editor')">✍️ 编辑器</a>
+      <a class="nav-link" data-page="outline" onclick="Router.navigate('outline')">🌳 章节大纲</a>
+      <a class="nav-link" data-page="characters" onclick="Router.navigate('characters')">👤 人物卡</a>
+      <a class="nav-link" data-page="worldbuilding" onclick="Router.navigate('worldbuilding')">🌍 世界观</a>
+      <a class="nav-link" data-page="toolbox" onclick="Router.navigate('toolbox')">🧰 AI工具箱</a>
+      <a class="nav-link" data-page="dashboard" onclick="Router.navigate('dashboard')">📊 仪表盘</a>
     </div>
 
     <div class="side-section novels">
@@ -84,6 +103,7 @@ window.initTiptap = async function () {
       <div class="novel-list" id="novelList">
         <div class="side-empty">暂无项目<br>点击上方按钮创建</div>
       </div>
+      <div id="archivedBox" style="display:none;margin-top:8px"></div>
     </div>
 
       <div class="side-section resources" id="resourceSection">
@@ -95,26 +115,32 @@ window.initTiptap = async function () {
 
   <!-- ================= Main ================= -->
   <main class="main">
-    <div class="side-toggle" onclick="UI.toggleSidebar()" title="展开/折叠侧栏">▶</div>
+    <div class="side-toggle" onclick="UI.toggleSidebar()" title="展开/折叠侧栏">◀</div>
     <div class="right-toggle" onclick="UI.toggleRight()" title="展开/折叠控制面板">◀</div>
 
+    <!-- ================= Router Page: Editor ================= -->
+    <div class="router-page show" id="routerPage-editor">
     <header class="topbar">
       <input type="hidden" id="targetWord" value="1000">
       <span class="doc-title" id="docTitle">未选择稿件</span>
-      <button class="tool-btn" id="btnAutoTitle" title="AI 生成标题" style="display:none" onclick="Composer.autoTitle()">✨ 拟标题</button>
+      <button class="tool-btn" id="btnAutoTitle" title="AI 生成标题" style="display:none" onclick="Composer.autoTitle()">✍️拟标题</button>
       <button class="tool-btn" onclick="ChapterUI.searchAllChapters()" title="全文搜索 (Ctrl+F)">🔍</button>
       <span class="doc-meta" id="docMeta"></span>
       <div class="spacer"></div>
       <div class="grp">
         <select id="modeSelect" title="创作模式" onchange="Composer.onModeChange(this.value)">
-          <option value="auto">智能协同</option>
-          <option value="orchestrated">指派Agent模型</option>
-          <option value="collab">协同闭环</option>
-          <option value="draft">快速草稿</option>
-          <option value="strict">严谨模式</option>
-          <option value="art">文艺创作</option>
-          <option value="light">轻量快速</option>
-          <option value="manual">手动自选模型</option>
+          <optgroup label="常用">
+            <option value="auto">智能协同（推荐）</option>
+            <option value="draft">快速草稿</option>
+            <option value="orchestrated">指派Agent模型</option>
+            <option value="manual">手动自选模型</option>
+          </optgroup>
+          <optgroup label="进阶">
+            <option value="strict">严谨模式</option>
+            <option value="art">文艺创作</option>
+            <option value="collab">协同闭环</option>
+            <option value="light">轻量快捷</option>
+          </optgroup>
         </select>
         <select id="modelSelect" style="display:none" title="选择模型"></select>
         <div id="orchestratedModels" style="display:none;background:var(--panel2);border-radius:6px;padding:6px 10px;margin-left:8px"></div>
@@ -130,16 +156,20 @@ window.initTiptap = async function () {
         <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="禁止AI改写已有前文">
           <input type="checkbox" id="noRewriteToggle" onchange="Composer.onNoRewriteChange()"> <span>禁改写</span>
         </label>
-        <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer;margin-left:6px" title="关闭需求-字数双层校验（重新开启需刷新页面或重新选中项目）">
+        <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer;margin-left:6px" title="关闭需求字数双层校验（重新开启需刷新页面或重新选中项目）">
           <input type="checkbox" id="skipWordCheck" onchange="Composer.onSkipWordCheck(this.checked)"> <span>跳过字数校验</span>
+        </label>
+        <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer;margin-left:6px" title="一键全开/全关思考。默认推荐：仅规划师开（快）；全开=所有角色都思考（更慢但更稳）">
+          <input type="checkbox" id="thinkingToggle" onchange="Composer.onThinkingChange(this.checked)"> <span>🧠 思考·全开</span>
         </label>
       </div>
       <span class="tool-divider"></span>
       <div class="grp">
         <button class="tool-btn on" id="modeRichBtn" onclick="Editor.setMode('rich')" title="富文本模式">📝</button>
-        <button class="tool-btn" id="modeMdBtn" onclick="Editor.setMode('markdown')" title="Markdown 模式">⇥</button>
+        <button class="tool-btn" id="modeMdBtn" onclick="Editor.setMode('markdown')" title="Markdown 模式">#</button>
         <button class="tool-btn" id="previewBtn" onclick="Editor.togglePreview()" title="阅读预览（原生排版）">📖</button>
         <button class="tool-btn" id="focusBtn" onclick="Editor.toggleFocus()" title="专注模式（折叠侧栏，全屏创作）">🎯</button>
+        <button class="tool-btn" id="deAIfyBtn" onclick="Editor.deAIfy()" title="去AI味：检测并润色消除AI痕迹">✨去AI味</button>
       </div>
     </header>
 
@@ -148,12 +178,12 @@ window.initTiptap = async function () {
       <span class="mcb-nav" onclick="ChapterUI.prevChapter()" title="上一章">◀</span>
       <div class="mcb-chapter" onclick="MobileUI.showChapterPicker()">
         <span class="mcb-name" id="mcbName">未选择章节</span>
-        <span class="mcb-arrow">▾</span>
+        <span class="mcb-arrow">▶</span>
       </div>
       <span class="mcb-nav" onclick="ChapterUI.nextChapter()" title="下一章">▶</span>
       <div class="mcb-acts">
         <span class="link-btn" onclick="ChapterUI.addChapter()" title="新建章节">＋</span>
-        <span class="link-btn" onclick="ChapterUI.renameChapter(Store.state.currentChapter?Store.state.currentChapter.id:'')" title="重命名">✏</span>
+        <span class="link-btn" onclick="ChapterUI.renameChapter(Store.state.currentChapter?Store.state.currentChapter.id:'')" title="重命名">✎</span>
         <span class="link-btn" onclick="ChapterUI.delChapter(Store.state.currentChapter?Store.state.currentChapter.id:'')" title="删除">✕</span>
       </div>
     </div>
@@ -167,39 +197,64 @@ window.initTiptap = async function () {
         <button class="tool-btn" onclick="Editor.insertH('## ')" title="二级标题">H2</button>
         <button class="tool-btn" onclick="Editor.insertH('### ')" title="三级标题">H3</button>
         <span class="tool-divider"></span>
-        <button class="tool-btn" onclick="ManualSave.saveDraft()" title="保存为版本 (Ctrl+S)">💾 保存版本</button>
+        <button class="tool-btn" onclick="ManualSave.saveDraft()" title="保存为版本(Ctrl+S)">💾 保存版本</button>
         <button class="tool-btn" onclick="VersionUI.open()" title="版本历史">📜 版本历史</button>
-        <button class="tool-btn" onclick="ChapterUI.splitChapterAtCursor()" title="从光标处拆分章节">✂ 拆分</button>
-        <button class="tool-btn on" id="btnCursorCont" onclick="Composer.continueFromCursor()" title="从光标位置续写">▶ 从光标续写</button>
-        <button class="tool-btn" id="previewBtn" onclick="Editor.togglePreview()" title="实时预览">👁 预览</button>
+        <span class="tool-divider"></span>
+        <button class="tool-btn" onclick="ChapterUI.splitChapterAtCursor()" title="从光标处拆分章节">✂️拆分</button>
+        <button class="tool-btn on" id="btnCursorCont" onclick="Composer.continueFromCursor()" title="从光标位置续写">✍️从光标续写</button>
+        <button class="tool-btn" id="previewBtn2" onclick="Editor.togglePreview()" title="实时预览">👁 预览</button>
         <span class="tool-divider"></span>
         <button class="tool-btn" onclick="ChapterUI.prevChapter()" title="上一章">◀ 上一章</button>
         <button class="tool-btn" onclick="ChapterUI.nextChapter()" title="下一章">下一章 ▶</button>
+        <span class="tool-divider"></span>
         <span class="tool-right">
-          <button class="tool-btn" onclick="Editor.importFile()" title="导入文档">📥 导入</button>
-          <button class="tool-btn" onclick="Editor.exportFile()" title="导出文档">📤 导出</button>
-          <button class="tool-btn" onclick="ResourceUI.summarizeSettings()" title="AI 从正文提取人物卡和世界观">🤖 AI 总结</button>
-          <button class="tool-btn" onclick="Editor.cleanAIFiller()" title="清理 AI 多余话术">🧹 净化</button>
+          <div class="more-menu-wrap" id="moreMenuWrap">
+            <button class="tool-btn" onclick="Editor.toggleMoreMenu(event)" title="更多工具">⋯ 更多</button>
+            <div class="more-menu" id="moreMenu" style="display:none">
+              <button class="tool-btn mm-item" onclick="Editor.importFile()">📥 导入文档</button>
+              <button class="tool-btn mm-item" onclick="Editor.exportFile()">📤 导出文档</button>
+              <button class="tool-btn mm-item" onclick="ResourceUI.summarizeSettings()">🤖 AI 总结（提取人物卡/世界观）</button>
+              <button class="tool-btn mm-item" onclick="Editor.cleanAIFiller()">🧹 净化（清理AI多余话术）</button>
+            </div>
+          </div>
         </span>
         <div class="wc">
           <span>字数 <b id="wcNow">0</b></span>
           <span>字符 <b id="charNow">0</b></span>
-          <span id="draftSavedTag" style="display:none;color:var(--success)">✓ 已自动保存</span>
+          <span id="draftSavedTag" style="display:none;color:var(--success)">✓已自动保存</span>
         </div>
       </div>
 
       <div class="editor-stage" id="editorStage">
         <div class="editor-pane" id="editorPane">
+          <div class="empty-guide" id="emptyGuide">
+            <div class="eg-card">
+              <button class="eg-close" onclick="Editor.dismissGuide(event)" title="关闭引导（不再自动显示）">✕</button>
+              <div class="eg-badge">📖 AI Novel Studio</div>
+              <h2 class="eg-title">开始你的第一部小说</h2>
+              <p class="eg-sub">三步完成第一篇 AI 协同创作：</p>
+              <div class="eg-steps">
+                <div class="eg-step"><span class="eg-num">1</span><div><b>新建项目</b><small>左侧「＋ 新建项目」，填写书名与题材</small></div></div>
+                <div class="eg-step"><span class="eg-num">2</span><div><b>写下创作需求</b><small>在底部输入框描述剧情，选择目标字数</small></div></div>
+                <div class="eg-step"><span class="eg-num">3</span><div><b>点击生成</b><small>AI 自动完成 构思大纲 → 动笔写作 → 审稿修正</small></div></div>
+              </div>
+              <div class="eg-actions">
+                <button class="btn btn-primary" onclick="ProjectUI.showCreate()">＋ 新建项目</button>
+                <button class="tool-btn" onclick="TemplateUI.quickOpen()">📚 查看模板</button>
+              </div>
+              <p class="eg-tip">已有项目？点击左侧项目名直接进入编辑</p>
+            </div>
+          </div>
           <div class="editor-inner">
             <div class="editor-rich" id="editorRich" spellcheck="false" oninput="Editor.onInput()" onkeyup="Editor.onSelection()" onmouseup="Editor.onSelection()"></div>
             <textarea class="editor-md" id="editorMd" style="display:none" spellcheck="false" oninput="Editor.onInput()" onmouseup="Editor.onSelection()" onkeyup="Editor.onSelection()"></textarea>
         </div>
         <div class="gen-actions" id="genActions" style="display:none">
           <span class="gen-act-hint">生成完成，选择操作：</span>
-          <button class="tool-btn" onclick="Editor.insertGeneratedAtCursor()" title="插入到光标位置">📍 插入光标处</button>
-          <button class="tool-btn" onclick="Editor.appendGeneratedToEnd()" title="追加到当前章节末尾">📎 追加到末尾</button>
-          <button class="tool-btn undo-btn" onclick="Editor.undoGenerated()" title="撤销本次自动追加（恢复生成前内容）">↩ 撤销</button>
-          <button class="tool-btn" onclick="Editor.discardGenerated()" title="丢弃生成内容">✕ 丢弃</button>
+          <button class="tool-btn" onclick="Editor.insertGeneratedAtCursor()" title="插入到光标位置">📌 插入光标处</button>
+          <button class="tool-btn" onclick="Editor.appendGeneratedToEnd()" title="追加到当前章节末尾">📥 追加到末尾</button>
+          <button class="tool-btn undo-btn" onclick="Editor.undoGenerated()" title="撤销本次自动追加（恢复生成前内容）">↩️撤销</button>
+          <button class="tool-btn" onclick="Editor.discardGenerated()" title="丢弃生成内容">🗑丢弃</button>
         </div>
       </div>
         <div class="preview-pane" id="previewPane">
@@ -223,27 +278,40 @@ window.initTiptap = async function () {
       <span>全书 <b id="sbTotalWords">0</b> 字</span>
       <span>本章 <b id="sbChapterWords">0</b> 字</span>
       <span class="spacer"></span>
-      <span id="sbSavedTag">已保存 ✓</span>
+      <span id="sbSavedTag">已保存</span>
     </div>
 
     <div class="composer">
       <div class="gen-status" id="genStatus">
         <span class="spin"></span>
         <span id="genStatusText">正在生成…</span>
+        <div class="gen-progress" id="genProgress" style="display:none">
+          <div class="gen-progress-top"><span id="genProgStage">准备中…</span><span id="genProgText"></span></div>
+          <div class="gen-progress-track"><i id="genProgBar" style="width:0%"></i></div>
+        </div>
         <button class="gen-stop" onclick="SSE.stop()">■ 终止</button>
       </div>
       <div class="composer-inner" id="composerInner">
         <textarea id="instructionInput" placeholder="💡 输入创作需求或选中文字后使用快捷指令…（Ctrl+Enter 发送）" oninput="Editor.syncInstructionHeight(this)" onkeydown="if(event.ctrlKey&amp;&amp;event.key==='Enter'){event.preventDefault();Composer.generate()}"></textarea>
         <textarea id="genOutline" class="outline-input" rows="2" placeholder="📝 手动填写本章或全书大纲（选填），留空则由 AI 生成" oninput="Composer.onOutlineChange()"></textarea>
-        <button class="tool-btn" onclick="TemplateUI.quickOpen()" title="模板库">📚</button>
-        <input class="mini-input" type="number" id="targetWordMini" value="1000" min="100" max="20000" step="100">
-        <button class="btn btn-primary btn-gen" id="btnGenerate" onclick="Composer.generate()">✨ 生成</button>
+        <div class="gen-main-row">
+          <button class="btn btn-primary btn-gen" id="btnGenerate" onclick="Composer.generate()">✨ 生成</button>
+          <button class="tool-btn gen-opt-toggle" onclick="Composer.toggleGenOptions(event)" title="更多生成选项">⚙️ 选项</button>
+        </div>
+        <div class="gen-opts" id="genOpts" style="display:none">
+          <button class="tool-btn" style="font-size:10px;margin-right:4px" onclick="ChapterUI.batchFromOutline()" title="根据大纲批量创建空白章节">📋 批量建章</button>
+          <button class="tool-btn" onclick="TemplateUI.quickOpen()" title="模板库">📚 模板</button>
+          <button class="tool-btn" onclick="Composer.previewRAG(event)" title="预览 AI 将参考的书中相关记忆（长篇小说连贯性）">🧠 相关记忆</button>
+          <span style="font-size:10px;color:var(--muted)" title="目标字数">目标字数</span>
+          <input class="mini-input" type="number" id="targetWordMini" value="1000" min="100" max="20000" step="100" title="目标字数">
+        </div>
       </div>
+      <div id="ragPreview" class="rag-preview" style="display:none"></div>
       <div class="composer-hint">
         <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> 发送</span>
         <span><kbd>Ctrl</kbd>+<kbd>S</kbd> 保存版本</span>
         <span><kbd>Esc</kbd> 终止生成</span>
-        <span class="composer-adv-toggle" onclick="this.parentElement.classList.toggle('show-adv')" title="高级选项">⚙</span>
+        <span class="composer-adv-toggle" onclick="this.parentElement.classList.toggle('show-adv')" title="高级选项">⚙️</span>
         <span class="composer-adv-row">
           <span style="color:var(--muted)">字数</span>
           <input type="range" id="targetWordSlider" min="100" max="10000" value="1000" step="100" style="width:70px;height:14px;cursor:pointer" oninput="Composer.onSliderChange()" title="目标字数">
@@ -260,21 +328,664 @@ window.initTiptap = async function () {
           <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="生成后自动追加到章节末尾">
             <input type="checkbox" id="autoAppendToggle" checked onchange="Composer.onAutoAppendChange()"> 追加
           </label>
+          <span class="tool-divider"></span>
+          <span style="font-size:10px;color:var(--muted)" title="推荐配置：仅规划师开思考（大纲质量最关键）；写作/审稿/轻活关（实测审稿思考开销极大，不划算）。可单独调整">🧠角色思考</span>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="规划师：构思大纲与剧情节点（动脑收益最大）">
+            <input type="checkbox" id="thinkThinker" checked onchange="Composer.onRoleThinkingChange('thinker', this.checked)"> 规划
+          </label>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="写作：正文创作（推荐关闭——写作是执行任务，思考收益小且更慢）">
+            <input type="checkbox" id="thinkWorker" onchange="Composer.onRoleThinkingChange('worker', this.checked)"> 写作
+          </label>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="审稿：质量校验（推荐关闭——实测审稿思考开销极大：审 700 字要 2.5 分钟，性价比低）">
+            <input type="checkbox" id="thinkVerifier" onchange="Composer.onRoleThinkingChange('verifier', this.checked)"> 审稿
+          </label>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="轻活：缩写/摘要/改写等小任务（推荐关闭——简单执行不需要思考）">
+            <input type="checkbox" id="thinkHelper" onchange="Composer.onRoleThinkingChange('helper', this.checked)"> 轻活
+          </label>
+          <span style="font-size:10px;color:var(--accent);margin-left:2px">推荐：仅规划开</span>
         </span>
-        <span id="modeHint" style="margin-left:auto;color:var(--accent)"></span>
+        <span id="modeHint" style="margin-left:auto;color:var(--accent);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%;flex-shrink:1"></span>
       </div>
+    </div>
+    </div><!-- /routerPage-editor -->
+
+    <!-- ================= Router Page: Chapter Outline ================= -->
+    <div class="router-page" id="routerPage-outline">
+      <div class="page-outline">
+        <div class="page-head">
+          <h2>📖 章节大纲</h2>
+          <div class="page-head-acts">
+            <button class="btn btn-primary btn-sm" onclick="OutlinePage.addVolume()">＋ 新建卷</button>
+            <button class="btn btn-ghost btn-sm" onclick="OutlinePage.addChapter()">＋ 新建章节</button>
+            <button class="btn btn-ghost btn-sm" onclick="OutlinePage.expandAll()">展开全部</button>
+            <button class="btn btn-ghost btn-sm" onclick="OutlinePage.collapseAll()">折叠全部</button>
+            <span class="spacer" style="flex:1"></span>
+            <span class="page-stats" id="outlineStats"></span>
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="outline-tree" id="outlineTree">
+            <div class="page-empty-state">
+              <div class="page-empty-icon">🌳</div>
+              <div>请先在左侧选中一个项目</div>
+            </div>
+          </div>
+        </div>
+        <div class="page-foot">
+          <div class="outline-actions">
+            <button class="btn btn-ghost btn-sm" onclick="OutlinePage.batchFromOutline()">📋 根据大纲批量建章</button>
+            <button class="btn btn-ghost btn-sm" onclick="OutlinePage.exportOutline()">📤 导出大纲</button>
+            <button class="btn btn-ghost btn-sm" onclick="OutlinePage.importOutline()">📥 导入大纲</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: Characters ================= -->
+    <div class="router-page" id="routerPage-characters">
+      <div class="page-characters">
+        <div class="page-head">
+          <h2>👤 人物卡管理</h2>
+          <div class="page-head-acts">
+            <button class="btn btn-primary btn-sm" onclick="CharacterPage.showCreate()">＋ 新建人物</button>
+            <button class="btn btn-ghost btn-sm" onclick="CharacterPage.importFromText()">📄 从正文提取</button>
+            <span class="spacer" style="flex:1"></span>
+            <input type="text" class="page-search" id="charSearch" placeholder="🔍 搜索人物" oninput="CharacterPage.render()">
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="char-grid" id="charGrid">
+            <div class="page-empty-state">
+              <div class="page-empty-icon">👤</div>
+              <div>请先在左侧选中一个项目</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: Worldbuilding ================= -->
+    <div class="router-page" id="routerPage-worldbuilding">
+      <div class="page-world">
+        <div class="page-head">
+          <h2>🌍 世界观设定</h2>
+          <div class="page-head-acts">
+            <button class="btn btn-primary btn-sm" onclick="WorldPage.showCreate()">＋ 新建设定</button>
+            <button class="btn btn-ghost btn-sm" onclick="WorldPage.importFromText()">📄 从正文提取</button>
+            <span class="spacer" style="flex:1"></span>
+            <input type="text" class="page-search" id="worldSearch" placeholder="🔍 搜索设定" oninput="WorldPage.render()">
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="world-grid" id="worldGrid">
+            <div class="page-empty-state">
+              <div class="page-empty-icon">🌍</div>
+              <div>请先在左侧选中一个项目</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: AI Toolbox ================= -->
+    <div class="router-page" id="routerPage-toolbox">
+      <div class="page-toolbox">
+        <div class="page-head">
+          <h2>🧰 AI 工具箱</h2>
+          <div class="page-head-acts">
+            <span class="spacer" style="flex:1"></span>
+            <input type="text" class="page-search" id="toolboxSearch" placeholder="🔍 搜索工具" oninput="ToolboxPage.filter(this.value)">
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="toolbox-tabs">
+            <span class="tb-tab active" data-cat="all" onclick="ToolboxPage.switchCat('all')">全部</span>
+            <span class="tb-tab" data-cat="generate" onclick="ToolboxPage.switchCat('generate')">🤖 AI写作</span>
+            <span class="tb-tab" data-cat="proofread" onclick="ToolboxPage.switchCat('proofread')">🔍 校对审查</span>
+            <span class="tb-tab" data-cat="analyze" onclick="ToolboxPage.switchCat('analyze')">📊 文本分析</span>
+            <span class="tb-tab" data-cat="convert" onclick="ToolboxPage.switchCat('convert')">🔄 格式转换</span>
+            <span class="tb-tab" data-cat="voice" onclick="ToolboxPage.switchCat('voice')">🎧 语音工具</span>
+          </div>
+          <div class="toolbox-grid" id="toolboxGrid"></div>
+          <div class="toolbox-output" id="toolboxOutput">
+            <div class="toolbox-output-head">
+              <span>📋 工具输出</span>
+              <button class="tool-btn" onclick="ToolboxPage.clearOutput()">清空</button>
+            </div>
+            <div class="toolbox-output-body" id="toolboxOutputBody">
+              <div class="page-empty-state" style="padding:20px"><div class="page-empty-icon" style="font-size:24px">🧰</div><div>点击工具卡片开始使用</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: Dashboard ================= -->
+    <div class="router-page" id="routerPage-dashboard">
+      <div class="page-dashboard">
+        <div class="page-head">
+          <h2>📊 创作数据仪表盘</h2>
+          <div class="page-head-acts">
+            <span class="spacer" style="flex:1"></span>
+            <span class="page-hint" id="dashLastUpdate"></span>
+            <button class="btn btn-ghost btn-sm" onclick="DashboardPage.refresh()">🔄 刷新</button>
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="dash-cards" id="dashCards">
+            <div class="dash-card">
+              <div class="dash-card-icon">📝</div>
+              <div class="dash-card-val" id="dashTotalWords">0</div>
+              <div class="dash-card-lbl">全书总字数</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon">📚</div>
+              <div class="dash-card-val" id="dashChapters">0</div>
+              <div class="dash-card-lbl">章节数量</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon">👤</div>
+              <div class="dash-card-val" id="dashCharacters">0</div>
+              <div class="dash-card-lbl">人物卡数量</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon">🌍</div>
+              <div class="dash-card-val" id="dashWorldSettings">0</div>
+              <div class="dash-card-lbl">世界观设定数</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon">📊</div>
+              <div class="dash-card-val" id="dashCalls">0</div>
+              <div class="dash-card-lbl">今日 API 调用</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon">💎</div>
+              <div class="dash-card-val" id="dashTokens">0</div>
+              <div class="dash-card-lbl">今日 Token 消耗</div>
+            </div>
+          </div>
+
+          <div class="dash-section">
+            <div class="dash-section-head">
+              <h3>📈 每日写作进度</h3>
+            </div>
+            <div class="dash-chart-wrap">
+              <div class="dash-bar-chart" id="dashBarChart"></div>
+            </div>
+          </div>
+
+          <div class="dash-section">
+            <div class="dash-section-head">
+              <h3>📈 最近活动</h3>
+            </div>
+            <div class="dash-log-list" id="dashLogList">
+              <div class="page-empty-state" style="padding:30px"><div class="page-empty-icon" style="font-size:24px">📭</div><div>暂无最近活动记录</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- /routerPage-editor -->
+
+    <!-- ================= Router Page: Editor (DESIGN) ================= -->
+    <div class="router-page design-page design-editor" id="routerPage-editor-design">
+      <div class="design-stage">
+        <div class="design-hero">
+          <div class="design-hero-overlay">
+            <div class="design-hero-head">
+              <div class="design-page-title" id="designDocTitle">Moon Writer designs</div>
+              <div class="design-hero-acts">
+                <span class="design-ico-btn" title="分享">📤</span>
+                <span class="design-ico-btn" title="保存">📡</span>
+                <span class="design-ico-btn" title="展开">💻</span>
+                <span class="design-ico-btn" title="网格">▦</span>
+                <span class="design-ico-btn" title="日历">📅</span>
+              </div>
+            </div>
+            <div class="design-prompt-bar">
+              <input type="text" class="design-prompt-input" id="designPromptInput" placeholder="💡 AI input">
+              <button class="design-btn-generate" id="designBtnGenerate" onclick="Composer.generate()">Generate</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: Outline (DESIGN) ================= -->
+    <div class="router-page design-page design-outline-page" id="routerPage-outline-design">
+      <div class="design-outline-toolbar">
+        <select class="design-select"><option>展开大纲</option><option>折叠大纲</option></select>
+        <button class="design-btn-ghost" onclick="OutlinePage.expandAll()">直边视图</button>
+        <span class="design-muted">显示状态树UI设计模式</span>
+        <div class="design-spacer"></div>
+        <button class="design-btn-ghost">高保真展示</button>
+      </div>
+      <div class="design-outline-body">
+        <aside class="design-volume-list">
+          <div class="design-volume-head">📜卷名</div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 1 <span class="vol-name">可折叠列表</span></div>
+          <div class="design-volume-item active" data-vid=""><span class="caret">▾</span> 2 <span class="vol-name">可折叠完整</span>
+            <div class="design-chapter-list">
+              <div class="design-ch-mini">2 章节章节</div>
+              <div class="design-ch-mini">4 章节层级标题</div>
+              <div class="design-ch-mini">5 章节章节标题</div>
+            </div>
+          </div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 5 <span class="vol-name">章节·仿章节标题</span></div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 6 <span class="vol-name">章节</span></div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 8 <span class="vol-name">数据章节</span></div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 17 <span class="vol-name">章节树视图标题</span></div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 10 <span class="vol-name">其他章节</span></div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 19 <span class="vol-name">目标章节</span></div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 12 <span class="vol-name">文件段落标题</span></div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 13 <span class="vol-name">文件章节</span></div>
+          <div class="design-volume-item" data-vid=""><span class="caret">▸</span> 24 <span class="vol-name">添加章节</span></div>
+        </aside>
+        <div class="design-chapter-table">
+          <div class="design-chapter-table-head">
+            <span></span><span></span><span>卷节</span><span>章节</span><span></span><span></span><span>字数</span><span></span>
+          </div>
+          <div class="design-chapter-row status-write" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">1</span>
+            <span>11.章节·人章南标题</span>
+            <span class="ot-status-dot write"></span><span class="ot-status-text">已写/写作中</span>
+            <span class="ot-wc">122</span>
+            <span>●</span>
+          </div>
+          <div class="design-chapter-row status-wc" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">2</span>
+            <span>12/章节标题</span>
+            <span class="ot-status-dot wc"></span><span class="ot-status-text">字数</span>
+            <span class="ot-wc">122</span>
+            <span>●</span>
+          </div>
+          <div class="design-chapter-row status-todo" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">4</span>
+            <span>11 章节标题示例</span>
+            <span class="ot-status-dot todo"></span><span class="ot-status-text">未开始</span>
+            <span class="ot-wc">123</span>
+            <span>●</span>
+          </div>
+          <div class="design-chapter-row status-wc" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">5</span>
+            <span>13.2 章章节人章章标题</span>
+            <span class="ot-status-dot wc"></span><span class="ot-status-text">字数</span>
+            <span class="ot-wc">124</span>
+            <span>●</span>
+          </div>
+          <div class="design-chapter-row status-wc" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">6</span>
+            <span>11/章节·标题示例</span>
+            <span class="ot-status-dot wc"></span><span class="ot-status-text">字数</span>
+            <span class="ot-wc">124</span>
+            <span>●</span>
+          </div>
+          <div class="design-chapter-row status-active" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">7</span>
+            <span>10.2 章节标题示例</span>
+            <span class="ot-status-dot todo"></span><span class="ot-status-text">未开始</span>
+            <span class="ot-wc">122</span>
+            <span>●</span>
+          </div>
+          <div class="design-chapter-row status-todo" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">8</span>
+            <span>11/章章节人章盘标题</span>
+            <span class="ot-status-dot todo"></span><span class="ot-status-text">未开始</span>
+            <span class="ot-wc">122</span>
+            <span>●</span>
+          </div>
+          <div class="design-chapter-row status-write" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">10</span>
+            <span>11/章节标题</span>
+            <span class="ot-status-dot write"></span><span class="ot-status-text">字数</span>
+            <span class="ot-wc">122</span>
+            <span>●</span>
+          </div>
+          <div class="design-chapter-row status-todo" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">12</span>
+            <span>11/章章节人层级标题</span>
+            <span class="ot-status-dot todo"></span><span class="ot-status-text">未开始</span>
+            <span class="ot-wc">122</span>
+            <span>●</span>
+          </div>
+          <div class="design-chapter-row status-todo" data-cid="">
+            <span class="ot-ch-status"></span>
+            <span class="ot-ch-line"></span>
+            <span class="ot-ch-num">13</span>
+            <span>11.章章节节标题</span>
+            <span class="ot-status-dot todo"></span><span class="ot-status-text">字数</span>
+            <span class="ot-wc">124</span>
+            <span>●</span>
+          </div>
+        </div>
+      </div>
+      <div class="design-outline-foot">
+        <button class="design-btn-add" onclick="OutlinePage.addChapter()">添加新章节</button>
+        <div class="design-spacer"></div>
+        <div class="design-pager">
+          <span class="pg">●</span>
+          <span class="pg">2</span>
+          <span class="pg">3</span>
+          <span class="pg">4</span>
+          <span class="pg active">●</span>
+          <span class="pg">●</span>
+          <span class="pg ico">+</span>
+          <span class="pg ico">‹</span>
+          <span class="pg ico">›</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: Characters (DESIGN) ================= -->
+    <div class="router-page design-page design-characters-page" id="routerPage-characters-design">
+      <div class="design-tabs">
+        <div class="design-tab">人物卡</div>
+        <div class="design-tab active">世界观设定</div>
+        <div class="design-tab">素材文档</div>
+      </div>
+      <div class="design-chars-body">
+        <div class="design-chars-list">
+          <div class="design-chars-head">
+            <h2>人物卡<span class="design-muted">AI小说引擎</span></h2>
+            <button class="design-btn-add">添加人物</button>
+          </div>
+          <div class="design-char-card empty">
+            <div class="char-corner tl"></div><div class="char-corner tr"></div>
+            <div class="char-corner bl"></div><div class="char-corner br"></div>
+            <div class="char-avatar"></div>
+            <div class="char-title">👤 头像示例</div>
+            <div class="char-date">— 2023-7-15 18:26:26 —</div>
+            <div class="char-tags"><span class="char-tag">身份标签</span><span class="char-tag">身份标在</span></div>
+            <div class="char-desc">在含含稿范着</div>
+            <div class="char-section">· 人物简介 ·</div>
+          </div>
+          <div class="design-char-card">
+            <div class="char-corner tl"></div><div class="char-corner tr"></div>
+            <div class="char-corner bl"></div><div class="char-corner br"></div>
+            <div class="char-avatar" style="background:linear-gradient(135deg,#e8e0d0,#c8b89c)">👤</div>
+            <div class="char-title">👤 姓名：示例</div>
+            <div class="char-date">— 2023-7-19 8:18:26 —</div>
+            <div class="char-tags"><span class="char-tag">身份标签</span><span class="char-tag">身份标签</span></div>
+            <div class="char-desc">示例：人物背景描述文字，包含性格特征与成长经历。</div>
+            <div class="char-section">· 人物简介 ·</div>
+          </div>
+          <div class="design-char-card">
+            <div class="char-corner tl"></div><div class="char-corner tr"></div>
+            <div class="char-corner bl"></div><div class="char-corner br"></div>
+            <div class="char-avatar" style="background:linear-gradient(135deg,#d4a866,#a87f3a)">👤</div>
+            <div class="char-title">👤 角色：示例</div>
+            <div class="char-date">— 2023-7-13 1:43:26 —</div>
+            <div class="char-tags"><span class="char-tag">身份标签</span><span class="char-tag">身份特征</span></div>
+            <div class="char-desc">示例：世界观设定描述文字，包含势力与背景说明。</div>
+            <div class="char-section">· 人物特征 ·</div>
+          </div>
+          <div class="design-char-card">
+            <div class="char-corner tl"></div><div class="char-corner tr"></div>
+            <div class="char-corner bl"></div><div class="char-corner br"></div>
+            <div class="char-avatar" style="background:linear-gradient(135deg,#5a4838,#3a2818)">最</div>
+            <div class="char-title">👤 最近更新</div>
+            <div class="char-date">— 2023-7-15 18:26:26 —</div>
+            <div class="char-tags"><span class="char-tag">身份标签</span><span class="char-tag">身份特征</span></div>
+            <div class="char-desc">示例：重要人物说明文字。</div>
+            <div class="char-section">· 人物特征 ·</div>
+          </div>
+        </div>
+        <aside class="design-world-side">
+          <div class="design-world-head"><span>🌍世界观设定</span><span class="design-close">×</span></div>
+          <div class="design-world-item"><span class="ico bg-orange">🗺️</span> 世界背景 <span class="arr">›</span></div>
+          <div class="design-world-item"><span class="ico bg-gold">⚔️</span> 势力分布 <span class="arr">›</span></div>
+          <div class="design-world-item"><span class="ico bg-orange">☯️</span> 修炼体系 <span class="arr">›</span></div>
+          <div class="design-world-item"><span class="ico bg-gold">📍</span> 重要地点 <span class="arr">›</span></div>
+        </aside>
+      </div>
+      <div class="design-trait-bar">
+        <span>性格特征：</span>
+        <div class="design-trait-track"><div class="design-trait-fill" style="width:60%"><span class="arrow">»</span></div></div>
+        <span class="design-muted">光影阴影效果，高保真UI设计</span>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: Toolbox (DESIGN) ================= -->
+    <div class="router-page design-page design-toolbox-page" id="routerPage-toolbox-design">
+      <div class="design-toolbox-body">
+        <div class="design-toolbox-main">
+          <h1 class="design-page-h1">AI工具箱</h1>
+          <p class="design-page-sub">AI小说工具产品滑出UI设计</p>
+          <div class="design-tool-grid">
+            <div class="design-tool-item" data-tool="text-polish" onclick="ToolboxPage.execute('proofread')">
+              <div class="design-tool-ico ico-blue-grad">📘</div>
+              <div class="design-tool-body">
+                <div class="design-tool-name">文本润色类</div>
+                <div class="design-tool-desc">AI文本清洗、错别字检查、一键润色</div>
+              </div>
+            </div>
+            <div class="design-tool-item" data-tool="content-gen" onclick="ToolboxPage.execute('continue')">
+              <div class="design-tool-ico ico-blue-grad">📗</div>
+              <div class="design-tool-body">
+                <div class="design-tool-name">内容生成类</div>
+                <div class="design-tool-desc">示例：流畅叙事、人物描写、情节推进</div>
+              </div>
+            </div>
+            <div class="design-tool-item" data-tool="chapter-out" onclick="ToolboxPage.execute('batchSummary')">
+              <div class="design-tool-ico ico-pink-grad">🌸</div>
+              <div class="design-tool-body">
+                <div class="design-tool-name">内容生成类</div>
+                <div class="design-tool-desc">批量章节摘要、设定提取</div>
+              </div>
+            </div>
+            <div class="design-tool-item" data-tool="book-check" onclick="ToolboxPage.execute('verifyFull')">
+              <div class="design-tool-ico ico-green-grad">📙</div>
+              <div class="design-tool-body">
+                <div class="design-tool-name">全书校对</div>
+                <div class="design-tool-desc">语需诉批搞题款化定需要，全书校对</div>
+              </div>
+            </div>
+            <div class="design-tool-item" data-tool="batch-extract" onclick="ToolboxPage.execute('extractCharacters')">
+              <div class="design-tool-ico ico-gold-grad">📦</div>
+              <div class="design-tool-body">
+                <div class="design-tool-name">批量章节摘要、设定提取</div>
+                <div class="design-tool-desc">示例：人物关系、场景设定分析</div>
+              </div>
+            </div>
+            <div class="design-tool-item" data-tool="aux" onclick="ToolboxPage.execute('versionHistory')">
+              <div class="design-tool-ico ico-gold-grad">🧬</div>
+              <div class="design-tool-body">
+                <div class="design-tool-name">辅助功能类</div>
+                <div class="design-tool-desc">版本历史、跨章节一致性审计</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <aside class="design-tool-side">
+          <div class="design-tool-side-head">
+            <h2>高保真</h2>
+            <div class="design-search">
+              <span class="ico">🔍</span>
+              <input type="text" placeholder="搜索">
+              <span class="ico dot">●</span>
+            </div>
+          </div>
+          <div class="design-tool-list">
+            <div class="design-tool-row" onclick="ToolboxPage.execute('versionHistory')">
+              <div class="design-tool-ico-mini ico-blue-grad">📘</div>
+              <div class="design-tool-row-body">
+                <div class="design-tool-name">版本历史</div>
+                <div class="design-tool-desc-mini">版本历史、一键润色</div>
+              </div>
+            </div>
+            <div class="design-tool-row active" onclick="ToolboxPage.execute('crossAudit')">
+              <div class="design-tool-ico-mini ico-pink-grad">🌸</div>
+              <div class="design-tool-row-body">
+                <div class="design-tool-name">跨章一致性审计</div>
+                <div class="design-tool-desc-mini">语章章节节研穿搞滴读</div>
+              </div>
+            </div>
+            <div class="design-tool-row active" onclick="ToolboxPage.execute('analyzeStyle')">
+              <div class="design-tool-ico-mini ico-green-grad">📙</div>
+              <div class="design-tool-row-body">
+                <div class="design-tool-name">风格重写</div>
+                <div class="design-tool-desc-mini">语章语意箭审计、语音写</div>
+              </div>
+            </div>
+            <div class="design-tool-row" onclick="ToolboxPage.execute('speakText')">
+              <div class="design-tool-ico-mini ico-gold-grad">📦</div>
+              <div class="design-tool-row-body">
+                <div class="design-tool-name">语音朗读</div>
+                <div class="design-tool-desc-mini">语音朗读、语音计算分析…</div>
+              </div>
+            </div>
+            <div class="design-tool-row" onclick="ToolboxPage.execute('showAchievements')">
+              <div class="design-tool-ico-mini ico-gold-grad">🏆</div>
+              <div class="design-tool-row-body">
+                <div class="design-tool-name">写作成就</div>
+                <div class="design-tool-desc-mini">写作成就</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: Dashboard (DESIGN) ================= -->
+    <div class="router-page design-page design-dashboard-page" id="routerPage-dashboard-design">
+      <div class="design-dash-body">
+        <div class="design-dash-main">
+          <div class="design-dash-cards">
+            <div class="design-hero-card hero-blue">
+              <div class="design-hero-card-head">今日字数</div>
+              <div class="design-hero-card-val" id="designDashTotal">12,750</div>
+              <div class="design-hero-card-ico">📄</div>
+            </div>
+            <div class="design-hero-card hero-orange">
+              <div class="design-hero-card-head">累计字数</div>
+              <div class="design-hero-card-val">连续写作天数</div>
+              <div class="design-hero-card-ico">📊</div>
+            </div>
+            <div class="design-hero-card hero-purple">
+              <div class="design-hero-card-head">AI调用次数</div>
+              <div class="design-hero-card-val">AI调用次数</div>
+              <div class="design-hero-card-ico">📈</div>
+            </div>
+          </div>
+          <div class="design-dash-chart">
+            <div class="design-chart-head">
+              <h3>7天写作数趋势</h3>
+              <div class="design-chart-legend"><span class="dot orange">●</span><span class="muted">×</span><span class="dot blue">同一</span></div>
+            </div>
+            <div class="design-chart-svg-wrap">
+              <svg class="design-chart-svg" viewBox="0 0 800 220" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="dg-orange-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#ff7849" stop-opacity=".6"/>
+                    <stop offset="100%" stop-color="#ff7849" stop-opacity="0"/>
+                  </linearGradient>
+                  <linearGradient id="dg-blue-stroke" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#4facfe" stop-opacity=".9"/>
+                    <stop offset="100%" stop-color="#00f2fe" stop-opacity=".9"/>
+                  </linearGradient>
+                </defs>
+                <g stroke="rgba(255,255,255,.18)" stroke-dasharray="4 4" stroke-width="1">
+                  <line x1="0" y1="10" x2="800" y2="10"/>
+                  <line x1="0" y1="60" x2="800" y2="60"/>
+                  <line x1="0" y1="110" x2="800" y2="110"/>
+                  <line x1="0" y1="160" x2="800" y2="160"/>
+                </g>
+                <path d="M0,190 C60,185 110,170 160,160 C200,150 240,90 280,75 C320,55 360,100 400,115 C440,130 480,40 520,30 C560,18 600,75 640,95 C680,110 720,100 760,95 L800,90 L800,220 L0,220 Z" fill="url(#dg-orange-fill)"/>
+                <path d="M0,190 C60,185 110,170 160,160 C200,150 240,90 280,75 C320,55 360,100 400,115 C440,130 480,40 520,30 C560,18 600,75 640,95 C680,110 720,100 760,95 L800,90" stroke="#ff7849" stroke-width="2.8" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+                <path d="M0,180 C60,175 110,170 160,165 C220,160 280,145 340,140 C400,135 460,130 520,125 C580,120 640,118 700,116 C740,115 770,115 800,115" stroke="url(#dg-blue-stroke)" stroke-width="1.8" fill="none" stroke-dasharray="5 4" stroke-linecap="round"/>
+                <g fill="#fff" stroke="#ff7849" stroke-width="2.2">
+                  <circle cx="0" cy="190" r="3"/>
+                  <circle cx="100" cy="175" r="3"/>
+                  <circle cx="200" cy="150" r="3"/>
+                  <circle cx="300" cy="80" r="3"/>
+                  <circle cx="400" cy="115" r="3"/>
+                  <circle cx="500" cy="32" r="3"/>
+                </g>
+                <g>
+                  <circle cx="500" cy="32" r="7" fill="#fff" stroke="#ff7849" stroke-width="2.5"/>
+                  <circle cx="500" cy="32" r="2.5" fill="#ff7849"/>
+                  <rect x="464" y="0" width="72" height="20" rx="10" fill="rgba(0,0,0,.6)" stroke="rgba(255,255,255,.2)" stroke-width="1"/>
+                  <text x="500" y="14" fill="#fff" font-size="11" text-anchor="middle" font-family="monospace" font-weight="600">20.69</text>
+                </g>
+              </svg>
+              <div class="design-chart-axis">
+                <span>00:21</span><span>01:29</span><span>01:29</span><span>01:29</span><span>01:29</span><span>01:29</span><span>01:28</span>
+              </div>
+              <div class="design-chart-ylabels">
+                <span>200</span><span>150</span><span>100</span><span>50</span><span>0</span>
+              </div>
+            </div>
+            <div class="design-progress">
+              <span class="lbl">作品完成度</span>
+              <div class="track"><div class="fill" style="width:45%"></div><span class="knob"></span></div>
+              <span class="more">···</span>
+            </div>
+          </div>
+        </div>
+        <aside class="design-dash-side">
+          <div class="design-side-card">
+            <h3>左右侧面板<span class="muted">▾</span></h3>
+            <div class="design-donut">
+              <svg viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="50" stroke="rgba(255,255,255,.06)" stroke-width="10" fill="none"/>
+                <circle cx="60" cy="60" r="50" stroke="#ff7849" stroke-width="10" fill="none"
+                        stroke-dasharray="120 314" transform="rotate(-90 60 60)" stroke-linecap="round"/>
+                <text x="60" y="58" fill="#fff" font-size="20" text-anchor="middle" font-family="monospace" font-weight="700">0/32</text>
+                <text x="60" y="74" fill="#9aa0b8" font-size="9" text-anchor="middle">语需字数状况</text>
+              </svg>
+              <div class="donut-tick" style="top:10%;left:80%">5%</div>
+              <div class="donut-tick" style="top:30%;left:90%">57%</div>
+              <div class="donut-tick" style="top:50%;left:90%">20%</div>
+              <div class="donut-tick" style="top:75%;left:10%">210%</div>
+              <div class="donut-tick" style="top:90%;left:50%">5M%</div>
+            </div>
+          </div>
+          <div class="design-side-card">
+            <h3>章节完成情况</h3>
+            <div class="design-chapter-status">
+              <div class="cs-row"><span class="ico bg-blue">📁</span> 章节完成情况 <span class="arr">›</span></div>
+              <div class="cs-row"><span class="ico bg-blue">📁</span> 章节完成情况 <span class="arr">›</span></div>
+              <div class="cs-row"><span class="ico bg-blue">📁</span> 章节完成情况 <span class="arr">›</span></div>
+              <div class="cs-row"><span class="ico bg-orange">📁</span> 作品完成度 <span class="arr">›</span></div>
+              <div class="cs-row"><span class="ico bg-blue">📁</span> 章节完成情况 <span class="arr">›</span></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
     </div>
   </main>
 
   <!-- ================= Right panel ================= -->
   <aside class="right-panel" id="rightPanel">
     <div class="right-tabs">
-      <span class="right-tab active" data-page="pipeline" onclick="RightPanel.switch('pipeline')" title="流水线状态">📡</span>
-      <span class="right-tab" data-page="templates" onclick="RightPanel.switch('templates')" title="模板库">📋</span>
+      <span class="right-tab active" data-page="pipeline" onclick="RightPanel.switch('pipeline')" title="流水线状态">⚙️</span>
+      <span class="right-tab" data-page="templates" onclick="RightPanel.switch('templates')" title="模板库">📚</span>
       <span class="right-tab" data-page="context" onclick="RightPanel.switch('context')" title="设定资源">👤</span>
       <span class="right-tab" data-page="models" onclick="RightPanel.switch('models')" title="模型管理">🤖</span>
       <span class="right-tab" data-page="tools" onclick="RightPanel.switch('tools')" title="工具">🔧</span>
       <span class="right-tab" data-page="appearance" onclick="RightPanel.switch('appearance')" title="背景外观">🎨</span>
+      <span class="right-tab" data-page="forecast" onclick="RightPanel.switch('forecast')" title="叙事预测">🔮</span>
+      <span class="right-tab" data-page="state" onclick="RightPanel.switch('state')" title="状态仪表盘">📊</span>
     </div>
     <div class="right-body">
 
@@ -299,9 +1010,9 @@ window.initTiptap = async function () {
           <!-- 静态引导：无生成任务时展示 -->
           <div id="pipeIntro" style="margin-top:10px;padding:10px;background:var(--panel3);border-radius:7px;font-size:10.5px;color:var(--muted);line-height:1.7">
             <div style="font-weight:600;margin-bottom:4px;color:var(--text2)">AI 协同创作流程</div>
-            <div>🖊️ <b>构思大纲</b> — 分析需求，搭建故事框架</div>
-            <div>📝 <b>动笔写作</b> — 根据大纲撰写正文</div>
-            <div>🔍 <b>品质审稿</b> — 检查一致性，发现问题自动修正</div>
+            <div>① <b>构思大纲</b>：分析需求，搭建故事框架</div>
+            <div>② <b>动笔写作</b>：根据大纲撰写正文</div>
+            <div>③ <b>品质审稿</b>：检查一致性，发现问题自动修正</div>
             <div style="margin-top:4px;font-size:10px;border-top:1px solid var(--border);padding-top:4px"><b>智能协同</b>：自动判断任务类型匹配创作模式；<b>严谨/文艺/轻量</b>：手动指定创作风格；<b>手动自选</b>：跳过流水线直调模型</div>
             <div style="margin-top:6px;color:var(--accent)">输入创作需求，点击下方「✨ 生成」开始</div>
           </div>
@@ -313,7 +1024,7 @@ window.initTiptap = async function () {
         <!-- Thinker 大纲折叠面板 -->
         <div class="pipe-panel" id="pipeOutline" style="display:none">
           <div class="pipe-panel-head" onclick="this.parentElement.classList.toggle('collapsed')">
-            <span class="caret">▾</span>📝 Thinker 生成大纲
+            <span class="caret">▸</span>🧠 Thinker 生成大纲
             <button class="tool-btn" style="margin-left:auto;font-size:10px" onclick="event.stopPropagation();navigator.clipboard.writeText(document.getElementById('pipeOutlineContent').textContent);UI.toast('已复制','success')">📋 复制</button>
             <button class="tool-btn" style="font-size:10px" onclick="event.stopPropagation();ChapterUI.editOutlineAndContinue()">✏️ 编辑</button>
           </div>
@@ -322,19 +1033,19 @@ window.initTiptap = async function () {
         <!-- Verifier 校验面板 -->
         <div class="pipe-panel" id="pipeIssues" style="display:none">
           <div class="pipe-panel-head" onclick="this.parentElement.classList.toggle('collapsed')">
-            <span class="caret">▾</span>🔍 Verifier 校验发现
+            <span class="caret">▸</span>🔍 Verifier 校验发现
           </div>
           <div class="pipe-panel-body" id="pipeIssuesList"></div>
         </div>
-        <button class="btn btn-ghost btn-block btn-sm" onclick="RightPanel.switch('templates')">📚 查看提示词模板</button>
+        <button class="btn btn-ghost btn-block btn-sm" onclick="RightPanel.switch('templates')">📋 查看提示词模板</button>
       </div>
 
       <!-- Templates page -->
       <div class="right-page" id="page-templates">
-        <div class="tpl-search"><input id="tplSearch" placeholder="🔍 搜索模板…" oninput="TemplateUI.render(this.value)"></div>
+        <div class="tpl-search"><input id="tplSearch" placeholder="🔍 搜索模板" oninput="TemplateUI.render(this.value)"></div>
         <div class="tpl-cats" id="tplCats"></div>
         <div id="tplList"></div>
-        <button class="btn btn-primary btn-block btn-sm" style="margin-top:10px" onclick="TemplateUI.editNew()">＋ 新建模板</button>
+        <button class="btn btn-primary btn-block btn-sm" style="margin-top:10px" onclick="TemplateUI.editNew()">＋新建模板</button>
       </div>
 
       <!-- Context page -->
@@ -345,13 +1056,13 @@ window.initTiptap = async function () {
         </div>
         <div id="ctxWorld" class="res-check-group">
           <div class="ghead">世界观设定</div>
-          <div class="res-check-empty">暂无世界观</div>
+          <div class="res-check-empty">暂无世界观设定</div>
         </div>
         <div id="ctxMaterials" class="res-check-group">
           <div class="ghead">素材文档</div>
           <div class="res-check-empty">暂无素材</div>
         </div>
-        <button class="btn btn-ghost btn-block btn-sm" onclick="RightPanel.switch('tools')" style="margin-top:8px">⚙ 管理设定资源</button>
+        <button class="btn btn-ghost btn-block btn-sm" onclick="RightPanel.switch('tools')" style="margin-top:8px">📂管理设定资源</button>
         <div style="margin-top:8px;padding:8px 10px;background:var(--panel2);border-radius:7px;font-size:10.5px;color:var(--muted);line-height:1.7">
           勾选的资源将自动拼接进生成请求的上下文，无需手动复制。
         </div>
@@ -360,6 +1071,7 @@ window.initTiptap = async function () {
       <!-- Models page -->
       <div class="right-page" id="page-models">
         <div class="res-check-empty">加载中…</div>
+        <div id="skillsPanelContainer" style="margin-top:18px;border-top:1px solid var(--border);padding-top:10px"></div>
       </div>
 
       <!-- Tools page -->
@@ -369,7 +1081,7 @@ window.initTiptap = async function () {
         <div class="helper-section">
           <div class="ghead">Helper 工具辅助 <span style="font-weight:400;font-size:10px;color:var(--faint)">· deepseek-chat 驱动</span></div>
 
-          <button class="btn btn-primary btn-block" id="btnRecord" onclick="Tools.startRecord()">🎤 开始录音</button>
+          <button class="btn btn-primary btn-block" id="btnRecord" onclick="Tools.startRecord()">🎙️ 开始录音</button>
 
           <div style="display:flex;gap:6px;margin-top:6px">
             <button class="btn btn-ghost btn-sm" style="flex:1" onclick="Tools.cleanText()">🧹 AI文本清洗</button>
@@ -393,24 +1105,28 @@ window.initTiptap = async function () {
 
         <div style="margin-top:14px">
           <hr style="border:none;border-top:1px solid var(--border);margin:10px 0">
+          <button class="btn btn-primary btn-block" onclick="Tools.proofreadText()" id="btnProofread" style="background:var(--accent)">📝 文字校对（错别字/的地得/标点）</button>
           <button class="btn btn-primary btn-block" onclick="Tools.verify()" id="btnVerify">🔍 一键逻辑自检</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.batchSummarize()" id="btnBatchSummary">📝 批量章节摘要</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.extractCharacters()" id="btnExtractChars">👥 自动提取设定</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.verifyFullBook()" id="btnVerifyFull">🔍 全书逐章校对</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="VersionUI.open()">📜 版本历史</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.clearContext()">🧹 清空上下文勾选</button>
-          <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.verifyCrossChapter()" id="btnCrossAudit">📋 跨章一致性审计</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.verifyCrossChapter()" id="btnCrossAudit">🔍 跨章一致性审计</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.analyzeStyle()" id="btnStyleGenome">🧬 风格基因组</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.speakText()" id="btnSpeak">🎧 语音朗读</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.showAchievements()" id="btnAchieve">🏆 写作成就</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.showPreferences()" id="btnPrefs">⚙️ 偏好记忆</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.searchAllProjects()" id="btnGlobalSearch">🌐 全局搜索</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.abCompare()" id="btnABCompare">⚖️ A/B 双稿对比</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.detectAIGC()" id="btnDetectAIGC" title="检测当前章节的 AI 生成痕迹">🤖 AI 味检测</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.serialDashboard()" id="btnSerial">📅 连载管理</button>
-          <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.styleRadar()" id="btnRadar">🎯 写作基因组</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.styleRadar()" id="btnRadar">🧬 写作基因组</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.wordFrequency()">📊 高频词汇分析</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.quickRecap()" id="btnRecap">📋 前情提要</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.showReadingStats()" id="btnReadingStats">📖 阅读统计</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.showTrash()" id="btnTrash" title="查看最近7天内删除的章节">🗑 回收站</button>
+          <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.ragMemory()" id="btnRAG" title="对全书建立记忆索引，支持关键剧情/人物快速检索">🧠 RAG记忆检索</button>
         </div>
 
         <div style="margin-top:14px">
@@ -420,41 +1136,60 @@ window.initTiptap = async function () {
 
         <div style="margin-top:16px">
           <div class="ghead">预留扩展</div>
-          <!-- 预留扩展入口（当前置灰）：自定义拖拽工作流 -->
-          <div class="reserved-btn">🧩 自定义拖拽工作流<span class="tag">规划中</span></div>
+          <!-- 预留扩展入口（当前置灰）：自定义拖拽工作流-->
+          <div class="reserved-btn">🚧 自定义拖拽工作流<span class="tag">规划中</span></div>
           <!-- 预留扩展入口（当前置灰）：A/B 双稿对比 -->
-          <div class="reserved-btn" style="margin-top:6px">📑 A/B 双稿对比<span class="tag">规划中</span></div>
+          <div class="reserved-btn" style="margin-top:6px">⚖️ A/B 双稿对比<span class="tag">规划中</span></div>
         </div>
       </div>
 
       <!-- Appearance page -->
       <div class="right-page" id="page-appearance">
         <div class="appearance-page">
-          <h3>当前背景</h3>
+          <h3>🎨 主题</h3>
+          <div class="theme-grid" id="themeGrid"></div>
+          <h3>🖼️ 当前背景</h3>
           <div class="appearance-current" id="appearanceCurrent">加载中…</div>
 
-          <h3>背景库</h3>
+          <h3>背景图</h3>
           <div class="bg-grid" id="appearanceLibrary"></div>
 
           <h3>自定义背景</h3>
           <div class="bg-grid" id="appearanceCustom"></div>
 
           <div class="appearance-upload">
-            <div class="drop-zone" id="appearanceDropZone">点击或拖拽上传图片 (PNG/JPG/WEBP)</div>
+            <div class="drop-zone" id="appearanceDropZone">点击或拖拽上传图片(PNG/JPG/WEBP)</div>
             <input type="file" id="appearanceFileInput" accept="image/png,image/jpeg,image/webp" style="display:none">
           </div>
 
           <div class="appearance-actions">
             <button class="btn btn-ghost btn-sm" onclick="Appearance.generateBg()">🎲 Picsum 生成</button>
             <button class="btn btn-ghost btn-sm" onclick="Appearance.randomBg()">🔀 随机切换</button>
-            <button class="btn btn-ghost btn-sm" onclick="Appearance.resetAll()">↩ 恢复默认</button>
+            <button class="btn btn-ghost btn-sm" onclick="Appearance.resetAll()">↩恢复默认</button>
           </div>
         </div>
+      </div>
+
+      <!-- Forecast page -->
+      <div class="right-page" id="page-forecast">
+        <div class="res-check-empty">加载中…</div>
+      </div>
+
+      <!-- State page -->
+      <div class="right-page" id="page-state">
+        <div class="res-check-empty">选择作品后查看状态</div>
       </div>
 
     </div>
   </aside>
 </div>
+
+
+
+
+
+
+
 
 <div class="toast-wrap" id="toastWrap"></div>
 <div id="modalRoot"></div>
@@ -466,7 +1201,7 @@ window.initTiptap = async function () {
   <span class="mt-btn" onclick="MobileUI.openDrawer()" title="菜单">☰</span>
   <span class="mt-btn" onclick="ManualSave.saveDraft()" title="保存版本">💾</span>
   <span class="mt-btn mt-api" onclick="MobileUI.openModelPanel()" title="API 密钥与模型">🔑</span>
-  <span class="mt-btn" onclick="MobileUI.toggleView()" title="切换电脑版">🖥</span>
+  <span class="mt-btn" onclick="MobileUI.toggleView()" title="切换电脑版">🖥️</span>
 </div>
 
 <!-- ============ 【移动端专属】侧边栏抽屉 ============ -->
@@ -479,10 +1214,18 @@ window.initTiptap = async function () {
   </div>
   <div class="md-body">
     <div class="side-search">
-      <input type="text" id="mSearchInput" placeholder="🔍 搜索项目或资源…" oninput="MobileUI.filter(this.value)">
+      <input type="text" id="mSearchInput" placeholder="🔍 搜索项目或资源" oninput="MobileUI.filter(this.value)">
     </div>
     <div class="side-new">
-      <button class="btn btn-primary btn-block" onclick="MobileUI.closeDrawer();ProjectUI.showCreate()">＋ 新建项目</button>
+      <button class="btn btn-primary btn-block" onclick="MobileUI.closeDrawer();ProjectUI.showCreate()">＋新建项目</button>
+    </div>
+    <div class="side-nav">
+      <a class="nav-link active" data-page="editor" onclick="MobileUI.closeDrawer();Router.navigate('editor')">✍️ 编辑器</a>
+      <a class="nav-link" data-page="outline" onclick="MobileUI.closeDrawer();Router.navigate('outline')">🌳 章节大纲</a>
+      <a class="nav-link" data-page="characters" onclick="MobileUI.closeDrawer();Router.navigate('characters')">👤 人物卡</a>
+      <a class="nav-link" data-page="worldbuilding" onclick="MobileUI.closeDrawer();Router.navigate('worldbuilding')">🌍 世界观</a>
+      <a class="nav-link" data-page="toolbox" onclick="MobileUI.closeDrawer();Router.navigate('toolbox')">🧰 AI工具箱</a>
+      <a class="nav-link" data-page="dashboard" onclick="MobileUI.closeDrawer();Router.navigate('dashboard')">📊 仪表盘</a>
     </div>
     <div class="side-section novels">
       <div class="side-label"><span>项目列表</span></div>
@@ -523,16 +1266,23 @@ window.initTiptap = async function () {
 </div>
 
 <!-- ============ 【移动端专属】右下角 FAB ============ -->
-<button class="mobile-fab mobile-only" id="mobileFab" onclick="MobileUI.openRightSheet()" title="控制面板">⚙</button>
+<button class="mobile-fab mobile-only" id="mobileFab" onclick="MobileUI.openRightSheet()" title="控制面板">⚡</button>
 
 <!-- ============ JS 模块（按依赖顺序加载） ============ -->
 <script src="/static/js/util.js"></script>
 <script src="/static/js/store.js"></script>
+<script src="/static/js/themes.js"></script>
 <script src="/static/js/api.js"></script>
 <script src="/static/js/auth.js"></script>
 <script src="/static/js/ui.js"></script>
 <script src="/static/js/sse.js"></script>
+<script src="/static/js/eino-api.js"></script>
+<script src="/static/js/skills-panel.js"></script>
+<script src="/static/js/outline-gen.js"></script>
+<script src="/static/js/forecast-panel.js"></script>
+<script src="/static/js/state-viewer.js"></script>
 <script src="/static/js/pipeline.js"></script>
+<script src="/static/js/appearance.js"></script>
 <script src="/static/js/editor.js"></script>
 <script src="/static/js/chapters.js"></script>
 <script src="/static/js/modelsettings.js"></script>
@@ -546,6 +1296,12 @@ window.initTiptap = async function () {
 <script src="/static/js/composer.js"></script>
 <script src="/static/js/usage.js"></script>
 <script src="/static/js/tools.js"></script>
+<script src="/static/js/router.js"></script>
+<script src="/static/js/pages-outline.js"></script>
+<script src="/static/js/pages-characters.js"></script>
+<script src="/static/js/pages-world.js"></script>
+<script src="/static/js/pages-toolbox.js"></script>
+<script src="/static/js/pages-dashboard.js"></script>
 <script src="/static/js/app.js"></script>
 <script src="/static/js/mobile.js"></script>
 <script>// 兜底加载：确保项目列表一定出现在页面上

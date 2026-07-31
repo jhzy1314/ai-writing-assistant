@@ -16,5 +16,10 @@ function wordCount(text) {
   var en = (text.match(/[a-zA-Z]+/g) || []).length;
   return cjk + en;
 }
+function escAttr(s) {
+  return String(s == null ? '' : s).replace(/[&<>"'`]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c];
+  });
+}
 function charCount(text) { return Array.from(text || '').length; }
 function uid() { return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
