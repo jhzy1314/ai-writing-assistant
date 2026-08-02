@@ -1,6 +1,13 @@
 /* ============ rightpanel.js：右侧面板切换 + 设定资源勾选区 ============ */
 var RightPanel = {
   switch: function (page) {
+    // 用户主动切换右侧面板时自动展开（若当前折叠），避免点了没反应/被拦截的观感
+    var rp = document.getElementById('rightPanel');
+    if (rp && rp.classList.contains('collapsed')) {
+      rp.classList.remove('collapsed');
+      document.body.classList.remove('right-hidden');
+      Store.set('rightCollapsed', false);
+    }
     document.querySelectorAll('.right-tab').forEach(function (t) {
       t.classList.toggle('active', t.dataset.page === page);
     });
