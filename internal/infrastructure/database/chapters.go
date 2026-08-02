@@ -191,7 +191,7 @@ func (s *Store) ListChapters(ctx context.Context, projectID, volumeID string) ([
 func (s *Store) CreateChapter(ctx context.Context, projectID, volumeID, title, content string) (*Chapter, error) {
 	var maxOrd int
 	_ = s.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(sort_order),0) FROM chapters WHERE project_id=?`, projectID).Scan(&maxOrd)
-	wc := len([]rune(content))
+	wc := wordCount(content)
 	c := &Chapter{
 		ID: newID(), ProjectID: projectID, VolumeID: volumeID, Title: title, Content: content,
 		WordCount: wc, SortOrder: maxOrd + 1, CreatedAt: now(), UpdatedAt: now(),
@@ -233,7 +233,7 @@ func (s *Store) UpdateChapter(ctx context.Context, id string, title, content, vo
 	if content != nil {
 		setParts = append(setParts, "content=?")
 		args = append(args, *content)
-		wc := len([]rune(*content))
+		wc := wordCount(*content)
 		setParts = append(setParts, "word_count=?")
 		args = append(args, wc)
 	}

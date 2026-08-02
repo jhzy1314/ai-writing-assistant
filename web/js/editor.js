@@ -427,7 +427,7 @@ var Editor = {
     var sbCh = document.getElementById('sbChapterWords');
     if (!sbTotal || !sbCh) return;
     var cur = Store.state.currentChapter;
-    var live = Array.from(this.getText() || '').length;
+    var live = wordCount(this.getText() || '');
     sbCh.textContent = live.toLocaleString();
     var total = 0;
     (Store.state.chapters || []).forEach(function (c) {
