@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -18,6 +19,7 @@ type WebAIProvider struct {
 	Headers     func(cookie, token string) map[string]string // 请求头构造函数
 	BuildBody   func(systemPrompt, userPrompt string) interface{} // 请求体构造函数
 	ParseResponse func(resp *http.Response) (string, error) // 响应解析函数
+	CustomCall  func(ctx context.Context, adapter *WebAIAdapter, systemPrompt, userPrompt string) (string, error) // 自定义调用（如 kimi 两步流程）
 }
 
 // WebAIProviders 预设的网页AI提供商
@@ -48,6 +50,8 @@ var WebAIProviders = map[string]*WebAIProvider{
 			}
 		},
 		ParseResponse: parseSSEResponse,
+		// kimi 网页版需要两步：先创建会话拿 chat_id，再向会话发消息（SSE 流）
+		CustomCall: callKimiFree,
 	},
 	"doubao-free": {
 		Name:    "豆包免费版",
@@ -153,6 +157,119 @@ var WebAIProviders = map[string]*WebAIProvider{
 		},
 		ParseResponse: parseSSEResponse,
 	},
+}
+
+// callKimiFree 调用 Kimi 网页版：先创建会话拿 chat_id，再向会话发消息读取 SSE 流
+func callKimiFree(ctx context.Context, a *WebAIAdapter, systemPrompt, userPrompt string) (string, error) {
+	base := "https://kimi.moonshot.cn"
+	headers := map[string]string{
+		"Content-Type": "application/json",
+		"Accept":       "text/event-stream",
+		"User-Agent":   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+		"Origin":       base,
+		"Referer":      base + "/",
+	}
+	if a.cookie != "" {
+		headers["Cookie"] = a.cookie
+	}
+	if a.sessionToken != "" {
+		headers["Authorization"] = "Bearer " + a.sessionToken
+	}
+
+	// 1) 创建会话
+	createBody := map[string]interface{}{
+		"Name":     "new-chat",
+		"messages": []map[string]string{{"role": "user", "content": userPrompt}},
+		"stream":   false,
+	}
+	cb, _ := json.Marshal(createBody)
+	createReq, err := http.NewRequestWithContext(ctx, "POST", base+"/api/chat", bytes.NewReader(cb))
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %w", err)
+	}
+	for k, v := range headers {
+		createReq.Header.Set(k, v)
+	}
+	createResp, err := a.client.Do(createReq)
+	if err != nil {
+		return "", fmt.Errorf("创建会话失败: %w", err)
+	}
+	createData, _ := io.ReadAll(createResp.Body)
+	createResp.Body.Close()
+	if createResp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("创建会话失败，状态码: %d, 响应: %s", createResp.StatusCode, string(createData))
+	}
+	var chatObj struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(createData, &chatObj); err != nil || chatObj.ID == "" {
+		return "", fmt.Errorf("解析会话ID失败: %s", string(createData))
+	}
+
+	// 2) 发送消息（SSE 流）
+	// Kimi 网页版不支持独立 system 消息（会导致回复为空），合并进 user
+	fullPrompt := userPrompt
+	if systemPrompt != "" {
+		fullPrompt = systemPrompt + "\n\n" + userPrompt
+	}
+	msgBody := map[string]interface{}{
+		"messages": []map[string]string{
+			{"role": "user", "content": fullPrompt},
+		},
+		"kimiplus_id": "kimi",
+		"use_search":  false,
+		"stream":      true,
+		"is_learning": false,
+	}
+	mb, _ := json.Marshal(msgBody)
+	msgReq, err := http.NewRequestWithContext(ctx, "POST", base+"/api/chat/"+chatObj.ID+"/completion/stream", bytes.NewReader(mb))
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %w", err)
+	}
+	for k, v := range headers {
+		msgReq.Header.Set(k, v)
+	}
+	msgResp, err := a.client.Do(msgReq)
+	if err != nil {
+		return "", fmt.Errorf("发送消息失败: %w", err)
+	}
+	defer msgResp.Body.Close()
+	if msgResp.StatusCode != http.StatusOK {
+		bd, _ := io.ReadAll(msgResp.Body)
+		return "", fmt.Errorf("发送消息失败，状态码: %d, 响应: %s", msgResp.StatusCode, string(bd))
+	}
+	return parseKimiSSE(msgResp.Body)
+}
+
+// parseKimiSSE 解析 Kimi SSE 流，提取 event=cmpl 的 text 字段
+func parseKimiSSE(body io.Reader) (string, error) {
+	var result strings.Builder
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		var evt struct {
+			Event string `json:"event"`
+			Text  string `json:"text"`
+		}
+		if err := json.Unmarshal([]byte(data), &evt); err != nil {
+			continue
+		}
+		if evt.Event == "cmpl" && evt.Text != "" {
+			result.WriteString(evt.Text)
+		}
+		if evt.Event == "done" {
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return result.String(), err
+	}
+	return result.String(), nil
 }
 
 // parseSSEResponse 解析SSE流式响应
@@ -291,6 +408,11 @@ func (a *WebAIAdapter) callWebAI(ctx context.Context, systemPrompt, userPrompt s
 	if !ok {
 		// 尝试使用自定义URL
 		return a.callCustomWebAI(ctx, systemPrompt, userPrompt)
+	}
+
+	// 自定义调用（kimi 等需要先建会话再发消息）
+	if provider.CustomCall != nil {
+		return provider.CustomCall(ctx, a, systemPrompt, userPrompt)
 	}
 
 	url := a.requestURL

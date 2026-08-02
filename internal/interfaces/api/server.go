@@ -369,10 +369,9 @@ func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) {
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		allowOrigin := "http://localhost:8081"
-		if origin == "" || strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1") || strings.HasPrefix(origin, "null") {
-			allowOrigin = origin
-		} else if origin != "" {
+		// 本地单机工具：允许任意来源（便于从 chat.deepseek.com 等页面控制台直接提交 cookie/token）
+		allowOrigin := origin
+		if origin == "" {
 			allowOrigin = "http://localhost:8081"
 		}
 		w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
