@@ -29,6 +29,7 @@ type CookieSession struct {
 	ID        string
 	Status    string
 	Cookies   string
+	Token     string // localStorage 登录态 token（如 deepseek userToken）
 	Error     string
 	StartedAt time.Time
 	Provider  string
@@ -82,9 +83,18 @@ func StartCookieCapture(provider string) (*CookieSession, error) {
 				if err != nil || cookies == "" {
 					continue
 				}
-				// 无论是否登录都记录检测进度，前端可展示“已检测到 N 个 Cookie”
 				s.DetectedCookies = len(strings.Split(cookies, ";"))
 				s.DetectedLen = len(cookies)
+				// 1) localStorage 登录态 token（最可靠，如 deepseek userToken）
+				token := getLoginToken(page, provider)
+				if token != "" {
+					s.Cookies = cookies
+					s.Token = token
+					s.Status = "completed"
+					cookieSessions.Store(s.ID, s)
+					return
+				}
+				// 2) cookie 白名单兜底
 				if hasSessionCookie(cookies, provider) {
 					s.Cookies = cookies
 					s.Status = "completed"
@@ -122,6 +132,41 @@ func (s *CookieSession) setFailed(msg string) {
 	s.Status = "failed"
 	s.Error = msg
 	cookieSessions.Store(s.ID, s)
+}
+
+// providerTokenKeys 各站点 localStorage 中的登录态 token key（登录后才非空）
+var providerTokenKeys = map[string]string{
+	"deepseek-free": "userToken",
+	"kimi-free":     "kimi_token",
+	"zhipu-free":    "chatglm_token",
+	"doubao-free":   "session_token",
+	"qwen-free":     "login_aliyunid_pk",
+}
+
+// getLoginToken 从页面 localStorage 读取登录态 token。
+// deepseek 的 userToken 存为 {"value":"..."} JSON；其它站点可能是裸字符串。
+// 注意：必须用 rod.Eval("() => ...") 箭头函数形式（rod v0.116 的 formatToJSFunc
+// 会把 JS 包成 function(){ return (js).apply(this, arguments) }，普通表达式会报错）
+func getLoginToken(page *rod.Page, provider string) string {
+	key := providerTokenKeys[provider]
+	if key == "" {
+		return ""
+	}
+	js := fmt.Sprintf(`() => { var v = localStorage.getItem(%q); if (!v || v === "null") return ""; try { var o = JSON.parse(v); if (o && typeof o === "object" && "value" in o) { return o.value ? String(o.value) : ""; } } catch(e) {} return v; }`, key)
+	res, err := page.Evaluate(rod.Eval(js))
+	if err != nil {
+		return ""
+	}
+	s := res.Value.Str()
+	s = strings.TrimSpace(s)
+	if len(s) < 10 || s == "null" || s == "undefined" {
+		return ""
+	}
+	// 排除明显的占位/空 JSON
+	if strings.HasPrefix(s, "{") && !strings.Contains(s, ":") {
+		return ""
+	}
+	return s
 }
 
 // junkCookie 判断是否为垃圾/风控/统计类 Cookie（未登录也会大量出现，不能作为登录依据）
@@ -163,7 +208,7 @@ func getCookiesString(page *rod.Page) (string, error) {
 // providerLoginCookies 各站点登录后才出现的特征 Cookie 名（白名单，命中即判定已登录）
 var providerLoginCookies = map[string][]string{
 	"kimi-free":     {"kimi_token", "user_token", "moonshot_token", "sessionid"},
-	"deepseek-free": {"ds_session_id", "user_token", "token", "sessionid", "deepseek_session"},
+	"deepseek-free": {"user_token", "token", "sessionid", "deepseek_session"}, // 注意：ds_session_id 未登录也有，不算
 	"doubao-free":   {"sessionid", "sid", "user_unique_id", "session_token"},
 	"qwen-free":     {"login_aliyunid", "unb", "aliyunid", "login_aliyunid_pk"},
 	"zhipu-free":    {"chatglm_token", "user_token", "sessionid", "glm_token"},

@@ -57,6 +57,9 @@ func (s *Server) HandleAutoCookiePoll(w http.ResponseWriter, r *http.Request) {
 	if session.Status == "completed" {
 		resp["cookie"] = session.Cookies
 		resp["session_id"] = session.ID
+		if session.Token != "" {
+			resp["token"] = session.Token
+		}
 	}
 	if session.Status == "failed" {
 		resp["error"] = session.Error

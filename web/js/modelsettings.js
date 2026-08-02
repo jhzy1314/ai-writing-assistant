@@ -221,7 +221,7 @@ var ModelSettings = {
           self._cookieBusy = false;
           m.overlay.remove();
           try {
-            await API.createWebAIModel({ name: name, provider: providerKey, cookie: r.cookie, request_url: baseURL, model_type: 'webai', vendor: providerKey });
+            await API.createWebAIModel({ name: name, provider: providerKey, cookie: r.cookie, session_token: r.token || '', request_url: baseURL, model_type: 'webai', vendor: providerKey });
             await ModelSettings.loadAll();
             UI.toast('✅ Cookie 抓取成功，已保存「' + name + '」', 'success');
           } catch (e2) { UI.toast('保存失败：' + e2.message, 'error'); }

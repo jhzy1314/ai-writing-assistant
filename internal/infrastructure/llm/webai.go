@@ -103,7 +103,7 @@ var WebAIProviders = map[string]*WebAIProvider{
 	},
 	"deepseek-free": {
 		Name:    "DeepSeek免费版",
-		BaseURL: "https://chat.deepseek.com/api/chat",
+		BaseURL: "https://chat.deepseek.com/api/v0/chat/completions",
 		Headers: func(cookie, token string) map[string]string {
 			h := map[string]string{
 				"Content-Type": "application/json",
