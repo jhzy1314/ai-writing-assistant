@@ -151,6 +151,20 @@ h1:first-child, h2:first-child, h3:first-child, h4:first-child { margin-top: 0; 
   animation-timing-function: cubic-bezier(.16, 1, .3, 1);
 }
 
+/* 不确定进度条：条纹流动动画（AI 分析等长耗时阶段保持视觉流动） */
+.v2-progress-flow {
+  background-image: linear-gradient(45deg,
+    rgba(255,255,255,.18) 25%, transparent 25%,
+    transparent 50%, rgba(255,255,255,.18) 50%,
+    rgba(255,255,255,.18) 75%, transparent 75%, transparent);
+  background-size: 22px 22px;
+  animation: v2-progress-slide .8s linear infinite;
+}
+@keyframes v2-progress-slide {
+  from { background-position: 0 0; }
+  to { background-position: 22px 0; }
+}
+
 /* ---------- 9. 移动端强化（≤768px 结构式响应） ---------- */
 @media (max-width: 768px) {
   body:not(.desktop) {

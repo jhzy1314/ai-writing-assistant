@@ -42,11 +42,16 @@ var ResourceUI = {
     if (!chapters.length) { UI.toast('当前项目还没有章节，先写几章再自动导入', 'warn'); return; }
     // 进度弹窗（不阻塞，纯展示）
     var pid = 'ai_' + uid();
-    var setStage = function (stage, pct) {
+    var setStage = function (stage, pct, flowing) {
       var el = document.getElementById(pid + '_stage');
       var bar = document.getElementById(pid + '_bar');
       if (el) el.textContent = stage;
-      if (bar) bar.style.width = (pct || 0) + '%';
+      if (bar) {
+        bar.style.width = (pct || 0) + '%';
+        // 长耗时阶段（AI 分析）加流动条纹，视觉上“在动”
+        if (flowing) bar.classList.add('v2-progress-flow');
+        else bar.classList.remove('v2-progress-flow');
+      }
     };
     var closeProgress = function () {
       document.querySelectorAll('#modalRoot .modal-overlay').forEach(function (o) { o.remove(); });
@@ -63,48 +68,66 @@ var ResourceUI = {
       actions: []
     });
     try {
-      // 阶段1：读取章节
-      setStage('📚 读取章节中…（' + chapters.length + ' 章）', 8);
-      var text = chapters.map(function (c) { return '【' + (c.title || '未命名') + '】\n' + (c.content || ''); }).join('\n\n');
-      if (text.length > 60000) text = text.slice(0, 60000);
-      setStage('🧠 AI 分析中…（已读取 ' + text.length + ' 字，通常需要 10-30 秒）', 25);
+      // 阶段1：读取章节（优化：每章只取前 3000 字+标题，保留人物出场密集的开头，控制总输入≤2万字加速）
+      setStage('📚 读取章节中…（' + chapters.length + ' 章）', 8, false);
+      var text = chapters.slice(0, 8).map(function (c) {
+        var body = (c.content || '');
+        if (body.length > 3000) body = body.slice(0, 3000);
+        return '【' + (c.title || '未命名') + '】\n' + body;
+      }).join('\n\n');
+      if (text.length > 20000) text = text.slice(0, 20000);
+      setStage('🧠 AI 分析中…（已读取 ' + text.length + ' 字，请稍候）', 25, true);
       var r = await API.post('/api/tools/execute', { tool: 'summarize', content: text });
       var result = r.result || '';
       var parsed = ResourceUI.parseSummaryResult(result);
       if (!parsed.characters.length && !parsed.worlds.length) {
-        setStage('⚠️ AI 未从正文识别到可导入的设定', 100);
+        setStage('⚠️ AI 未从正文识别到可导入的设定', 100, false);
         setTimeout(closeProgress, 1500);
         UI.toast('AI 未从正文识别到可导入的设定', '');
         return;
       }
       // 阶段2：保存
-      setStage('💾 保存中…', 55);
-      var existingChars = (Store.state.characters || []).map(function (c) { return c.name; });
-      var existingWorlds = (Store.state.worldSettings || []).map(function (w) { return w.title; });
-      var newChars = parsed.characters.filter(function (c) { return existingChars.indexOf(c.name) < 0; });
-      var newWorlds = parsed.worlds.filter(function (w) { return existingWorlds.indexOf(w.title) < 0; });
-      var saved = 0, failed = 0;
+      setStage('💾 保存中…', 55, false);
+      // 模糊去重：规范化名字（去空白/引号/括号/重复字）后比对，避免"天一"vs"天一天一"、"我"vs"叙述者我"等重复
+      var norm = function (s) {
+        return String(s || '')
+          .replace(/[\s"'"'“”‘’（）()《》【】\[\]：:，,。.！!？?]/g, '')
+          .replace(/(.+)\1$/, '$1'); // 去掉尾部重复段（天一天一 -> 天一）
+      };
+      var existingCharsNorm = (Store.state.characters || []).map(function (c) { return norm(c.name); });
+      var existingWorldsNorm = (Store.state.worldSettings || []).map(function (w) { return norm(w.title); });
+      var newChars = parsed.characters.filter(function (c) { return existingCharsNorm.indexOf(norm(c.name)) < 0; });
+      var newWorlds = parsed.worlds.filter(function (w) { return existingWorldsNorm.indexOf(norm(w.title)) < 0; });
+      // 新提取的彼此之间也去重（保留第一个）
+      var seenNew = {};
+      newChars = newChars.filter(function (c) {
+        var k = norm(c.name);
+        if (!k || seenNew[k]) return false;
+        seenNew[k] = true;
+        return true;
+      });
+      var saved = 0, failed = 0, skipped = parsed.characters.length + parsed.worlds.length - newChars.length - newWorlds.length;
       var total = newChars.length + newWorlds.length;
       for (var i = 0; i < newChars.length; i++) {
         try { await ResourceUI.saveCharacter(null, newChars[i].name, newChars[i]); saved++; }
         catch (e) { failed++; }
         var countEl = document.getElementById(pid + '_count');
         if (countEl) countEl.textContent = '人物 ' + (i + 1) + '/' + newChars.length;
-        setStage('💾 保存人物卡 ' + (i + 1) + '/' + newChars.length, 55 + Math.round((i + 1) / (total || 1) * 35));
+        setStage('💾 保存人物卡 ' + (i + 1) + '/' + newChars.length, 55 + Math.round((i + 1) / (total || 1) * 35), false);
       }
       for (var j = 0; j < newWorlds.length; j++) {
         try { await ResourceUI.saveWorld(null, newWorlds[j].title, newWorlds[j]); saved++; }
         catch (e) { failed++; }
-        setStage('💾 保存世界观 ' + (j + 1) + '/' + newWorlds.length, 55 + Math.round((newChars.length + j + 1) / (total || 1) * 35));
+        setStage('💾 保存世界观 ' + (j + 1) + '/' + newWorlds.length, 55 + Math.round((newChars.length + j + 1) / (total || 1) * 35), false);
       }
-      setStage('✅ 完成', 100);
+      setStage('✅ 完成', 100, false);
       setTimeout(closeProgress, 1200);
       Sidebar.renderResources(); RightPanel.renderContext(); ProjectUI.updateMeta();
-      if (saved > 0) UI.toast('✅ 已自动导入 ' + saved + ' 条设定（' + newChars.length + ' 人物 / ' + newWorlds.length + ' 世界观）' + (failed ? '，' + failed + ' 条保存失败' : ''), 'success');
-      else if (newChars.length === 0 && newWorlds.length === 0 && (parsed.characters.length || parsed.worlds.length)) UI.toast('提取到 ' + (parsed.characters.length + parsed.worlds.length) + ' 条设定，但都已存在（自动跳过重复）', 'info');
+      if (saved > 0) UI.toast('✅ 已自动导入 ' + saved + ' 条设定（新增 ' + newChars.length + ' 人物 / ' + newWorlds.length + ' 世界观' + (skipped > 0 ? '，跳过重复 ' + skipped + ' 条' : '') + '）' + (failed ? '，' + failed + ' 条保存失败' : ''), 'success');
+      else if (skipped > 0) UI.toast('提取到 ' + (parsed.characters.length + parsed.worlds.length) + ' 条设定，但都已存在（自动跳过重复 ' + skipped + ' 条）', 'info');
       else UI.toast('AI 未从正文识别到可导入的设定', '');
     } catch (e) {
-      setStage('❌ 失败：' + e.message, 100);
+      setStage('❌ 失败：' + e.message, 100, false);
       setTimeout(closeProgress, 2000);
       UI.toast('自动导入失败：' + e.message, 'error');
     }
