@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -82,9 +83,32 @@ var WebAIProviders = map[string]*WebAIProvider{
 		},
 		ParseResponse: parseSSEResponse,
 	},
-	
-	
-	
+	"mimo-free": {
+		Name:    "小米MiMo免费版",
+		BaseURL: "https://aistudio.xiaomimimo.com/open-apis/bot/chat",
+		CustomCall: callMimoFree,
+		Headers: func(cookie, token string) map[string]string {
+			h := map[string]string{
+				"Content-Type":   "application/json",
+				"Accept-Language": "system",
+				"x-timeZone":      "Asia/Shanghai",
+			}
+			if cookie != "" {
+				h["Cookie"] = cookie
+			}
+			return h
+		},
+		BuildBody: func(systemPrompt, userPrompt string) interface{} {
+			return map[string]interface{}{
+				"messages": []map[string]string{
+					{"role": "system", "content": systemPrompt},
+					{"role": "user", "content": userPrompt},
+				},
+				"stream": true,
+			}
+		},
+		ParseResponse: parseSSEResponse,
+	},
 }
 
 // callDoubaoFree 调用豆包网页版：POST /chat/completion，SSE 流式回复
@@ -175,6 +199,146 @@ func parseDoubaoSSE(body io.Reader) (string, error) {
 		result.WriteString(t)
 	}
 	return strings.TrimSpace(result.String()), nil
+}
+
+// callMimoFree 调用小米 MiMo 网页版：POST /open-apis/bot/chat，SSE 流式回复
+// 认证靠 3 个 cookie：xiaomichatbot_serviceToken + userId + xiaomichatbot_ph（ph 同时要作为 URL 参数）
+func callMimoFree(ctx context.Context, a *WebAIAdapter, systemPrompt, userPrompt string) (string, error) {
+	base := "https://aistudio.xiaomimimo.com"
+
+	// 从 cookie 里提取 xiaomichatbot_ph（去引号）
+	ph := ""
+	if a.cookie != "" {
+		for _, part := range strings.Split(a.cookie, ";") {
+			part = strings.TrimSpace(part)
+			if strings.HasPrefix(part, "xiaomichatbot_ph=") {
+				ph = strings.Trim(strings.TrimPrefix(part, "xiaomichatbot_ph="), "\"")
+				break
+			}
+		}
+	}
+
+	fullPrompt := userPrompt
+	if systemPrompt != "" {
+		fullPrompt = systemPrompt + "\n\n" + userPrompt
+	}
+	body := map[string]interface{}{
+		"msgId":          uuid.NewString(),
+		"conversationId": uuid.NewString(),
+		"query":          fullPrompt,
+		"isEditedQuery":  false,
+		"modelConfig": map[string]interface{}{
+			"enableThinking":  false,
+			"webSearchStatus": "disabled",
+			"model":           "mimo-v2.5-pro",
+		},
+		"multiMedias": []interface{}{},
+	}
+	jb, _ := json.Marshal(body)
+
+	apiURL := base + "/open-apis/bot/chat"
+	if ph != "" {
+		apiURL += "?xiaomichatbot_ph=" + url.QueryEscape(ph)
+	}
+
+	headers := map[string]string{
+		"Content-Type":   "application/json",
+		"Accept-Language": "system",
+		"x-timeZone":      "Asia/Shanghai",
+		"User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+		"Origin":          base,
+		"Referer":         base + "/",
+	}
+	if a.cookie != "" {
+		headers["Cookie"] = a.cookie
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(jb))
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %w", err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("发送请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		bd, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("MiMo请求失败，状态码: %d, 响应: %s", resp.StatusCode, string(bd))
+	}
+	return parseMimoSSE(resp.Body)
+}
+
+// parseMimoSSE 解析 MiMo SSE 流：提取 event=message 的 data.content，跳过 <think> 思考块，遇 event=finish 结束
+func parseMimoSSE(body io.Reader) (string, error) {
+	var result strings.Builder
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	var inThink bool
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "event:") {
+			evt := strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			if evt == "finish" {
+				break
+			}
+			continue
+		}
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		var evt struct {
+			Type    string `json:"type"`
+			Content string `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(data), &evt); err != nil {
+			continue
+		}
+		if evt.Type != "text" || evt.Content == "" {
+			continue
+		}
+		// 处理 <think> 思考块：思考内容跳过
+		for _, seg := range splitThink(evt.Content, &inThink) {
+			if seg != "" {
+				result.WriteString(seg)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return result.String(), err
+	}
+	return strings.TrimSpace(strings.ReplaceAll(result.String(), "\u0000", "")), nil
+}
+
+// splitThink 按 <think> 标签切分文本，跳过思考内容；inThink 维护跨 chunk 的思考状态
+func splitThink(s string, inThink *bool) []string {
+	var out []string
+	rest := s
+	for {
+		if *inThink {
+			idx := strings.Index(rest, "</think>")
+			if idx < 0 {
+				return out // 整个 chunk 都是思考内容
+			}
+			*inThink = false
+			rest = rest[idx+len("</think>"):]
+			continue
+		}
+		idx := strings.Index(rest, "<think>")
+		if idx < 0 {
+			out = append(out, rest)
+			return out
+		}
+		if idx > 0 {
+			out = append(out, rest[:idx])
+		}
+		*inThink = true
+		rest = rest[idx+len("<think>"):]
+	}
 }
 
 // callKimiFree 调用 Kimi 网页版：先创建会话拿 chat_id，再向会话发消息读取 SSE 流
