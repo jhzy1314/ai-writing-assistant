@@ -393,10 +393,10 @@ var ResourceUI = {
   },
   unpackChar: function (desc) {
     var f = { gender: '', tags: '', appearance: '', personality: '', background: '', bottomline: '', relations: '', notes: '' };
-    var map = { '性别': 'gender', '标签': 'tags', '外貌': 'appearance', '性格': 'personality', '背景': 'background', '行为底线': 'bottomline', '人际关系': 'relations', '备注': 'notes' };
+    var map = { '性别': 'gender', '标签': 'tags', '角色定位': 'tags', '外貌': 'appearance', '外貌特征': 'appearance', '性格': 'personality', '性格描述': 'personality', '背景': 'background', '背景故事': 'background', '行为底线': 'bottomline', '人际关系': 'relations', '关系网络': 'relations', '能力/技能': 'notes', '能力技能': 'notes', '备注': 'notes' };
     (desc || '').split('\n').forEach(function (line) {
-      var m = line.match(/^(性别|标签|外貌|性格|背景|行为底线|人际关系|备注)：(.*)$/);
-      if (m) f[map[m[1]]] = m[2];
+      var m = line.match(/^(性别|标签|角色定位|外貌|外貌特征|性格|性格描述|背景|背景故事|行为底线|人际关系|关系网络|能力\/技能|能力技能|备注)：(.*)$/);
+      if (m && map[m[1]]) f[map[m[1]]] = m[2];
     });
     return f;
   },

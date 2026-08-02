@@ -68,16 +68,23 @@ var CharacterPage = {
       for (var i = 0; i < chars.length; i++) { if (chars[i].id === id) { c = chars[i]; break; } }
     }
     var isNew = !c;
+    // 统一数据模型：AI 自动导入/侧栏保存的人物卡把字段打包在 description 里（格式：性别：男\n外貌：…），
+    // 这里也解析 description 填充，保证人物卡页面能看到 AI 总结的外貌/性格/背景等内容
+    var f = c && c.description ? ResourceUI.unpackChar(c.description) : {};
+    if (c && c.description && c.description.indexOf('：') < 0 && c.description.indexOf(':') < 0) {
+      // description 不是字段格式（旧数据/纯文本），原样放进背景
+      f.background = c.description;
+    }
     var html = '<div class="form-group"><label>姓名 *</label><input id="charName" value="' + escAttr(c ? c.name || '' : '') + '"></div>';
-    html += '<div class="form-row"><div class="form-group"><label>性别</label><select id="charGender"><option value="">--</option><option value="男"' + (c && c.gender === '男' ? ' selected' : '') + '>男</option><option value="女"' + (c && c.gender === '女' ? ' selected' : '') + '>女</option><option value="其他"' + (c && c.gender === '其他' ? ' selected' : '') + '>其他</option></select></div>';
-    html += '<div class="form-group"><label>年龄</label><input id="charAge" value="' + escAttr(c ? c.age || '' : '') + '"></div></div>';
-    html += '<div class="form-group"><label>角色定位</label><input id="charRole" value="' + escAttr(c ? c.role || '' : '') + '" placeholder="主角/反派/配角..."></div>';
-    html += '<div class="form-group"><label>外貌特征</label><textarea id="charAppearance" rows="2">' + esc(c ? c.appearance || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>性格描述</label><textarea id="charPersonality" rows="2">' + esc(c ? c.personality || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>背景故事</label><textarea id="charBackground" rows="3">' + esc(c ? c.background || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>能力/技能</label><textarea id="charAbilities" rows="2">' + esc(c ? c.abilities || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>关系网络</label><textarea id="charRelations" rows="2" placeholder="人物A: 师徒关系...">' + esc(c ? c.relations || '' : '') + '</textarea></div>';
-    html += '<div class="form-group"><label>备注</label><textarea id="charNotes" rows="2">' + esc(c ? c.notes || '' : '') + '</textarea></div>';
+    html += '<div class="form-row"><div class="form-group"><label>性别</label><select id="charGender"><option value="">--</option><option value="男"' + (((c && c.gender) || f.gender) === '男' ? ' selected' : '') + '>男</option><option value="女"' + (((c && c.gender) || f.gender) === '女' ? ' selected' : '') + '>女</option><option value="其他"' + (((c && c.gender) || f.gender) === '其他' ? ' selected' : '') + '>其他</option></select></div>';
+    html += '<div class="form-group"><label>年龄</label><input id="charAge" value="' + escAttr(c && c.age ? c.age : '') + '"></div></div>';
+    html += '<div class="form-group"><label>角色定位</label><input id="charRole" value="' + escAttr((c && c.role) || f.tags || '') + '" placeholder="主角/反派/配角..."></div>';
+    html += '<div class="form-group"><label>外貌特征</label><textarea id="charAppearance" rows="2">' + esc((c && c.appearance) || f.appearance || '') + '</textarea></div>';
+    html += '<div class="form-group"><label>性格描述</label><textarea id="charPersonality" rows="2">' + esc((c && c.personality) || f.personality || '') + '</textarea></div>';
+    html += '<div class="form-group"><label>背景故事</label><textarea id="charBackground" rows="3">' + esc((c && c.background) || f.background || '') + '</textarea></div>';
+    html += '<div class="form-group"><label>能力/技能</label><textarea id="charAbilities" rows="2">' + esc((c && c.abilities) || '') + '</textarea></div>';
+    html += '<div class="form-group"><label>关系网络</label><textarea id="charRelations" rows="2" placeholder="人物A: 师徒关系...">' + esc((c && c.relations) || f.relations || '') + '</textarea></div>';
+    html += '<div class="form-group"><label>备注</label><textarea id="charNotes" rows="2">' + esc((c && c.notes) || f.notes || '') + '</textarea></div>';
 
     var self = this;
     UI.modal({
@@ -111,6 +118,17 @@ var CharacterPage = {
     var p = Store.state.currentProject;
     if (!p) { UI.toast('请先在左侧选择项目', 'warn'); return; }
     data.project_id = p.id;
+    // 统一数据模型：把编辑字段打包进 description（与 AI 自动导入/侧栏保存格式一致：性别：男\n外貌：…）
+    var parts = [];
+    if (data.gender) parts.push('性别：' + data.gender);
+    if (data.role) parts.push('角色定位：' + data.role);
+    if (data.appearance) parts.push('外貌：' + data.appearance);
+    if (data.personality) parts.push('性格：' + data.personality);
+    if (data.background) parts.push('背景：' + data.background);
+    if (data.abilities) parts.push('能力/技能：' + data.abilities);
+    if (data.relations) parts.push('人际关系：' + data.relations);
+    if (data.notes) parts.push('备注：' + data.notes);
+    if (parts.length) data.description = parts.join('\n');
     try {
       if (id) { await API.updateCharacter(id, data); }
       else { await API.createCharacter(data); }
