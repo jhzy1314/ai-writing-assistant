@@ -82,32 +82,7 @@ var WebAIProviders = map[string]*WebAIProvider{
 		},
 		ParseResponse: parseSSEResponse,
 	},
-	"qwen-free": {
-		Name:    "通义千问免费版",
-		BaseURL: "https://tongyi.aliyun.com/api/chat",
-		Headers: func(cookie, token string) map[string]string {
-			h := map[string]string{
-				"Content-Type": "application/json",
-			}
-			if cookie != "" {
-				h["Cookie"] = cookie
-			}
-			if token != "" {
-				h["Authorization"] = "Bearer " + token
-			}
-			return h
-		},
-		BuildBody: func(systemPrompt, userPrompt string) interface{} {
-			return map[string]interface{}{
-				"messages": []map[string]string{
-					{"role": "system", "content": systemPrompt},
-					{"role": "user", "content": userPrompt},
-				},
-				"stream": true,
-			}
-		},
-		ParseResponse: parseSSEResponse,
-	},
+	
 	
 	
 }
