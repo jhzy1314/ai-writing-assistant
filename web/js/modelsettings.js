@@ -204,6 +204,7 @@ var ModelSettings = {
     var t0 = Date.now();
     var m = UI.modal({
       title: '🪄 自动获取 Cookie：' + name,
+      noOverlayClose: true, // 等待登录期间禁止点遮罩关闭（防误关），只能点「关闭窗口」
       body: '<div style="font-size:12px;line-height:1.8">' +
         '<div>1️⃣ 系统已打开 <b>' + esc(name) + '</b> 的浏览器窗口</div>' +
         '<div>2️⃣ 请在窗口中<b>登录你的账号</b>（登录后会自动跳转回聊天页）</div>' +
@@ -241,14 +242,18 @@ var ModelSettings = {
         }
       } catch (e) { /* 轮询中，忽略瞬时错误 */ }
     }, 2000);
-    // 窗口关闭时取消
-    m.overlay.querySelector('[data-act]').onclick = function () {
+    // 窗口关闭时取消（「关闭窗口」按钮 + 右上角 ✕ 都走取消清理）
+    var cancelFn = function () {
       clearInterval(iv);
       API.autoCookieCancel(sid).catch(function () {});
       self._cookieBusy = false;
       m.overlay.remove();
       UI.toast('已取消抓取', 'warn');
     };
+    var closeBtn = m.overlay.querySelector('[data-act]');
+    if (closeBtn) closeBtn.onclick = cancelFn;
+    var mx = m.overlay.querySelector('.modal-x');
+    if (mx) mx.onclick = function (e) { e.stopPropagation(); cancelFn(); };
   },
   showWebaiCreate: function () {
     this.showCreate();

@@ -93,7 +93,10 @@ var UI = {
       };
     }
     ov.appendChild(m);
-    ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+    // 默认点击遮罩关闭；opts.noOverlayClose=true 时禁止（等待类弹窗防误关）
+    if (!opts.noOverlayClose) {
+      ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+    }
     if (opts.actions) {
       m.querySelectorAll('[data-act]').forEach(function (btn) {
         btn.onclick = function () {
