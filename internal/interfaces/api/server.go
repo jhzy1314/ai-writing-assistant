@@ -217,11 +217,10 @@ func (s *Server) routes() {
 	if indexHTML == nil {
 		indexHTML = []byte("<html><body>index.html not embedded</body></html>")
 	}
-	// 给 JS/CSS 链接加版本号，强制浏览器加载最新；同时把版本号注入顶栏显示
+	// 给 JS/CSS 链接加版本号，强制浏览器加载最新
 	cacheBusted := strings.NewReplacer(
 		".js\"", ".js?v="+buildVersion+"\"",
 		".css\"", ".css?v="+buildVersion+"\"",
-		"__BUILD_VERSION__", buildVersion,
 	).Replace(string(indexHTML))
 
 	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) {
