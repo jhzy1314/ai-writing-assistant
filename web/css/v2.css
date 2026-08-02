@@ -1,0 +1,193 @@
+/* ============================================================
+ * v2.css · AI Novel Studio 新视觉层（Operate 模式）
+ * 依据 impeccable craft-floor + taste-skill 原则重写。
+ * 在 style.css / beautify.css / themes.css / polish.css 之后加载，
+ * 只覆盖视觉（不改变 HTML 结构与 JS 逻辑），回退只需删除本文件引用。
+ * ============================================================ */
+
+/* ---------- 1. 设计令牌覆盖：单 accent、语义状态、克制阴影 ---------- */
+:root {
+  /* 字体层级：固定 rem 比例 1.125-1.2（Operate 模式，不做流体字号） */
+  --v2-fs-xs: 11px;
+  --v2-fs-sm: 12.5px;
+  --v2-fs-base: 14px;
+  --v2-fs-md: 16px;
+  --v2-fs-lg: 18px;
+  --v2-fs-xl: 22px;
+  --v2-fs-2xl: 26px;
+  /* 圆角一致性：卡片 12-16px，小控件 6-8px，pill 只给小按钮/标签 */
+  --v2-radius-card: 14px;
+  --v2-radius-ctrl: 8px;
+  --v2-radius-pill: 999px;
+  /* 阴影：带偏移+模糊，无零偏移发光晕 */
+  --v2-shadow-1: 0 1px 2px rgba(15,20,35,.05);
+  --v2-shadow-2: 0 2px 6px rgba(15,20,35,.07);
+  --v2-shadow-3: 0 8px 24px rgba(15,20,35,.12);
+  /* 状态语义（与现有变量对齐，保证对比度） */
+  --v2-ring: rgba(232,148,90,.35);
+}
+[data-theme="dark"] {
+  --v2-ring: rgba(240,160,96,.4);
+  --v2-shadow-1: 0 1px 2px rgba(0,0,0,.25);
+  --v2-shadow-2: 0 2px 6px rgba(0,0,0,.3);
+  --v2-shadow-3: 0 8px 24px rgba(0,0,0,.42);
+}
+
+/* ---------- 2. 全局基础：正文测量 65-75ch、对比度兜底 ---------- */
+body { font-size: var(--v2-fs-base); }
+.editor-rich, .editor-md, .preview-inner, .pipe-outline, .tool-output-body {
+  max-width: 72ch;
+}
+input, textarea, select, button {
+  font-family: inherit;
+}
+
+/* ---------- 3. 组件全状态 ---------- */
+/* 按钮：default / hover / focus-visible / active / disabled */
+.btn, .tool-btn, .link-btn {
+  transition: background .15s ease, color .15s ease, border-color .15s ease,
+              transform .1s ease, box-shadow .15s ease;
+}
+.btn:focus-visible, .tool-btn:focus-visible, .link-btn:focus-visible,
+select:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--v2-ring);
+  outline-offset: 1px;
+}
+.btn:active, .tool-btn:active {
+  transform: scale(.97);
+}
+.btn-primary {
+  box-shadow: var(--v2-shadow-1);
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: var(--v2-shadow-2);
+}
+
+/* 表单：label 在上、错误在下、placeholder 对比度 */
+.form-group label { margin-bottom: 4px; }
+.form-group input, .form-group textarea, .form-group select {
+  border: 1px solid var(--border2);
+  border-radius: var(--v2-radius-ctrl);
+  padding: 7px 10px;
+  background: var(--panel);
+  color: var(--text);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--v2-ring);
+  outline: none;
+}
+.form-group input::placeholder, .form-group textarea::placeholder {
+  color: var(--muted);
+  opacity: .9;
+}
+.form-error { color: var(--danger); font-size: var(--v2-fs-xs); margin-top: 3px; }
+
+/* 卡片：克制抬升（边框+轻阴影二选一，避免 ghost card） */
+.eg-card, .pipe-card, .world-card, .char-card, .model-card,
+.tool-card, .template-card, .dash-card {
+  border: 1px solid var(--border);
+  border-radius: var(--v2-radius-card);
+  box-shadow: var(--v2-shadow-1);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.eg-card:hover, .pipe-card:hover, .world-card:hover, .char-card:hover,
+.model-card:hover, .tool-card:hover, .template-card:hover, .dash-card:hover {
+  box-shadow: var(--v2-shadow-2);
+}
+
+/* ---------- 4. 侧边栏 / 顶栏：第二中性层（比内容面略冷/略暖） ---------- */
+.sidebar {
+  background: var(--panel2);
+}
+[data-theme="light"] .sidebar {
+  background: rgba(246,244,240,.96);
+}
+.quota-bar, .topbar {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- 5. 文本层级：明显字重/字号步进，克制字距 ---------- */
+.eg-title { font-size: var(--v2-fs-2xl); letter-spacing: -0.01em; }
+.page-head h2 { font-size: var(--v2-fs-xl); letter-spacing: -0.01em; }
+.doc-title { letter-spacing: -0.01em; }
+h3.modal-title, .modal h3 { font-size: var(--v2-fs-md); }
+
+/* 正文行高 1.6、行距节奏：标题上方空间 > 下方 */
+h1, h2, h3, h4 {
+  margin-top: 1.4em;
+  margin-bottom: .5em;
+}
+h1:first-child, h2:first-child, h3:first-child, h4:first-child { margin-top: 0; }
+
+/* ---------- 6. 弹窗 / 覆盖层：定位子元素不被 overflow 裁剪 ---------- */
+.modal-overlay {
+  background: rgba(10,14,26,.55);
+  backdrop-filter: blur(2px);
+}
+.modal {
+  border-radius: var(--v2-radius-card);
+  box-shadow: var(--v2-shadow-3);
+  border: 1px solid var(--border2);
+}
+
+/* ---------- 7. 状态反馈：loading 骨架 / 空状态 / 错误 ---------- */
+.v2-skeleton {
+  background: linear-gradient(90deg, var(--panel2) 25%, var(--panel3) 50%, var(--panel2) 75%);
+  background-size: 200% 100%;
+  animation: v2-shimmer 1.4s infinite;
+  border-radius: 6px;
+}
+@keyframes v2-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* ---------- 8. 动效：150-250ms、ease-out、状态传达非装饰 ---------- */
+.toast, .modal, .more-menu, .pro-mode-panel {
+  animation-duration: .18s;
+  animation-timing-function: cubic-bezier(.16, 1, .3, 1);
+}
+
+/* ---------- 9. 移动端强化（≤768px 结构式响应） ---------- */
+@media (max-width: 768px) {
+  body:not(.desktop) {
+    --v2-fs-base: 15px;
+  }
+  /* 触摸目标 ≥ 40px */
+  body:not(.desktop) .tool-btn,
+  body:not(.desktop) .link-btn,
+  body:not(.desktop) .mcb-nav,
+  body:not(.desktop) .mrs-tab {
+    min-height: 40px;
+  }
+  /* 弹窗贴近视口 */
+  body:not(.desktop) .modal {
+    max-width: 94vw;
+    max-height: 86vh;
+  }
+  /* 正文行高放宽 */
+  body:not(.desktop) .editor-rich,
+  body:not(.desktop) .editor-md {
+    font-size: 16px;
+    line-height: 1.85;
+  }
+  /* 防止横向溢出 */
+  body:not(.desktop) .composer-hint,
+  body:not(.desktop) .editor-toolbar {
+    overflow-x: auto;
+  }
+  /* 生成区按钮行允许换行，避免 proModeBtn 被推出视口 */
+  body:not(.desktop) .gen-main-row {
+    flex-wrap: wrap;
+  }
+  body:not(.desktop) .gen-main-row .btn-gen {
+    flex: 1 1 auto;
+    min-width: 96px;
+  }
+  body:not(.desktop) .gen-main-row .pro-mode-toggle {
+    flex-shrink: 0;
+  }
+}

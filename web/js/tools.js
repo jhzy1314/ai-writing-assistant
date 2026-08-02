@@ -1,4 +1,4 @@
-/* ============ tools.js：Helper 工具辅助操作（录音转写 / 清洗 / 排序 / 提取 / 转换 / 统计） ============ */
+﻿/* ============ tools.js：Helper 工具辅助操作（录音转写 / 清洗 / 排序 / 提取 / 转换 / 统计） ============ */
 var Tools = {
 
   /* ---- 文字校对 ---- */
@@ -920,7 +920,7 @@ var Tools = {
 
     var flagsHtml = '';
     flags.forEach(function (f) {
-      flagsHtml += '<div style="display:flex;justify-content:space-between;padding:4px 8px;margin:2px 0;border-left:3px solid ' + color + ';font-size:10px;background:var(--panel3);border-radius:2px">' +
+      flagsHtml += '<div style="display:flex;justify-content:space-between;padding:4px 8px;margin:2px 0;border-left:1px solid ' + color + ';font-size:10px;background:var(--panel3);border-radius:2px">' +
         '<span>' + esc(f.rule || f.ruleName || '') + '</span>' +
         '<span style="color:var(--muted)">' + esc(f.desc || '').substring(0, 30) + '</span>' +
         '<span>' + ((f.confidence || 0) * 100).toFixed(0) + '%</span>' +
@@ -949,3 +949,4 @@ var Tools = {
     });
   }
 };
+

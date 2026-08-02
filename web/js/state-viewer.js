@@ -1,4 +1,4 @@
-/* ============ state-viewer.js：运行时状态仪表盘 ============ */
+﻿/* ============ state-viewer.js：运行时状态仪表盘 ============ */
 ;(function () {
   var StateViewer = {
     loading: false,
@@ -79,7 +79,7 @@
           else if (statusLabel === 'deferred') { statusColor = '#fb923c'; }
           else if (statusLabel === 'resolved') { statusColor = '#9ca3af'; }
 
-          html += '<div style="padding:8px 10px;border-left:3px solid ' + statusColor + ';margin-bottom:6px;background:var(--panel2);border-radius:0 6px 6px 0">' +
+          html += '<div style="padding:8px 10px;border-left:1px solid ' + statusColor + ';margin-bottom:6px;background:var(--panel2);border-radius:0 6px 6px 0">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
             '<strong style="font-size:11px">' + esc(h.hookId || '') + '</strong>' +
             '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:' + statusColor + '20;color:' + statusColor + '">' + esc(statusLabel) + '</span>' +
@@ -112,3 +112,4 @@
 
   window.StateViewer = StateViewer;
 })();
+

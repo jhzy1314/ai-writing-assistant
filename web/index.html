@@ -1,4 +1,4 @@
-?<!DOCTYPE html>
+﻿?<!DOCTYPE html>
 <html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="UTF-8">
@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="/static/css/beautify.css">
 <link rel="stylesheet" href="/static/css/themes.css">
 <link rel="stylesheet" href="/static/css/polish.css">
+<link rel="stylesheet" href="/static/css/v2.css">
 <script type="importmap">
 {
   "imports": {
@@ -48,7 +49,7 @@ window.initTiptap = async function () {
 </script>
 </head>
 <body>
-<div id="offlineBar" style="display:none;background:#b45309;color:#fff;text-align:center;padding:4px;font-size:12px">🌐 网络已断开 —— AI生成和在线背景不可用，本地写作和数据保存正常</div>
+<div id="offlineBar" style="display:none;background:#b45309;color:#fff;text-align:center;padding:4px;font-size:12px">🌐 网络已断开 -- AI生成和在线背景不可用，本地写作和数据保存正常</div>
 <!-- ============ Top quota bar ============ -->
 <div class="quota-bar">
   <div class="brand"><span class="logo">✦</span><span>AI Novel Studio</span></div>
@@ -358,13 +359,13 @@ window.initTiptap = async function () {
           <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="规划师：构思大纲与剧情节点（动脑收益最大）">
             <input type="checkbox" id="thinkThinker" checked onchange="Composer.onRoleThinkingChange('thinker', this.checked)"> 规划
           </label>
-          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="写作：正文创作（推荐关闭——写作是执行任务，思考收益小且更慢）">
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="写作：正文创作（推荐关闭--写作是执行任务，思考收益小且更慢）">
             <input type="checkbox" id="thinkWorker" onchange="Composer.onRoleThinkingChange('worker', this.checked)"> 写作
           </label>
-          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="审稿：质量校验（推荐关闭——实测审稿思考开销极大：审 700 字要 2.5 分钟，性价比低）">
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="审稿：质量校验（推荐关闭--实测审稿思考开销极大：审 700 字要 2.5 分钟，性价比低）">
             <input type="checkbox" id="thinkVerifier" onchange="Composer.onRoleThinkingChange('verifier', this.checked)"> 审稿
           </label>
-          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="轻活：缩写/摘要/改写等小任务（推荐关闭——简单执行不需要思考）">
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="轻活：缩写/摘要/改写等小任务（推荐关闭--简单执行不需要思考）">
             <input type="checkbox" id="thinkHelper" onchange="Composer.onRoleThinkingChange('helper', this.checked)"> 轻活
           </label>
           <span style="font-size:10px;color:var(--accent);margin-left:2px">推荐：仅规划开</span>
@@ -738,7 +739,7 @@ window.initTiptap = async function () {
             <div class="char-corner bl"></div><div class="char-corner br"></div>
             <div class="char-avatar"></div>
             <div class="char-title">👤 头像示例</div>
-            <div class="char-date">— 2023-7-15 18:26:26 —</div>
+            <div class="char-date">2023-7-15 18:26:26</div>
             <div class="char-tags"><span class="char-tag">身份标签</span><span class="char-tag">身份标在</span></div>
             <div class="char-desc">在含含稿范着</div>
             <div class="char-section">· 人物简介 ·</div>
@@ -748,7 +749,7 @@ window.initTiptap = async function () {
             <div class="char-corner bl"></div><div class="char-corner br"></div>
             <div class="char-avatar" style="background:linear-gradient(135deg,#e8e0d0,#c8b89c)">👤</div>
             <div class="char-title">👤 姓名：示例</div>
-            <div class="char-date">— 2023-7-19 8:18:26 —</div>
+            <div class="char-date">2023-7-19 8:18:26</div>
             <div class="char-tags"><span class="char-tag">身份标签</span><span class="char-tag">身份标签</span></div>
             <div class="char-desc">示例：人物背景描述文字，包含性格特征与成长经历。</div>
             <div class="char-section">· 人物简介 ·</div>
@@ -758,7 +759,7 @@ window.initTiptap = async function () {
             <div class="char-corner bl"></div><div class="char-corner br"></div>
             <div class="char-avatar" style="background:linear-gradient(135deg,#d4a866,#a87f3a)">👤</div>
             <div class="char-title">👤 角色：示例</div>
-            <div class="char-date">— 2023-7-13 1:43:26 —</div>
+            <div class="char-date">2023-7-13 1:43:26</div>
             <div class="char-tags"><span class="char-tag">身份标签</span><span class="char-tag">身份特征</span></div>
             <div class="char-desc">示例：世界观设定描述文字，包含势力与背景说明。</div>
             <div class="char-section">· 人物特征 ·</div>
@@ -768,7 +769,7 @@ window.initTiptap = async function () {
             <div class="char-corner bl"></div><div class="char-corner br"></div>
             <div class="char-avatar" style="background:linear-gradient(135deg,#5a4838,#3a2818)">最</div>
             <div class="char-title">👤 最近更新</div>
-            <div class="char-date">— 2023-7-15 18:26:26 —</div>
+            <div class="char-date">2023-7-15 18:26:26</div>
             <div class="char-tags"><span class="char-tag">身份标签</span><span class="char-tag">身份特征</span></div>
             <div class="char-desc">示例：重要人物说明文字。</div>
             <div class="char-section">· 人物特征 ·</div>
@@ -1401,3 +1402,4 @@ if (typeof MobileUI !== 'undefined') MobileUI.init();
 </script>
 </body>
 </html>
+

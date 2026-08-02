@@ -1,4 +1,4 @@
-/* ============ editor.js：Tiptap 双模式编辑器 ============ */
+﻿/* ============ editor.js：Tiptap 双模式编辑器 ============ */
 var Editor = {
   tiptap: null,
   streaming: false,
@@ -205,7 +205,7 @@ var Editor = {
       if (tells && tells.issues && tells.issues.length) {
         var html = tells.issues.map(function (it) {
           var color = it.severity === 'warning' ? '#e6a23c' : '#909399';
-          return '<div style="margin:5px 0;padding-left:4px;border-left:3px solid ' + color + '">' +
+          return '<div style="margin:5px 0;padding-left:4px;border-left:1px solid ' + color + '">' +
             '<b style="color:' + color + '">【' + it.category + '】</b> ' + it.description +
             '<div style="color:var(--muted);font-size:11px;margin:2px 0 0 10px">→ ' + (it.suggestion || '') + '</div></div>';
         }).join('');
@@ -927,3 +927,4 @@ var Editor = {
     return html;
   }
 };
+
