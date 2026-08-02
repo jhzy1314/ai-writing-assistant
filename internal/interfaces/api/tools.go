@@ -25,6 +25,7 @@ func (s *Server) HandleToolExecute(w http.ResponseWriter, r *http.Request) {
 			To          string `json:"to"`
 			Instruction string `json:"instruction"`
 		} `json:"params"`
+		Model string `json:"model"` // 可选：指定工具使用的模型（如 summarize 用快速模型）
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "请求体解析失败: "+err.Error())
@@ -53,8 +54,8 @@ func (s *Server) HandleToolExecute(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), reqTimeout)
 	defer cancel()
 
-	// 调用 Helper 角色执行工具任务
-	result, modelName, err := s.callHelperTool(ctx, userPrompt)
+	// 调用 Helper 角色执行工具任务（summarize 等工具可指定快速模型；提取类工具关思考加速）
+	result, modelName, err := s.callHelperTool(ctx, userPrompt, req.Model, req.Tool)
 	if err != nil {
 		writeError(w, http.StatusServiceUnavailable, "工具执行失败: "+err.Error())
 		return
@@ -67,12 +68,32 @@ func (s *Server) HandleToolExecute(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// callHelperTool 调用 Helper 角色非流式生成，含备用模型降级
-func (s *Server) callHelperTool(ctx context.Context, userPrompt string) (string, string, error) {
+// callHelperTool 调用 Helper 角色非流式生成，含备用模型降级；preferredModel 非空时优先使用该模型（失败再回退角色绑定）
+// 提取/总结类工具（summarize/extract_*/count 等）自动关闭深度思考以提速
+func (s *Server) callHelperTool(ctx context.Context, userPrompt, preferredModel, tool string) (string, string, error) {
 	agent := roles.NewRoleAgent(llm.RoleHelper, "light")
-	adapters, err := s.registry.AdaptersForRole(ctx, llm.RoleHelper)
-	if err != nil {
-		return "", "", fmt.Errorf("Helper 无可用模型: %w", err)
+	var adapters []llm.ModelAdapter
+	if preferredModel != "" {
+		if a, err := s.registry.AdapterByName(ctx, preferredModel); err == nil {
+			adapters = []llm.ModelAdapter{a}
+		}
+	}
+	if len(adapters) == 0 {
+		var err error
+		adapters, err = s.registry.AdaptersForRole(ctx, llm.RoleHelper)
+		if err != nil {
+			return "", "", fmt.Errorf("Helper 无可用模型: %w", err)
+		}
+	}
+	// 提取/总结类工具关闭深度思考（简单任务不需要推理，提速明显）
+	noThink := tool == "summarize" || tool == "extract_characters" || tool == "extract_worldsetting" ||
+		tool == "count" || tool == "clean" || tool == "convert"
+	if noThink {
+		for _, ad := range adapters {
+			if t, ok := ad.(interface{ SetThinking(bool) }); ok {
+				t.SetThinking(false)
+			}
+		}
 	}
 	var lastErr error
 	for _, ad := range adapters {
@@ -241,6 +262,7 @@ func buildToolPrompt(tool, content, from, to, instruction string) string {
 1. 只提取主要角色：出场多、有名字、对剧情重要的人物，最多 8 个。龙套/路人不要列。
 2. 同名角色只输出一次，禁止重复（例如"天一"只出现一次，不要输出"天一天一"）。
 3. 每个字段用 1-2 句话精炼描述，不要展开长篇。
+3b. 每个角色至少输出 外貌、性格、背景 三个字段：正文没有明确描写时，根据上下文合理推断补齐（性格必须推断，这是人设核心）；外貌正文没提才可省略。
 4. 不要用"未知"占位！正文中没有的信息，那一行就不写。只写正文里确实有的内容。
 5. 没有明显世界观（时代/规则/势力/地点）时，可以只输出人物卡部分。
 

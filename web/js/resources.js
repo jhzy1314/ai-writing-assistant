@@ -68,16 +68,24 @@ var ResourceUI = {
       actions: []
     });
     try {
-      // 阶段1：读取章节（优化：每章只取前 3000 字+标题，保留人物出场密集的开头，控制总输入≤2万字加速）
-      setStage('📚 读取章节中…（' + chapters.length + ' 章）', 8, false);
-      var text = chapters.slice(0, 8).map(function (c) {
+      // 阶段1：读取章节（每章取前 1500 字+标题，限 6 章，总输入≤1.2万字；角色出场密集的开头即可，提速明显）
+      setStage('📚 读取章节中…（' + chapters.length + ' 章，取前 6 章）', 8, false);
+      var text = chapters.slice(0, 6).map(function (c) {
         var body = (c.content || '');
-        if (body.length > 3000) body = body.slice(0, 3000);
+        if (body.length > 1500) body = body.slice(0, 1500);
         return '【' + (c.title || '未命名') + '】\n' + body;
       }).join('\n\n');
-      if (text.length > 20000) text = text.slice(0, 20000);
-      setStage('🧠 AI 分析中…（已读取 ' + text.length + ' 字，请稍候）', 25, true);
-      var r = await API.post('/api/tools/execute', { tool: 'summarize', content: text });
+      if (text.length > 12000) text = text.slice(0, 12000);
+      // 优先使用快速模型（实测 deepseek-v4-flash 对长文本总结最快，glm-5.2 反而慢）
+      var fastModel = null;
+      var models = Store.state.models || [];
+      var prefer = ['deepseek-v4-flash', 'deepseek-v4-pro', 'glm-5.2', 'glm-5', 'mimo-v2.5'];
+      for (var pi = 0; pi < prefer.length; pi++) {
+        var m = models.find(function (x) { return x.name === prefer[pi] && x.status === 'active'; });
+        if (m) { fastModel = m.name; break; }
+      }
+      setStage('🧠 AI 分析中…（' + text.length + ' 字，使用 ' + (fastModel || '默认模型') + '）', 25, true);
+      var r = await API.post('/api/tools/execute', { tool: 'summarize', content: text, model: fastModel || '' });
       var result = r.result || '';
       var parsed = ResourceUI.parseSummaryResult(result);
       if (!parsed.characters.length && !parsed.worlds.length) {

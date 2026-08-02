@@ -67,7 +67,7 @@ func (s *Server) HandlePrecheck(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	prompt := buildPrecheckPrompt(req)
-	text, modelName, err := s.callHelperTool(ctx, prompt)
+	text, modelName, err := s.callHelperTool(ctx, prompt, "", "")
 	if err != nil {
 		// Helper 调用失败，回退到纯启发式校验
 		result := heuristicPrecheck(req)

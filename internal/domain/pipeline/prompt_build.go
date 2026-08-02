@@ -30,6 +30,10 @@ func buildThinkerUserPrompt(req GenerateRequest, bundle ContextBundle, pl Pipeli
 		b.WriteString(bundle.AssembledText())
 		b.WriteString("\n")
 	}
+	// 人设保持约束：规划剧情时人物行为必须基于人物卡设定
+	if strings.TrimSpace(bundle.CharacterSetting) != "" {
+		b.WriteString("【人设铁律】上方【人物卡】是角色设定基准。规划剧情/动机/对话时，所有角色的行为必须符合其人物卡设定（性格、背景、关系、说话方式）。人物可随剧情合理成长，但成长线要有铺垫。\n\n")
+	}
 	if req.SelectedText != "" {
 		b.WriteString("【编辑器选中文字】\n")
 		b.WriteString(req.SelectedText)
@@ -69,6 +73,10 @@ func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline st
 	if bundle.HasContext() {
 		b.WriteString(bundle.AssembledText())
 		b.WriteString("\n")
+	}
+	// 人设保持约束：人物卡已注入时，强制遵守人设并允许合理成长
+	if strings.TrimSpace(bundle.CharacterSetting) != "" {
+		b.WriteString("【人设铁律】必须严格遵守上方【人物卡】中的人物设定：外貌、性格、说话方式、背景、人际关系等核心特质不得偏离。人物可以随剧情事件合理成长变化（如性格渐变、关系发展），但必须有前文铺垫，禁止突然的性情大变或行为崩坏。若剧情需要人设发展，要在行文中自然过渡并保持人物可识别性。\n\n")
 	}
 	if req.SelectedText != "" {
 		b.WriteString("【编辑器选中文字】\n")
@@ -136,6 +144,10 @@ func buildVerifierUserPrompt(req GenerateRequest, bundle ContextBundle, content 
 	if bundle.HasContext() {
 		b.WriteString(bundle.AssembledText())
 		b.WriteString("\n")
+	}
+	// 人设审查约束：校验官必须对照人物卡核查人设一致性（允许合理成长但需前文铺垫）
+	if strings.TrimSpace(bundle.CharacterSetting) != "" {
+		b.WriteString("【人设审查】上方【人物卡】是角色设定基准。逐项核查正文中角色是否人设崩坏（外貌/性格/说话方式/关系突变且无前文铺垫）。允许人物随剧情合理成长，但成长必须有铺垫、可识别。发现人设偏差必须列为缺陷。\n\n")
 	}
 	if strings.TrimSpace(outline) != "" {
 		b.WriteString("【创作框架与审稿清单（来自规划师，请逐项核对）】\n")
