@@ -125,12 +125,12 @@ var ModelSettings = {
         provKeys.forEach(function (key) {
           var p = providers[key];
           html += '<div class="webai-provider-card" style="background:var(--panel2);border:1px solid var(--border);border-radius:7px;padding:10px;margin-bottom:8px">' +
-            '<div style="display:flex;align-items:center;justify-content:space-between">' +
-            '<div><b style="color:var(--accent)">' + esc(p.name || key) + '</b>' +
-            '<div style="font-size:10px;color:var(--muted)">端点：' + esc(p.baseURL || '') + '</div></div>' +
-            '<div style="display:flex;gap:6px">' +
-            '<button class="btn btn-primary btn-sm" onclick="ModelSettings.autoCookie(\'' + key + '\',\'' + esc(p.name) + '\',\'' + esc(p.baseURL || '') + '\')" style="font-size:11px">🪄 自动获取</button>' +
-            '<button class="btn btn-ghost btn-sm" onclick="ModelSettings.showWebaiQuickSetup(\'' + key + '\',\'' + esc(p.name) + '\',\'' + esc(p.baseURL || '') + '\')" style="font-size:11px">✍️ 手动填写</button>' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">' +
+            '<div style="flex:1;min-width:0"><b style="color:var(--accent)">' + esc(p.name || key) + '</b>' +
+            '<div style="font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(p.baseURL || '') + '">端点：' + esc(p.baseURL || '') + '</div></div>' +
+            '<div style="display:flex;gap:6px;flex-shrink:0">' +
+            '<button class="btn btn-primary btn-sm" onclick="ModelSettings.autoCookie(\'' + key + '\',\'' + esc(p.name) + '\',\'' + esc(p.baseURL || '') + '\')" style="font-size:11px;white-space:nowrap">🪄 自动获取</button>' +
+            '<button class="btn btn-ghost btn-sm" onclick="ModelSettings.showWebaiQuickSetup(\'' + key + '\',\'' + esc(p.name) + '\',\'' + esc(p.baseURL || '') + '\')" style="font-size:11px;white-space:nowrap">✍️ 手动填写</button>' +
             '</div></div></div>';
         });
       }
