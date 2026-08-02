@@ -137,7 +137,7 @@ func (s *CookieSession) setFailed(msg string) {
 // providerTokenKeys 各站点 localStorage 中的登录态 token key（登录后才非空）
 var providerTokenKeys = map[string]string{
 	"deepseek-free": "userToken",
-	"kimi-free":     "kimi_token",
+	"kimi-free":     "access_token", // 实测：Kimi 登录态在 localStorage.access_token（JWT）
 	"zhipu-free":    "chatglm_token",
 	"doubao-free":   "session_token",
 	"qwen-free":     "login_aliyunid_pk",

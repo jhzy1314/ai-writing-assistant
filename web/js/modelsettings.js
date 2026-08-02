@@ -159,9 +159,10 @@ var ModelSettings = {
     var idn = 'wa_' + uid();
     UI.modal({
       title: '配置免费网页AI：' + name,
-      body: '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">在浏览器中打开 ' + esc(name) + ' 网站，按F12打开开发者工具→应用→Cookies→复制对应Cookie值</div>' +
+      body: '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">在浏览器中打开 ' + esc(name) + ' 网站并登录，按F12→Console（控制台）执行下面代码复制凭证：<br><code style="font-size:10px">copy(JSON.stringify({cookie: document.cookie, token: localStorage.getItem(\'access_token\') || localStorage.getItem(\'userToken\')}))</code><br>然后在浏览器按Ctrl+V粘贴到下面「Cookie值」框（token 自动带出，若没有请单独粘贴到 Token 框）</div>' +
         '<div class="form-group"><label>模型名称</label><input id="' + idn + '_name" value="' + esc(name) + '免费版" placeholder="模型名称"></div>' +
-        '<div class="form-group"><label>Cookie值 *</label><input id="' + idn + '_cookie" type="password" placeholder="粘贴从浏览器复制的Cookie"></div>' +
+        '<div class="form-group"><label>Cookie值 *</label><input id="' + idn + '_cookie" type="password" placeholder="粘贴 JSON 或 Cookie 串"></div>' +
+        '<div class="form-group"><label>Token（可选）</label><input id="' + idn + '_token" type="password" placeholder="Kimi 等需要 access_token"></div>' +
         '<div class="form-group"><label>请求地址</label><input id="' + idn + '_url" value="' + esc(baseURL) + '" placeholder="网页AI接口地址"></div>' +
         '<div class="form-group"><label>模型标识</label><input id="' + idn + '_model" placeholder="网页AI内部模型名（可选）"></div>',
       actions: [
@@ -169,11 +170,20 @@ var ModelSettings = {
         { id: 'ok', label: '保存', cls: 'btn-primary', onClick: async function (m, ov) {
           var cname = document.getElementById(idn + '_name').value.trim();
           var cookie = document.getElementById(idn + '_cookie').value.trim();
+          var token = document.getElementById(idn + '_token').value.trim();
           var url = document.getElementById(idn + '_url').value.trim();
           var model = document.getElementById(idn + '_model').value.trim();
+          // 支持粘贴 {cookie, token} JSON（浏览器控制台 copy 输出的格式）
+          if (cookie.indexOf('{') === 0) {
+            try {
+              var parsed = JSON.parse(cookie);
+              if (parsed.cookie) cookie = parsed.cookie;
+              if (parsed.token && !token) token = parsed.token;
+            } catch (e) {}
+          }
           if (!cname || !cookie) { UI.toast('模型名称和Cookie必填', 'warn'); return; }
           try {
-            await API.createWebAIModel({ name: cname, provider: providerKey, cookie: cookie, request_url: url, model_type: 'webai', vendor: providerKey, model_name: model });
+            await API.createWebAIModel({ name: cname, provider: providerKey, cookie: cookie, session_token: token, request_url: url, model_type: 'webai', vendor: providerKey, model_name: model });
             ov.remove();
             await ModelSettings.loadAll();
             ModelSettings._tab = 'webai';
