@@ -159,7 +159,7 @@ func (s *Server) HandleTestModelConnection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second) // 网页AI首次回复可能较慢（豆包/Kimi SSE 流）
 	defer cancel()
 
 	var adapter llm.ModelAdapter

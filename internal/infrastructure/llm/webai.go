@@ -2,6 +2,8 @@ package llm
 
 import (
 	"bufio"
+	"regexp"
+	"github.com/google/uuid"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -55,7 +57,8 @@ var WebAIProviders = map[string]*WebAIProvider{
 	},
 	"doubao-free": {
 		Name:    "豆包免费版",
-		BaseURL: "https://www.doubao.com/chat/api",
+		BaseURL: "https://www.doubao.com/chat/completion",
+		CustomCall: callDoubaoFree,
 		Headers: func(cookie, token string) map[string]string {
 			h := map[string]string{
 				"Content-Type": "application/json",
@@ -105,58 +108,98 @@ var WebAIProviders = map[string]*WebAIProvider{
 		},
 		ParseResponse: parseSSEResponse,
 	},
-	"deepseek-free": {
-		Name:    "DeepSeek免费版",
-		BaseURL: "https://chat.deepseek.com/api/v0/chat/completions",
-		Headers: func(cookie, token string) map[string]string {
-			h := map[string]string{
-				"Content-Type": "application/json",
-			}
-			if cookie != "" {
-				h["Cookie"] = cookie
-			}
-			if token != "" {
-				h["Authorization"] = "Bearer " + token
-			}
-			return h
+	
+	
+}
+
+// callDoubaoFree 调用豆包网页版：POST /chat/completion，SSE 流式回复
+func callDoubaoFree(ctx context.Context, a *WebAIAdapter, systemPrompt, userPrompt string) (string, error) {
+	base := "https://www.doubao.com"
+	url := base + "/chat/completion?aid=497858&device_id=7666727005992076850&device_platform=web&doubao_device_platform=web&doubao_pc_version=3.29.14&fp=verify_msbhl52p_RwDdXPeV_qmDS_4xxT_B0Ji_62J3Rcig5pat&language=zh&pc_version=3.29.14&pkg_type=release_version&real_aid=497858&region=CN&samantha_web=1&sys_region=CN&tea_uuid=7666727013902386728&tz_name=Asia%2FShanghai&use-olympus-account=1&version_code=20800&web_id=7666727013902386728&web_platform=browser&web_tab_id=" + uuid.NewString()
+
+	// 合并 system 到 user（豆包消息格式是 content_block）
+	fullPrompt := userPrompt
+	if systemPrompt != "" {
+		fullPrompt = systemPrompt + "\n\n" + userPrompt
+	}
+	body := map[string]interface{}{
+		"client_meta": map[string]interface{}{
+			"local_conversation_id": "local_" + fmt.Sprintf("%d", time.Now().UnixNano()),
+			"conversation_id":       "",
+			"bot_id":                "7338286299411103781",
+			"last_section_id":       "",
+			"last_message_index":    nil,
 		},
-		BuildBody: func(systemPrompt, userPrompt string) interface{} {
-			return map[string]interface{}{
-				"messages": []map[string]string{
-					{"role": "system", "content": systemPrompt},
-					{"role": "user", "content": userPrompt},
+		"messages": []map[string]interface{}{{
+			"local_message_id": uuid.NewString(),
+			"content_block": []map[string]interface{}{{
+				"block_type": 10000,
+				"content": map[string]interface{}{
+					"text_block": map[string]string{
+						"text": fullPrompt, "icon_url": "", "icon_url_dark": "", "summary": "",
+					},
+					"pc_event_block": "",
 				},
-				"stream": true,
-			}
-		},
-		ParseResponse: parseSSEResponse,
-	},
-	"zhipu-free": {
-		Name:    "智谱清言免费版",
-		BaseURL: "https://chatglm.cn/api/chat",
-		Headers: func(cookie, token string) map[string]string {
-			h := map[string]string{
-				"Content-Type": "application/json",
-			}
-			if cookie != "" {
-				h["Cookie"] = cookie
-			}
-			if token != "" {
-				h["Authorization"] = "Bearer " + token
-			}
-			return h
-		},
-		BuildBody: func(systemPrompt, userPrompt string) interface{} {
-			return map[string]interface{}{
-				"messages": []map[string]string{
-					{"role": "system", "content": systemPrompt},
-					{"role": "user", "content": userPrompt},
-				},
-				"stream": true,
-			}
-		},
-		ParseResponse: parseSSEResponse,
-	},
+				"block_id": uuid.NewString(), "parent_id": "",
+				"meta_info": []interface{}{}, "append_fields": []interface{}{},
+			}},
+			"message_status": 0,
+		}},
+	}
+	jb, _ := json.Marshal(body)
+
+	headers := map[string]string{
+		"Content-Type":     "application/json",
+		"Agw-Js-Conv":      "str",
+		"x-flow-trace":     "04-" + uuid.NewString() + "-" + uuid.NewString() + "-01",
+		"last-event-id":    "undefined",
+		"User-Agent":       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+		"Origin":           base,
+		"Referer":          base + "/chat/",
+	}
+	if a.cookie != "" {
+		headers["Cookie"] = a.cookie
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jb))
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %w", err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("发送请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		bd, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("豆包请求失败，状态码: %d, 响应: %s", resp.StatusCode, string(bd))
+	}
+	return parseDoubaoSSE(resp.Body)
+}
+
+// parseDoubaoSSE 解析豆包 SSE 流：读取完整响应，提取所有 "text":"..." 片段（跳过用户消息原文）
+func parseDoubaoSSE(body io.Reader) (string, error) {
+	raw, err := io.ReadAll(body)
+	if err != nil {
+		return "", err
+	}
+	full := string(raw)
+	// 豆包回复在 content 字段的 text_block.text 里，用正则提取所有 text 值
+	re := regexp.MustCompile(`"text":"((?:[^"\\]|\\.)*)"`)
+	matches := re.FindAllStringSubmatch(full, -1)
+	var result strings.Builder
+	for i, m := range matches {
+		if i == 0 {
+			continue // 第一个 text 通常是用户自己的消息
+		}
+		t := strings.ReplaceAll(m[1], "\\n", "\n")
+		t = strings.ReplaceAll(t, "\\\"", "\"")
+		result.WriteString(t)
+	}
+	return strings.TrimSpace(result.String()), nil
 }
 
 // callKimiFree 调用 Kimi 网页版：先创建会话拿 chat_id，再向会话发消息读取 SSE 流
