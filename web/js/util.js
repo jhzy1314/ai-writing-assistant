@@ -11,10 +11,8 @@ function fmtTime(s) {
   return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 function wordCount(text) {
-  text = text || '';
-  var cjk = (text.match(/[\u4e00-\u9fff\u3040-\u30ff]/g) || []).length;
-  var en = (text.match(/[a-zA-Z]+/g) || []).length;
-  return cjk + en;
+  // 与后端 wordCount 口径一致：统计非空白字符数（含标点，排除空格/换行）
+  return Array.from(text || '').filter(function (c) { return !/\s/.test(c); }).length;
 }
 function escAttr(s) {
   return String(s == null ? '' : s).replace(/[&<>"'`]/g, function (c) {

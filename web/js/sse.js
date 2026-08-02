@@ -155,9 +155,10 @@ var SSE = {
     Composer.setGenerating(true);
     PipelineUI.reset();
     this._setProgress('⏳ 准备中…', 3, 0, payload.target_word || 0);
-    // 自动快照：每 90 秒保存一次当前进度
+    // 自动快照：每 90 秒保存一次当前进度（新章模式下跳过，避免污染当前章节）
     this._snapshotTimer = setInterval(function () {
       if (!SSE.active || !SSE._bindChapterId || !SSE.streamText) return;
+      if (Store.state.composer && Store.state.composer.newChapterWrite) return;
       var ch = Store.state.chapters.find(function (c) { return c.id === SSE._bindChapterId; });
       if (!ch) return;
       var snapTitle = (ch.title || '未命名') + ' · 自动快照 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
@@ -180,7 +181,8 @@ var SSE = {
       if (e.name === 'AbortError') { this.finish(); UI.toast('已终止生成', 'warn'); PipelineUI.setActive(false); return; }
       // 断连时缓存已有内容，并尝试重试一次
       var boundCh = Store.state.chapters.find(function(c){return c.id===SSE._bindChapterId;});
-      if (boundCh && this.streamText) {
+      // 新章模式下断连不覆盖当前章节（重试会继续累积）
+      if (boundCh && this.streamText && !(Store.state.composer && Store.state.composer.newChapterWrite)) {
         API.updateChapter(boundCh.id, { content: this.streamText }).catch(function(e){ console.warn('[sse] disconnect save failed:', e && e.message); });
       }
       if (this._retryCount < 1 && this._lastPayload) {
@@ -227,7 +229,7 @@ var SSE = {
     }
     this.finish();
   },
-  handle: function (ev) {
+  handle: async function (ev) {
     switch (ev.type) {
       case 'estimate':
         PipelineUI.setStage('预估 Token…', 'idle', 8);
@@ -250,7 +252,11 @@ var SSE = {
       case 'token':
         if (ev.reset) { this.streamText = ''; this._tokenCount = 0; Editor.resetStream(); }
         if (ev.text) {
-          this.streamText += ev.text; Editor.appendStream(ev.text);
+          this.streamText += ev.text;
+          // 「新章」模式：流式内容不写入当前章节编辑器，仅缓存到 streamText，done 时统一建新章
+          if (!(Store.state.composer && Store.state.composer.newChapterWrite)) {
+            Editor.appendStream(ev.text);
+          }
           this._tokenCount = (this._tokenCount || 0) + Math.ceil(Array.from(ev.text).length / 1.5);
           // 实时更新配额条
           document.getElementById('qTokens').textContent = ((Store.state.usage && Store.state.usage.today ? Store.state.usage.today.tokens : 0) + this._tokenCount).toLocaleString();
@@ -312,7 +318,7 @@ var SSE = {
         UI.toast(errMsg, 'error');
         // 修复：即使链路报错，已流式生成的正文也不能丢——立即保存到绑定章节并同步编辑器
         var boundCh2 = Store.state.chapters.find(function(c){return c.id===SSE._bindChapterId;});
-        if (boundCh2 && SSE.streamText && SSE.streamText.trim()) {
+        if (boundCh2 && SSE.streamText && SSE.streamText.trim() && !(Store.state.composer && Store.state.composer.newChapterWrite)) {
           var savedLen = Array.from(SSE.streamText).length;
           boundCh2.content = SSE.streamText;
           API.updateChapter(boundCh2.id, { content: SSE.streamText }).catch(function(){});
@@ -341,6 +347,42 @@ var SSE = {
         if (ev.final_text) { this.streamText = ev.final_text; }
     // 用快照ID写入，防止生成中切换章节导致串文
     var boundCh = Store.state.chapters.find(function(c){return c.id===SSE._bindChapterId;});
+    // 「新章」模式：生成内容写入新建的下一章节，当前章节保持不动
+    if (Store.state.composer && Store.state.composer.newChapterWrite && ev.final_text) {
+      var p = Store.state.currentProject;
+      if (p) {
+        var lastCh = Store.state.chapters && Store.state.chapters.length ? Store.state.chapters[Store.state.chapters.length - 1] : null;
+        var newVol = boundCh ? boundCh.volume_id : '';
+        var num = (Store.state.chapters || []).length + 1;
+        var newTitle = '第' + num + '章';
+        try {
+          var newCh = await API.createChapter({ project_id: p.id, volume_id: newVol, title: newTitle, content: ev.final_text });
+          if (newCh) {
+            Store.state.chapters = Store.state.chapters || [];
+            Store.state.chapters.push(newCh);
+            Store.state.currentChapter = newCh;
+            Editor.setContent(ev.final_text);
+            ChapterUI.renderTree();
+            ProjectUI.updateMeta();
+            SSE._bindChapterId = newCh.id;
+            UI.toast('已写入新章节「' + newTitle + '」（' + Array.from(ev.final_text).length.toLocaleString() + '字）', 'success');
+            // 新章模式下跳过下面的覆盖/追加逻辑
+            document.getElementById('instructionInput').value = '';
+            Store.state.pipeline.steps.forEach(function (s) { s.status = 'done'; });
+            PipelineUI.setStage('生成完成', 'idle', 100);
+            PipelineUI.log('✓ 完成（新章节）');
+            PipelineUI.setActive(false, true);
+            PipelineUI.render();
+            var rb2 = document.getElementById('pipeRetry'); if (rb2) rb2.remove();
+            ProjectUI.updateMeta();
+            ChapterUI.renderTree();
+            return;
+          }
+        } catch (e) {
+          UI.toast('创建新章节失败：' + e.message + '，已退回写入当前章节', 'warn');
+        }
+      }
+    }
     // 修复：final_text 为空时不覆盖章节已有内容（防止后端异常把正文清空）
     if (boundCh && ev.final_text) {
       boundCh.content = ev.final_text;

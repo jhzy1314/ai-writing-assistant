@@ -65,6 +65,10 @@ var Composer = {
     var aaToggle = document.getElementById('autoAppendToggle');
     if (aaToggle) aaToggle.checked = Store.state.composer.autoAppend !== false;
     Store.state.composer.autoAppend = Store.state.composer.autoAppend !== false;
+    // 新章节写入
+    var ncToggle = document.getElementById('newChapterToggle');
+    if (ncToggle) ncToggle.checked = Store.state.composer.newChapterWrite === true;
+    Store.state.composer.newChapterWrite = Store.state.composer.newChapterWrite === true;
     // 大纲
     var goEl = document.getElementById('genOutline');
     if (goEl) goEl.value = Store.state.composer.outline || '';
@@ -442,6 +446,13 @@ var Composer = {
   continueFromCursor: function () {
     var ch = Store.state.currentChapter;
     if (!ch) { UI.toast('请先选择章节', 'warn'); return; }
+    // 「新章」模式：不依赖光标，以整个当前章节为上下文，生成内容写入下一章
+    if (Store.state.composer && Store.state.composer.newChapterWrite) {
+      Store.state.composer.cursorPosition = -1; // 标记：不使用光标截断
+      document.getElementById('instructionInput').value = '续写'; 
+      this.generate();
+      return;
+    }
     var cursorPos = Editor.getCursorPosition();
     if (cursorPos < 0) { UI.toast('请将光标放在章节正文中', 'warn'); return; }
     Store.state.composer.cursorPosition = cursorPos;
@@ -472,6 +483,11 @@ var Composer = {
   onAutoAppendChange: function () {
     var cb = document.getElementById('autoAppendToggle');
     Store.state.composer.autoAppend = cb ? cb.checked : true;
+    Store.savePrefs();
+  },
+  onNewChapterChange: function () {
+    var cb = document.getElementById('newChapterToggle');
+    Store.state.composer.newChapterWrite = cb ? cb.checked : false;
     Store.savePrefs();
   },
   toggleGenOptions: function (ev) {

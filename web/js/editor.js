@@ -388,7 +388,7 @@ var Editor = {
           }, '覆盖', '刷新', function () {
             var newText = latest.content || '';
             self.setContent(newText);
-            if (ch) { ch.content = newText; ch.word_count = Array.from(newText).length; ch._saveVersion = latest.updated_at; }
+            if (ch) { ch.content = newText; ch.word_count = wordCount(newText); ch._saveVersion = latest.updated_at; }
             self.updateWordCount();
           });
         } else {
@@ -401,7 +401,7 @@ var Editor = {
   },
   _doSave: function (ch, text) {
     ch.content = text;
-    ch.word_count = Array.from(text).length;
+    ch.word_count = wordCount(text);
     this._conflictChecked = null;
     var self = this;
     API.updateChapter(ch.id, { content: text, if_updated_at: ch._saveVersion }).then(function () {

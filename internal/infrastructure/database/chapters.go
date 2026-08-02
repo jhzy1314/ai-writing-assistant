@@ -988,24 +988,18 @@ func (s *Store) ChaptersAssembledText(ctx context.Context, projectID string) (st
 // MarshalJSON safe
 func marshalJSON(v interface{}) ([]byte, error) { return json.Marshal(v) }
 
-// wordCount 统计中文/英文混合文本的字数（中文按字符，英文按空格分词）
+// wordCount 统计文本字数：与前端编辑器口径一致（Array.from(text).length，含标点）。
+// 中文小说平台惯例按字符计（含标点），空行/换行不算。
 func wordCount(s string) int {
 	count := 0
-	inWord := false
 	for _, r := range s {
-		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) {
-			count++
-			inWord = false
-		} else if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			if !inWord {
-				count++
-				inWord = true
-			}
-		} else if unicode.IsSpace(r) {
-			inWord = false
-		} else {
-			inWord = false
+		if r == '\n' || r == '\r' || r == '\t' {
+			continue
 		}
+		if unicode.IsSpace(r) {
+			continue
+		}
+		count++
 	}
 	return count
 }

@@ -354,6 +354,9 @@ window.initTiptap = async function () {
           <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="生成后自动追加到章节末尾">
             <input type="checkbox" id="autoAppendToggle" checked onchange="Composer.onAutoAppendChange()"> 追加
           </label>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="续写/生成的新内容写入新建的下一章节（当前章节保持不动）">
+            <input type="checkbox" id="newChapterToggle" onchange="Composer.onNewChapterChange()"> 新章
+          </label>
           <span class="tool-divider"></span>
           <span style="font-size:10px;color:var(--muted)" title="推荐配置：仅规划师开思考（大纲质量最关键）；写作/审稿/轻活关（实测审稿思考开销极大，不划算）。可单独调整">🧠角色思考</span>
           <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="规划师：构思大纲与剧情节点（动脑收益最大）">
