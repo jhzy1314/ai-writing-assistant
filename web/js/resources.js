@@ -27,34 +27,87 @@ var ResourceUI = {
   /* ---- AI 一键总结：从编辑器内容提取人物卡 + 世界观 ---- */
   /* ---- 自动导入：AI 读完全部章节后自动提取并保存人物卡/世界观（无需手动确认） ---- */
   autoImportSettings: async function () {
+    if (ResourceUI._autoImportRunning) { UI.toast('自动导入正在进行中，请稍候…', 'warn'); return; }
+    ResourceUI._autoImportRunning = true;
+    try {
+      await ResourceUI._autoImportImpl();
+    } finally {
+      ResourceUI._autoImportRunning = false;
+    }
+  },
+  _autoImportImpl: async function () {
     var p = Store.state.currentProject;
     if (!p) { UI.toast('请先选择项目', 'warn'); return; }
-    // 收集全部章节正文（最多取前 8 章或 6 万字，避免超长）
     var chapters = Store.state.chapters || [];
     if (!chapters.length) { UI.toast('当前项目还没有章节，先写几章再自动导入', 'warn'); return; }
-    var text = chapters.map(function (c) { return '【' + (c.title || '未命名') + '】\n' + (c.content || ''); }).join('\n\n');
-    if (text.length > 60000) text = text.slice(0, 60000);
-    UI.toast('AI 正在通读全项目并自动提取设定…', '');
+    // 进度弹窗（不阻塞，纯展示）
+    var pid = 'ai_' + uid();
+    var setStage = function (stage, pct) {
+      var el = document.getElementById(pid + '_stage');
+      var bar = document.getElementById(pid + '_bar');
+      if (el) el.textContent = stage;
+      if (bar) bar.style.width = (pct || 0) + '%';
+    };
+    var closeProgress = function () {
+      document.querySelectorAll('#modalRoot .modal-overlay').forEach(function (o) { o.remove(); });
+    };
+    UI.modal({
+      id: pid,
+      title: '🤖 AI 自动导入设定',
+      sub: '正在通读本项目全部章节，自动提取人物卡与世界观',
+      body: '<div style="padding:4px 0 12px">' +
+        '<div id="' + pid + '_stage" style="font-size:13px;color:var(--text2);margin-bottom:8px">准备中…</div>' +
+        '<div style="height:8px;background:var(--panel3);border-radius:4px;overflow:hidden"><div id="' + pid + '_bar" style="height:100%;width:2%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width .3s ease"></div></div>' +
+        '<div id="' + pid + '_count" style="font-size:11px;color:var(--muted);margin-top:8px"></div>' +
+        '</div>',
+      actions: []
+    });
     try {
+      // 阶段1：读取章节
+      setStage('📚 读取章节中…（' + chapters.length + ' 章）', 8);
+      var text = chapters.map(function (c) { return '【' + (c.title || '未命名') + '】\n' + (c.content || ''); }).join('\n\n');
+      if (text.length > 60000) text = text.slice(0, 60000);
+      setStage('🧠 AI 分析中…（已读取 ' + text.length + ' 字，通常需要 10-30 秒）', 25);
       var r = await API.post('/api/tools/execute', { tool: 'summarize', content: text });
       var result = r.result || '';
       var parsed = ResourceUI.parseSummaryResult(result);
+      if (!parsed.characters.length && !parsed.worlds.length) {
+        setStage('⚠️ AI 未从正文识别到可导入的设定', 100);
+        setTimeout(closeProgress, 1500);
+        UI.toast('AI 未从正文识别到可导入的设定', '');
+        return;
+      }
+      // 阶段2：保存
+      setStage('💾 保存中…', 55);
       var existingChars = (Store.state.characters || []).map(function (c) { return c.name; });
       var existingWorlds = (Store.state.worldSettings || []).map(function (w) { return w.title; });
       var newChars = parsed.characters.filter(function (c) { return existingChars.indexOf(c.name) < 0; });
       var newWorlds = parsed.worlds.filter(function (w) { return existingWorlds.indexOf(w.title) < 0; });
-      var saved = 0;
+      var saved = 0, failed = 0;
+      var total = newChars.length + newWorlds.length;
       for (var i = 0; i < newChars.length; i++) {
-        try { await ResourceUI.saveCharacter(null, newChars[i].name, newChars[i]); saved++; } catch (e) {}
+        try { await ResourceUI.saveCharacter(null, newChars[i].name, newChars[i]); saved++; }
+        catch (e) { failed++; }
+        var countEl = document.getElementById(pid + '_count');
+        if (countEl) countEl.textContent = '人物 ' + (i + 1) + '/' + newChars.length;
+        setStage('💾 保存人物卡 ' + (i + 1) + '/' + newChars.length, 55 + Math.round((i + 1) / (total || 1) * 35));
       }
       for (var j = 0; j < newWorlds.length; j++) {
-        try { await ResourceUI.saveWorld(null, newWorlds[j].title, newWorlds[j]); saved++; } catch (e) {}
+        try { await ResourceUI.saveWorld(null, newWorlds[j].title, newWorlds[j]); saved++; }
+        catch (e) { failed++; }
+        setStage('💾 保存世界观 ' + (j + 1) + '/' + newWorlds.length, 55 + Math.round((newChars.length + j + 1) / (total || 1) * 35));
       }
+      setStage('✅ 完成', 100);
+      setTimeout(closeProgress, 1200);
       Sidebar.renderResources(); RightPanel.renderContext(); ProjectUI.updateMeta();
-      if (saved > 0) UI.toast('✅ 已自动导入 ' + saved + ' 条设定（' + newChars.length + ' 人物 / ' + newWorlds.length + ' 世界观）', 'success');
+      if (saved > 0) UI.toast('✅ 已自动导入 ' + saved + ' 条设定（' + newChars.length + ' 人物 / ' + newWorlds.length + ' 世界观）' + (failed ? '，' + failed + ' 条保存失败' : ''), 'success');
       else if (newChars.length === 0 && newWorlds.length === 0 && (parsed.characters.length || parsed.worlds.length)) UI.toast('提取到 ' + (parsed.characters.length + parsed.worlds.length) + ' 条设定，但都已存在（自动跳过重复）', 'info');
       else UI.toast('AI 未从正文识别到可导入的设定', '');
-    } catch (e) { UI.toast('自动导入失败：' + e.message, 'error'); }
+    } catch (e) {
+      setStage('❌ 失败：' + e.message, 100);
+      setTimeout(closeProgress, 2000);
+      UI.toast('自动导入失败：' + e.message, 'error');
+    }
   },
 
   summarizeSettings: async function () {
