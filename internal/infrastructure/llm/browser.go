@@ -85,7 +85,7 @@ func StartCookieCapture(provider string) (*CookieSession, error) {
 				// 无论是否登录都记录检测进度，前端可展示“已检测到 N 个 Cookie”
 				s.DetectedCookies = len(strings.Split(cookies, ";"))
 				s.DetectedLen = len(cookies)
-				if hasSessionCookie(cookies) {
+				if hasSessionCookie(cookies, provider) {
 					s.Cookies = cookies
 					s.Status = "completed"
 					cookieSessions.Store(s.ID, s)
@@ -131,10 +131,10 @@ func junkCookie(name string) bool {
 		return true
 	}
 	switch n {
-	case "ab", "cna", "unb", "unp", "umt", "isg", "tfstk", "x5sec", "acw_tc", "aliyungf_tc", "sensorsdata", "hwwafsesid", "hwwafsesid_hw":
+	case "ab", "cna", "unb", "unp", "umt", "isg", "tfstk", "x5sec", "acw_tc", "aliyungf_tc", "sensorsdata", "hwwafsesid", "hwwafsesid_hw", "hmaccount", "hmlvt", "hmlpvt", "doodle_asset", "theme":
 		return true
 	}
-	for _, j := range []string{"csrf", "waf", "sensors", "hawk", "aliyungf", "x5sec", "acw_"} {
+	for _, j := range []string{"csrf", "waf", "sensors", "hawk", "aliyungf", "x5sec", "acw_", "hm_lvt", "hm_lpvt"} {
 		if strings.Contains(n, j) {
 			return true
 		}
@@ -160,21 +160,43 @@ func getCookiesString(page *rod.Page) (string, error) {
 	return strings.Join(parts, "; "), nil
 }
 
-// hasSessionCookie 判断是否已登录：必须有“登录态”特征的 Cookie 才算数。
-// 判定规则（满足其一）：
-//  1. 存在名称含 session/token/sid/auth/login/uid/member/user 的 Cookie 且值较长（>=8）
-//  2. 至少 2 个 Cookie 的值都很长（>=40，登录态通常才有）
-//  3. 整个 Cookie 串 >=200 字符（单条肥 Cookie 的站点也能命中）
-func hasSessionCookie(cookieStr string) bool {
+// providerLoginCookies 各站点登录后才出现的特征 Cookie 名（白名单，命中即判定已登录）
+var providerLoginCookies = map[string][]string{
+	"kimi-free":     {"kimi_token", "user_token", "moonshot_token", "sessionid"},
+	"deepseek-free": {"user_token", "token", "sessionid", "deepseek_session"},
+	"doubao-free":   {"sessionid", "sid", "user_unique_id", "session_token"},
+	"qwen-free":     {"login_aliyunid", "unb", "aliyunid", "login_aliyunid_pk"},
+	"zhipu-free":    {"chatglm_token", "user_token", "sessionid", "glm_token"},
+}
+
+// hasSessionCookie 判断是否已登录：只认各站点的登录特征 Cookie，
+// 未登录时的统计/资产类 Cookie（即使很长）一律不算登录。
+func hasSessionCookie(cookieStr, provider string) bool {
 	if cookieStr == "" {
 		return false
 	}
 	parts := strings.Split(cookieStr, ";")
-	if len(parts) < 2 && len(cookieStr) < 200 {
-		return false
+	// 1) 先按站点白名单精确匹配（最强证据）
+	if names, ok := providerLoginCookies[provider]; ok {
+		for _, n := range names {
+			if n == "" {
+				continue
+			}
+			for _, p := range parts {
+				p = strings.TrimSpace(p)
+				eq := strings.Index(p, "=")
+				if eq <= 0 {
+					continue
+				}
+				if strings.EqualFold(strings.TrimSpace(p[:eq]), n) && len(p[eq+1:]) >= 8 {
+					return true
+				}
+			}
+		}
 	}
+	// 2) 兜底：名称含登录态关键词且值 >= 40（足够长的才可能是真实登录态，
+	//    不再使用“整串 >=200 字符”这种会误判未登录站的宽松规则）
 	authRe := regexp.MustCompile(`(?i)(session|token|sid|auth|login|uid|member|user)`)
-	longCount := 0
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
 		if p == "" {
@@ -185,12 +207,9 @@ func hasSessionCookie(cookieStr string) bool {
 			continue
 		}
 		val := p[eq+1:]
-		if len(val) >= 8 && authRe.MatchString(p[:eq]) {
+		if len(val) >= 40 && authRe.MatchString(p[:eq]) {
 			return true
 		}
-		if len(val) >= 40 {
-			longCount++
-		}
 	}
-	return longCount >= 2 || len(cookieStr) >= 200
+	return false
 }
