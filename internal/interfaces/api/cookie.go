@@ -1,12 +1,22 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/ai-novel/studio/internal/infrastructure/llm"
 	"github.com/go-chi/chi/v5"
 )
+
+// webAIModelNames provider 默认模型名（后端自动保存用）
+var webAIModelNames = map[string]string{
+	"kimi-free":     "Kimi免费版",
+	"doubao-free":   "豆包免费版",
+	"qwen-free":     "通义千问免费版",
+	"deepseek-free": "DeepSeek免费版",
+	"zhipu-free":    "智谱清言免费版",
+}
 
 func (s *Server) HandleAutoCookieStart(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -59,6 +69,16 @@ func (s *Server) HandleAutoCookiePoll(w http.ResponseWriter, r *http.Request) {
 		resp["session_id"] = session.ID
 		if session.Token != "" {
 			resp["token"] = session.Token
+		}
+		// 后端直接保存（不依赖前端 JS 版本/传参），避免浏览器缓存旧版导致
+		// 抓取成功但 token 没存上。同名模型走 upsert 更新。
+		if modelName, ok := webAIModelNames[session.Provider]; ok && session.Cookies != "" {
+			ctx2, cancel2 := context.WithTimeout(r.Context(), 10*time.Second)
+			defer cancel2()
+			_, err := s.store.CreateWebAIModel(ctx2, modelName, session.Provider, session.Cookies, session.Token, llm.WebAIProviders[session.Provider].BaseURL, "", 4000, 300)
+			if err == nil {
+				resp["saved"] = true
+			}
 		}
 	}
 	if session.Status == "failed" {
