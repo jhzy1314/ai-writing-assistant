@@ -11,11 +11,9 @@ import (
 
 // webAIModelNames provider 默认模型名（后端自动保存用）
 var webAIModelNames = map[string]string{
-	"kimi-free":     "Kimi免费版",
-	"doubao-free":   "豆包免费版",
-	"qwen-free":     "通义千问免费版",
-	"deepseek-free": "DeepSeek免费版",
-	"zhipu-free":    "智谱清言免费版",
+	"kimi-free":   "Kimi免费版",
+	"doubao-free": "豆包免费版",
+	"mimo-free":   "小米MiMo免费版",
 }
 
 func (s *Server) HandleAutoCookieStart(w http.ResponseWriter, r *http.Request) {

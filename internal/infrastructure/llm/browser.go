@@ -13,11 +13,9 @@ import (
 )
 
 var providerBaseURLs = map[string]string{
-	"kimi-free":     "https://kimi.moonshot.cn/",
-	"doubao-free":   "https://www.doubao.com/chat/",
-	"qwen-free":     "https://tongyi.aliyun.com/",
-	"deepseek-free": "https://chat.deepseek.com/",
-	"zhipu-free":    "https://chatglm.cn/",
+	"kimi-free":   "https://kimi.moonshot.cn/",
+	"doubao-free": "https://www.doubao.com/chat/",
+	"mimo-free":   "https://aistudio.xiaomimimo.com/",
 }
 
 var (
@@ -136,11 +134,9 @@ func (s *CookieSession) setFailed(msg string) {
 
 // providerTokenKeys 各站点 localStorage 中的登录态 token key（登录后才非空）
 var providerTokenKeys = map[string]string{
-	"deepseek-free": "userToken",
-	"kimi-free":     "access_token", // 实测：Kimi 登录态在 localStorage.access_token（JWT）
-	"zhipu-free":    "chatglm_token",
-	"doubao-free":   "session_token",
-	"qwen-free":     "login_aliyunid_pk",
+	"kimi-free":   "access_token", // 实测：Kimi 登录态在 localStorage.access_token（JWT）
+	"doubao-free": "session_token",
+	"mimo-free":   "", // MiMo 认证全靠 cookie（serviceToken+userId+ph），无 localStorage token
 }
 
 // getLoginToken 从页面 localStorage 读取登录态 token。
@@ -207,11 +203,9 @@ func getCookiesString(page *rod.Page) (string, error) {
 
 // providerLoginCookies 各站点登录后才出现的特征 Cookie 名（白名单，命中即判定已登录）
 var providerLoginCookies = map[string][]string{
-	"kimi-free":     {"kimi_token", "user_token", "moonshot_token", "sessionid"},
-	"deepseek-free": {"user_token", "token", "sessionid", "deepseek_session"}, // 注意：ds_session_id 未登录也有，不算
-	"doubao-free":   {"sessionid", "sid", "user_unique_id", "session_token"},
-	"qwen-free":     {"login_aliyunid", "unb", "aliyunid", "login_aliyunid_pk"},
-	"zhipu-free":    {"chatglm_token", "user_token", "sessionid", "glm_token"},
+	"kimi-free":   {"kimi_token", "user_token", "moonshot_token", "sessionid"},
+	"doubao-free": {"sessionid", "sid", "user_unique_id", "session_token"},
+	"mimo-free":   {"xiaomichatbot_serviceToken", "userId"}, // 实测：MiMo 登录态 cookie（serviceToken HttpOnly）
 }
 
 // hasSessionCookie 判断是否已登录：只认各站点的登录特征 Cookie，
