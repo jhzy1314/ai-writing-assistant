@@ -414,7 +414,7 @@ window.initTiptap = async function () {
           <h2>👤 人物卡管理</h2>
           <div class="page-head-acts">
             <button class="btn btn-primary btn-sm" onclick="CharacterPage.showCreate()">＋ 新建人物</button>
-            <button class="btn btn-ghost btn-sm" onclick="CharacterPage.importFromText()">📄 从正文提取</button>
+            <button class="btn btn-ghost btn-sm" onclick="ResourceUI.autoImportSettings()" title="AI 通读本项目全部章节，自动提取并保存人物卡/世界观（重复自动跳过）">🤖 自动导入</button>
             <span class="spacer" style="flex:1"></span>
             <input type="text" class="page-search" id="charSearch" placeholder="🔍 搜索人物" oninput="CharacterPage.render()">
           </div>
@@ -437,7 +437,7 @@ window.initTiptap = async function () {
           <h2>🌍 世界观设定</h2>
           <div class="page-head-acts">
             <button class="btn btn-primary btn-sm" onclick="WorldPage.showCreate()">＋ 新建设定</button>
-            <button class="btn btn-ghost btn-sm" onclick="WorldPage.importFromText()">📄 从正文提取</button>
+            <button class="btn btn-ghost btn-sm" onclick="ResourceUI.autoImportSettings()" title="AI 通读本项目全部章节，自动提取并保存人物卡/世界观（重复自动跳过）">🤖 自动导入</button>
             <span class="spacer" style="flex:1"></span>
             <input type="text" class="page-search" id="worldSearch" placeholder="🔍 搜索设定" oninput="WorldPage.render()">
           </div>

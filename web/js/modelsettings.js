@@ -598,8 +598,8 @@ var ModelSettings = {
     try {
       var rm = Store.state.roleModels || {};
       var tm = (rm.thinker && rm.thinker.models && rm.thinker.models[0]) || {};
-      ModelSettings._primaryModelName = tm.name || 'deepseek-chat';
-    } catch (e) { ModelSettings._primaryModelName = 'deepseek-chat'; }
+      ModelSettings._primaryModelName = tm.name || 'deepseek-v4-flash';
+    } catch (e) { ModelSettings._primaryModelName = 'deepseek-v4-flash'; }
     var models = Store.state.models || [];
     var active = models.filter(function (m) { return m.status === 'active'; });
     // 查找任意已配置 key 的模型（不限于 deepseek-v4-pro），用于展示密钥状态
@@ -611,7 +611,7 @@ var ModelSettings = {
     UI.modal({
       title: '🔑 API 密钥与模型管理',
       wide: '520px',
-      body: '<div style="margin-bottom:12px;font-size:12px;color:var(--muted)">当前 Agent 角色默认模型：<b style="color:var(--accent)">' + (ModelSettings._primaryModelName || 'deepseek-chat') + '</b>。可在下方按角色分别绑定模型。</div>' +
+      body: '<div style="margin-bottom:12px;font-size:12px;color:var(--muted)">当前 Agent 角色默认模型：<b style="color:var(--accent)">' + (ModelSettings._primaryModelName || 'deepseek-v4-flash') + '</b>。可在下方按角色分别绑定模型。</div>' +
         '<div class="qp-section" style="background:var(--panel3);border-radius:8px;padding:12px;margin-bottom:10px">' +
         '<div style="font-weight:600;margin-bottom:8px">DeepSeek API Key</div>' +
         '<div style="display:flex;gap:8px;align-items:center">' +

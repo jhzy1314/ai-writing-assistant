@@ -218,7 +218,7 @@ var ProjectUI = {
       ' | 全书 ' + totalWc.toLocaleString() + '字' +
       ' · ' + Store.state.characters.length + '人物 ' + Store.state.worldSettings.length + '世界观 ' + Store.state.materials.length + '素材' +
       ' · ' + Store.state.chapters.length + '章节';
-    document.getElementById('resProjName').textContent = (p ? p.name : '') + ' · ' + totalWc.toLocaleString() + '字';
+    document.getElementById('resProjName').textContent = '📁 ' + (p ? p.name : '') + ' · ' + totalWc.toLocaleString() + '字';
   },
   showCreate: function () {
     var idn = 'n_' + uid();

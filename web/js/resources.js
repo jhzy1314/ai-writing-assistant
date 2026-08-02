@@ -25,6 +25,38 @@ var Context = {
 
 var ResourceUI = {
   /* ---- AI 一键总结：从编辑器内容提取人物卡 + 世界观 ---- */
+  /* ---- 自动导入：AI 读完全部章节后自动提取并保存人物卡/世界观（无需手动确认） ---- */
+  autoImportSettings: async function () {
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择项目', 'warn'); return; }
+    // 收集全部章节正文（最多取前 8 章或 6 万字，避免超长）
+    var chapters = Store.state.chapters || [];
+    if (!chapters.length) { UI.toast('当前项目还没有章节，先写几章再自动导入', 'warn'); return; }
+    var text = chapters.map(function (c) { return '【' + (c.title || '未命名') + '】\n' + (c.content || ''); }).join('\n\n');
+    if (text.length > 60000) text = text.slice(0, 60000);
+    UI.toast('AI 正在通读全项目并自动提取设定…', '');
+    try {
+      var r = await API.post('/api/tools/execute', { tool: 'summarize', content: text });
+      var result = r.result || '';
+      var parsed = ResourceUI.parseSummaryResult(result);
+      var existingChars = (Store.state.characters || []).map(function (c) { return c.name; });
+      var existingWorlds = (Store.state.worldSettings || []).map(function (w) { return w.title; });
+      var newChars = parsed.characters.filter(function (c) { return existingChars.indexOf(c.name) < 0; });
+      var newWorlds = parsed.worlds.filter(function (w) { return existingWorlds.indexOf(w.title) < 0; });
+      var saved = 0;
+      for (var i = 0; i < newChars.length; i++) {
+        try { await ResourceUI.saveCharacter(null, newChars[i].name, newChars[i]); saved++; } catch (e) {}
+      }
+      for (var j = 0; j < newWorlds.length; j++) {
+        try { await ResourceUI.saveWorld(null, newWorlds[j].title, newWorlds[j]); saved++; } catch (e) {}
+      }
+      Sidebar.renderResources(); RightPanel.renderContext(); ProjectUI.updateMeta();
+      if (saved > 0) UI.toast('✅ 已自动导入 ' + saved + ' 条设定（' + newChars.length + ' 人物 / ' + newWorlds.length + ' 世界观）', 'success');
+      else if (newChars.length === 0 && newWorlds.length === 0 && (parsed.characters.length || parsed.worlds.length)) UI.toast('提取到 ' + (parsed.characters.length + parsed.worlds.length) + ' 条设定，但都已存在（自动跳过重复）', 'info');
+      else UI.toast('AI 未从正文识别到可导入的设定', '');
+    } catch (e) { UI.toast('自动导入失败：' + e.message, 'error'); }
+  },
+
   summarizeSettings: async function () {
     var text = Editor.getText();
     if (!text || !text.trim()) { UI.toast('编辑器内容为空，请先撰写部分章节再总结', 'warn'); return; }

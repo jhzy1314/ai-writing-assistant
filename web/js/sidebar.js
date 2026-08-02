@@ -42,15 +42,15 @@ var Sidebar = {
     var chars = Store.state.characters.filter(function (c) { return match(c.name); });
     html += '<div class="res-group">' +
       '<div class="res-group-head" onclick="Sidebar.toggleGroup(this)"><span class="caret">▾</span>👥 人物卡<span class="count">' + Store.state.characters.length + '</span>' +
-      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.editCharacter()">＋</span>' +
-      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.summarizeSettings()" title="AI 从正文自动提取人物和世界观">🤖</span></div>' +
+      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.editCharacter()" title="新建人物卡">＋</span>' +
+      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.autoImportSettings()" title="🤖 自动导入：AI 通读全项目后自动提取并保存人物卡/世界观（仅当前项目）">🤖</span></div>' +
       '<div class="res-group-body">';
     if (!Store.state.characters.length) html += '<div class="res-check-empty" style="padding:12px;background:var(--panel3);border-radius:8px;border:1px dashed var(--border);margin:4px 0">' +
       '<div style="font-weight:600;margin-bottom:4px">📝 开始创建人物</div>' +
       '<div style="font-size:10px;color:var(--muted);line-height:1.7">' +
-      '方法一：点击上方 <b>＋</b> 按钮手动创建人物卡<br>' +
-      '方法二：选中章节后点击 <b>🤖</b> AI 一键从正文提取<br>' +
-      '方法三：在「工具」面板使用「自动提取设定」</div></div>';
+      '方法一：点击上方 <b>＋</b> 手动创建人物卡<br>' +
+      '方法二：点击 <b>🤖</b> 让 AI 通读全项目自动导入<br>' +
+      '方法三：先写正文，再在「工具」面板用「自动提取设定」</div></div>';
     chars.forEach(function (c) {
       html += '<div class="res-item" onclick="ResourceUI.editCharacter(\'' + c.id + '\')" title="' + esc(c.name) + '">' +
         '<span class="icon">👤</span><span class="name">' + esc(c.name) + '</span>' +
@@ -61,14 +61,15 @@ var Sidebar = {
     var ws = Store.state.worldSettings.filter(function (w) { return match(w.title); });
     html += '<div class="res-group">' +
       '<div class="res-group-head" onclick="Sidebar.toggleGroup(this)"><span class="caret">▾</span>🌍 世界观<span class="count">' + Store.state.worldSettings.length + '</span>' +
-      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.editWorld()">＋</span></div>' +
+      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.editWorld()" title="新建世界观">＋</span>' +
+      '<span class="link-btn" onclick="event.stopPropagation();ResourceUI.autoImportSettings()" title="🤖 自动导入：AI 通读全项目后自动提取并保存人物卡/世界观（仅当前项目）">🤖</span></div>' +
       '<div class="res-group-body">';
     if (!Store.state.worldSettings.length) html += '<div class="res-check-empty" style="padding:12px;background:var(--panel3);border-radius:8px;border:1px dashed var(--border);margin:4px 0">' +
       '<div style="font-weight:600;margin-bottom:4px">🌍 开始创建世界观</div>' +
       '<div style="font-size:10px;color:var(--muted);line-height:1.7">' +
-      '方法一：点击上方 <b>＋</b> 按钮手动创建世界观<br>' +
-      '方法二：在「工具」面板使用「自动提取设定」<br>' +
-      '方法三：先写正文，再用 AI 从正文提取</div></div>';
+      '方法一：点击上方 <b>＋</b> 手动创建世界观<br>' +
+      '方法二：点击 <b>🤖</b> 让 AI 通读全项目自动导入<br>' +
+      '方法三：先写正文，再在「工具」面板用「自动提取设定」</div></div>';
     ws.forEach(function (w) {
       html += '<div class="res-item" onclick="ResourceUI.editWorld(\'' + w.id + '\')" title="' + esc(w.title) + '">' +
         '<span class="icon">🌐</span><span class="name">' + esc(w.title) + '</span>' +

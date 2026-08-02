@@ -1,7 +1,36 @@
 /* ============ rightpanel.js：右侧面板切换 + 设定资源勾选区 ============ */
 var RightPanel = {
   switch: function (page) {
-    // 用户主动切换右侧面板时自动展开（若当前折叠），避免点了没反应/被拦截的观感
+    // 移动端：右面板是底部弹出 sheet，切到对应页并展开
+    var isMobile = !document.body.classList.contains('desktop');
+    if (isMobile && typeof MobileUI !== 'undefined') {
+      MobileUI.openRightSheet();
+      MobileUI.switchRightPage(page);
+      // 打开 sheet 后自动渲染对应页内容
+      if (page === 'templates' && typeof TemplateUI !== 'undefined') TemplateUI.render();
+      if (page === 'models' && typeof ModelSettings !== 'undefined') {
+        ModelSettings.loadAll();
+        setTimeout(function () {
+          var body = document.getElementById('mrsBody');
+          var pageEl = body ? body.querySelector('#page-models') : null;
+          if (pageEl && typeof SkillsPanel !== 'undefined') {
+            var existing = pageEl.querySelector('#skillsPanelContainer');
+            if (!existing) {
+              var div = document.createElement('div');
+              div.id = 'skillsPanelContainer';
+              div.style.cssText = 'margin-top:18px;border-top:1px solid var(--border);padding-top:10px';
+              pageEl.appendChild(div);
+            }
+            SkillsPanel.renderTo('skillsPanelContainer');
+          }
+        }, 300);
+      }
+      if (page === 'appearance' && typeof Appearance !== 'undefined') Appearance.load();
+      if (page === 'forecast' && typeof ForecastPanel !== 'undefined') ForecastPanel.render();
+      if (page === 'state' && typeof StateViewer !== 'undefined') StateViewer.render();
+      return;
+    }
+    // 桌面端：用户主动切换右侧面板时自动展开（若当前折叠），避免点了没反应/被拦截的观感
     var rp = document.getElementById('rightPanel');
     if (rp && rp.classList.contains('collapsed')) {
       rp.classList.remove('collapsed');

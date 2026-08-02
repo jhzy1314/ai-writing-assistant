@@ -1,6 +1,14 @@
 /* ============ composer.js：创作模式 / 生成 / 终止 ============ */
 var Composer = {
   init: function () {
+    // 一次性迁移：旧版本默认选中了列表第一个模型(deepseek-chat)，新逻辑应优先角色绑定模型(deepseek-v4-flash)
+    try {
+      var legacyName = Store.state.composer.modelName;
+      if (legacyName === 'deepseek-chat' && Store.get('runMode', 'auto') === 'auto') {
+        Store.state.composer.modelName = '';
+        Store.remove('modelName');
+      }
+    } catch (e) {}
     var mode = Store.state.composer.runMode;
     document.getElementById('modeSelect').value = mode;
     var twm = document.getElementById('targetWordMini');
@@ -187,9 +195,29 @@ var Composer = {
         Store.savePrefs();
       };
       if (!Store.state.composer.modelName && active.length) {
-        Store.state.composer.modelName = active[0].name;
-        sel.value = active[0].name;
-        Store.state.composer.modelConfigId = active[0].id;
+        // 默认模型优先：角色绑定（thinker）> is_default 标记 > 列表第一个
+        var preferred = null;
+        try {
+          var rm = await API.getRoleModels('thinker');
+          var bound = (rm && rm.item && rm.item.models) || [];
+          if (bound.length) preferred = bound[0].name;
+        } catch (e) {}
+        if (!preferred) {
+          var def = active.find(function (m) { return m.is_default === 1 || m.is_default === true; });
+          if (def) preferred = def.name;
+        }
+        if (!preferred) preferred = active[0].name;
+        Store.state.composer.modelName = preferred;
+        sel.value = preferred;
+        var opt = sel.querySelector('option[value="' + preferred.replace(/"/g, '\\"') + '"]');
+        Store.state.composer.modelConfigId = opt ? (opt.getAttribute('data-id') || '') : (active[0].id || '');
+        Store.savePrefs();
+      } else if (Store.state.composer.modelName === 'deepseek-chat' && active.some(function (m) { return m.name === 'deepseek-v4-flash' && m.is_default === 1; })) {
+        // 迁移：旧版本默认选了列表第一个(deepseek-chat)，现默认模型已是 deepseek-v4-flash，纠正
+        Store.state.composer.modelName = 'deepseek-v4-flash';
+        sel.value = 'deepseek-v4-flash';
+        var opt2 = sel.querySelector('option[value="deepseek-v4-flash"]');
+        Store.state.composer.modelConfigId = opt2 ? (opt2.getAttribute('data-id') || '') : '';
         Store.savePrefs();
       }
     } catch (e) { UI.toast('模型列表加载失败', 'error'); }
