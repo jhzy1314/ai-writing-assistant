@@ -198,7 +198,8 @@ var ModelSettings = {
     var m = Store.state.models.find(function (x) { return x.id === id; });
     UI.toast('正在测试「' + (m ? m.name : id) + '」…', 'info');
     try {
-      var r = await API.testWebAIModel({ provider: m ? m.vendor : '', cookie: m ? (m.cookie || m.api_key || '') : '', session_token: m ? (m.session_token || '') : '', request_url: m ? (m.api_endpoint || m.request_url || '') : '' });
+      // 传 model_id，由后端从 DB 解密拿真实 cookie 测试（前端拿到的是加密密文）
+      var r = await API.testWebAIModel({ model_id: id });
       UI.toast('连接成功', 'success');
     } catch (e) { UI.toast('连接失败：' + e.message, 'error'); }
   },

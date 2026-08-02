@@ -304,6 +304,7 @@ func (s *Server) HandleUpdateWebAIModel(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) HandleTestWebAIConnection(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		ModelID      string `json:"model_id"`
 		Provider     string `json:"provider"`
 		Cookie       string `json:"cookie"`
 		SessionToken string `json:"session_token"`
@@ -313,6 +314,20 @@ func (s *Server) HandleTestWebAIConnection(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	// 优先按模型 ID 从 DB 取真实凭证（前端拿到的 cookie 是加密密文，不能直接用）
+	if req.ModelID != "" {
+		item, err := s.store.GetModel(r.Context(), req.ModelID)
+		if err == nil && item != nil {
+			req.Provider = item.Provider
+			req.Cookie = item.Cookie        // 解密后的真实 cookie
+			req.SessionToken = item.SessionToken
+			if item.RequestURL != "" {
+				req.RequestURL = item.RequestURL
+			}
+		}
+	}
+
 	if req.Provider == "" && req.RequestURL == "" {
 		writeError(w, http.StatusBadRequest, "请选择提供商或填写自定义请求URL")
 		return
