@@ -68,12 +68,8 @@ var ResourceUI = {
       actions: []
     });
     try {
-      // 阶段1：读取章节（用全文保证人物/世界观完整性，避免截断丢信息；总量保护 ≤3万字）
-      setStage('📚 读取章节中…（' + chapters.length + ' 章）', 8, false);
-      var text = chapters.map(function (c) {
-        return '【' + (c.title || '未命名') + '】\n' + (c.content || '');
-      }).join('\n\n');
-      if (text.length > 30000) text = text.slice(0, 30000);
+      // 阶段1：分批读取章节——每批约 1.5 万字，全部分批处理完后合并，10 万字长文也能完整覆盖不丢角色
+      setStage('📚 读取章节中…（' + chapters.length + ' 章）', 5, false);
       // 优先使用快速总结模型（实测 deepseek-v4-flash 最快；glm 系推理慢。按用户要求：哪个快用哪个）
       var fastModel = null;
       var models = Store.state.models || [];
@@ -82,10 +78,34 @@ var ResourceUI = {
         var m = models.find(function (x) { return x.name === prefer[pi] && x.status === 'active'; });
         if (m) { fastModel = m.name; break; }
       }
-      setStage('🧠 AI 分析中…（' + text.length + ' 字，使用 ' + (fastModel || '默认模型') + '）', 25, true);
-      var r = await API.post('/api/tools/execute', { tool: 'summarize', content: text, model: fastModel || '' });
-      var result = r.result || '';
-      var parsed = ResourceUI.parseSummaryResult(result);
+      // 按章节分批：每批累计到 1.5 万字就封批，保证每批在模型舒适长度内且不丢任何章节
+      var batches = [];
+      var cur = '';
+      var curChapters = 0;
+      chapters.forEach(function (c) {
+        var block = '【' + (c.title || '未命名') + '】\n' + (c.content || '');
+        if (cur.length + block.length > 15000 && curChapters > 0) {
+          batches.push(cur);
+          cur = block;
+          curChapters = 1;
+        } else {
+          cur = cur ? cur + '\n\n' + block : block;
+          curChapters++;
+        }
+      });
+      if (cur) batches.push(cur);
+      if (!batches.length) { UI.toast('当前项目没有可读章节', 'warn'); closeProgress(); return; }
+      // 逐批调用 AI 总结，合并所有批次结果
+      var allParsed = { characters: [], worlds: [] };
+      for (var bi = 0; bi < batches.length; bi++) {
+        var bText = batches[bi];
+        setStage('🧠 AI 分析第 ' + (bi + 1) + '/' + batches.length + ' 批…（' + bText.length + ' 字）', 15 + Math.round(bi / batches.length * 55), true);
+        var r = await API.post('/api/tools/execute', { tool: 'summarize', content: bText, model: fastModel || '' });
+        var batchParsed = ResourceUI.parseSummaryResult(r.result || '');
+        allParsed.characters = allParsed.characters.concat(batchParsed.characters || []);
+        allParsed.worlds = allParsed.worlds.concat(batchParsed.worlds || []);
+      }
+      var parsed = allParsed;
       if (!parsed.characters.length && !parsed.worlds.length) {
         setStage('⚠️ AI 未从正文识别到可导入的设定', 100, false);
         setTimeout(closeProgress, 1500);
