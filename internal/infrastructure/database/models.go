@@ -313,11 +313,23 @@ func (s *Store) DeleteModel(ctx context.Context, id string) error {
 	return err
 }
 
-// CreateWebAIModel 创建网页AI模型
+// CreateWebAIModel 创建网页AI模型（upsert：同名已存在则更新配置，避免 UNIQUE constraint failed: models.name）
 func (s *Store) CreateWebAIModel(ctx context.Context, name, provider, cookie, sessionToken, requestURL, description string, maxTokens, timeoutSeconds int) (*ModelConfig, error) {
 	encryptedCookie, err := encryptCookie(cookie)
 	if err != nil {
 		return nil, fmt.Errorf("加密Cookie失败: %w", err)
+	}
+
+	// 同名已存在 -> 更新配置，返回已有模型
+	var existingID string
+	err = s.db.QueryRowContext(ctx, `SELECT id FROM models WHERE name=?`, name).Scan(&existingID)
+	if err == nil {
+		_, err = s.db.ExecContext(ctx, `UPDATE models SET cookie=?, session_token=?, provider=?, vendor=?, request_url=?, api_endpoint=?, status=? WHERE id=?`,
+			encryptedCookie, sessionToken, provider, provider, requestURL, requestURL, "active", existingID)
+		if err != nil {
+			return nil, err
+		}
+		return s.GetModel(ctx, existingID)
 	}
 
 	m := &ModelConfig{
