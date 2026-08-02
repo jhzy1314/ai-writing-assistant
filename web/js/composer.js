@@ -446,10 +446,32 @@ var Composer = {
   continueFromCursor: function () {
     var ch = Store.state.currentChapter;
     if (!ch) { UI.toast('请先选择章节', 'warn'); return; }
+    var self = this;
+    // 每次续写都让用户现场决定写入位置：本章追加 or 新建下一章
+    UI.modal({
+      title: '续写位置',
+      body: '<div style="font-size:12px;line-height:2">续写内容写入哪里？</div>',
+      actions: [
+        { id: 'same', label: '📄 写在本章', onClick: function (m, ov) {
+          ov.remove();
+          Store.state.composer.newChapterWrite = false;
+          self._doContinue();
+        }},
+        { id: 'next', label: '📄 写入下一章', cls: 'btn-primary', onClick: function (m, ov) {
+          ov.remove();
+          Store.state.composer.newChapterWrite = true;
+          self._doContinue();
+        }}
+      ]
+    });
+  },
+  _doContinue: function () {
+    var ch = Store.state.currentChapter;
+    if (!ch) { UI.toast('请先选择章节', 'warn'); return; }
     // 「新章」模式：不依赖光标，以整个当前章节为上下文，生成内容写入下一章
     if (Store.state.composer && Store.state.composer.newChapterWrite) {
       Store.state.composer.cursorPosition = -1; // 标记：不使用光标截断
-      document.getElementById('instructionInput').value = '续写'; 
+      document.getElementById('instructionInput').value = '续写';
       this.generate();
       return;
     }
