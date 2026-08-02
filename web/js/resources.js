@@ -57,7 +57,7 @@ var ResourceUI = {
       sub: '正在通读本项目全部章节，自动提取人物卡与世界观',
       body: '<div style="padding:4px 0 12px">' +
         '<div id="' + pid + '_stage" style="font-size:13px;color:var(--text2);margin-bottom:8px">准备中…</div>' +
-        '<div style="height:8px;background:var(--panel3);border-radius:4px;overflow:hidden"><div id="' + pid + '_bar" style="height:100%;width:2%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width .3s ease"></div></div>' +
+        '<div style="height:8px;background:var(--panel3);border-radius:4px;overflow:hidden"><div id="' + pid + '_bar" style="height:100%;width:2%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width .3s ease; /* impeccable-disable-line layout-transition: 进度条状态动画 */"></div></div>' +
         '<div id="' + pid + '_count" style="font-size:11px;color:var(--muted);margin-top:8px"></div>' +
         '</div>',
       actions: []
