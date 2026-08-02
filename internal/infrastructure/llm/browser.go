@@ -163,7 +163,7 @@ func getCookiesString(page *rod.Page) (string, error) {
 // providerLoginCookies 各站点登录后才出现的特征 Cookie 名（白名单，命中即判定已登录）
 var providerLoginCookies = map[string][]string{
 	"kimi-free":     {"kimi_token", "user_token", "moonshot_token", "sessionid"},
-	"deepseek-free": {"user_token", "token", "sessionid", "deepseek_session"},
+	"deepseek-free": {"ds_session_id", "user_token", "token", "sessionid", "deepseek_session"},
 	"doubao-free":   {"sessionid", "sid", "user_unique_id", "session_token"},
 	"qwen-free":     {"login_aliyunid", "unb", "aliyunid", "login_aliyunid_pk"},
 	"zhipu-free":    {"chatglm_token", "user_token", "sessionid", "glm_token"},
