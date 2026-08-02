@@ -129,9 +129,25 @@ var CharacterPage = {
   },
   importFromText: function () {
     var self = this;
+    // 自动取当前编辑器内容（无需手动复制）；无内容时提示可粘贴或一键使用全书
+    var editorText = '';
+    try { editorText = (typeof Editor !== 'undefined' && Editor.getText) ? (Editor.getText() || '') : ''; } catch (e) {}
+    var ch = Store.state.currentChapter;
+    var chText = ch && ch.content ? ch.content : '';
+    var initial = editorText || chText || '';
+    if (initial.length > 60000) initial = initial.slice(0, 60000);
+    var escInit = esc(initial);
     UI.modal({
       title: '从正文提取人物卡',
-      body: '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">粘贴正文片段，AI 将自动识别并提取人物信息</p><textarea id="charImportText" rows="8" style="width:100%" placeholder="粘贴正文内容..."></textarea>',
+      wide: '620px',
+      body: '<p style="font-size:12px;color:var(--muted);margin-bottom:8px">已自动填入当前' + (editorText ? '编辑器内容' : (chText ? '章节内容' : '（编辑器为空，可粘贴或点击下方按钮使用全书）')) + '，AI 将识别并提取人物信息。</p>' +
+        '<div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap">' +
+        '<button class="tool-btn" type="button" onclick="document.getElementById(\'charImportText\').value=window.__charAutoSource\'current\';return false" style="font-size:11px">🔄 重新载入当前内容</button>' +
+        '<button class="tool-btn" type="button" onclick="CharacterPage.useAllChapters(\'charImportText\')" style="font-size:11px">📚 使用全书内容</button>' +
+        '<button class="tool-btn" type="button" onclick="document.getElementById(\'charImportText\').value=\'\';return false" style="font-size:11px">🗑 清空</button>' +
+        '</div>' +
+        '<textarea id="charImportText" rows="10" style="width:100%;font-size:13px">' + escInit + '</textarea>' +
+        '<div style="font-size:10px;color:var(--faint);margin-top:4px">提示：可直接编辑上方文本；「使用全书内容」会拼接本项目的全部章节。</div>',
       actions: [
         { id: 'cancel', label: '取消' },
         { id: 'ok', label: '提取', cls: 'btn-primary', onClick: function (m, ov) {
@@ -142,6 +158,16 @@ var CharacterPage = {
         }}
       ]
     });
+    // 缓存当前内容供「重新载入」按钮使用
+    try { window.__charAutoSource = { 'current': initial }; } catch (e) {}
+  },
+  useAllChapters: function (taId) {
+    var chs = Store.state.chapters || [];
+    if (!chs.length) { UI.toast('本项目还没有章节', 'warn'); return; }
+    var text = chs.map(function (c) { return '【' + (c.title || '未命名') + '】\n' + (c.content || ''); }).join('\n\n');
+    if (text.length > 60000) text = text.slice(0, 60000);
+    var ta = document.getElementById(taId);
+    if (ta) { ta.value = text; UI.toast('已载入全书内容（' + chs.length + ' 章）', 'success'); }
   },
   doImport: async function (text) {
     UI.toast('正在分析人物...', 'info');
