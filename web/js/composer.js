@@ -468,11 +468,24 @@ var Composer = {
       var mm = document.getElementById('moreMenu');
       if (mm && mm.style.display !== 'none') mm.style.display = 'none';
       this._positionProPanel();
+      UI.toast('⚡ 专业模式已展开，可填写或让 AI 生成设定', 'success');
+    } else {
+      UI.toast('专业模式已关闭', '');
     }
     if (btn) btn.classList.toggle('on', show);
     // 同步大纲内容到 genOutline（生成时读取）
     if (show) this.syncProOutlineToGen();
     Store.set('proModeOpen', show);
+  },
+  /* 关闭专业模式面板（面板右上角 ✕ 关闭按钮） */
+  closeProMode: function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var panel = document.getElementById('proModePanel');
+    var btn = document.getElementById('proModeBtn');
+    if (panel) panel.style.display = 'none';
+    if (btn) btn.classList.remove('on');
+    Store.set('proModeOpen', false);
+    UI.toast('专业模式已关闭，可继续创作', '');
   },
   onProOutline: function () {
     // 聚合专业模式所有字段为结构化大纲（写入 genOutline 供生成使用）

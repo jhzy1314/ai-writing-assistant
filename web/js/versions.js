@@ -21,7 +21,7 @@ var VersionUI = {
         '</div></div>';
     });
     body += '</div>';
-    UI.modal({ title: '版本历史', sub: '每次 AI 生成完成自动保存版本。回退将载入内容到编辑器（可继续编辑后另存为新版本）。', body: body, wide: '520px' });
+    UI.modal({ title: '版本历史', sub: '每次 AI 生成完成自动保存版本。回退将载入内容到编辑器（可继续编辑后另存为新版本）。', body: body, wide: '520px', actions: [{ id: 'close', label: '关闭' }] });
   },
   rollback: async function (vid) {
     try {

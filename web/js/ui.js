@@ -72,6 +72,8 @@ var UI = {
     m.className = 'modal';
     if (opts.wide) m.style.width = opts.wide;
     var html = '<h3>' + esc(opts.title) + '</h3>';
+    // 统一右上角 ✕ 关闭按钮：所有弹窗都有显式关闭入口（点击有反馈）
+    html += '<span class="modal-x" title="关闭">✕</span>';
     if (opts.sub) html += '<div class="modal-sub">' + opts.sub + '</div>';
     if (opts.body) html += '<div class="modal-body">' + opts.body + '</div>';
     if (opts.actions) {
@@ -82,6 +84,14 @@ var UI = {
       html += '</div>';
     }
     m.innerHTML = html;
+    // ✕ 关闭按钮：关闭弹窗并给出反馈
+    var mx = m.querySelector('.modal-x');
+    if (mx) {
+      mx.onclick = function (e) {
+        e.stopPropagation();
+        ov.remove();
+      };
+    }
     ov.appendChild(m);
     ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
     if (opts.actions) {
