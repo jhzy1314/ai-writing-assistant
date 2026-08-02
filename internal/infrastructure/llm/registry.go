@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -101,9 +102,20 @@ func (r *Registry) adapterForName(ctx context.Context, name string) (ModelAdapte
 	if m.Status != "active" {
 		return nil, fmt.Errorf("模型 %s 已停用", name)
 	}
-	a, err := NewOpenAICompatible(ctx, m.Vendor, m.APIKey, m.APIEndpoint, m.Name, m.MaxTokens)
-	if err != nil {
-		return nil, err
+	var a ModelAdapter
+	if m.ModelType == "web" || strings.HasSuffix(m.Provider, "-free") {
+		// 网页AI：用 WebAIAdapter（cookie + session_token + 自定义调用如 kimi 两步流程）
+		wa, err := NewWebAIAdapter(m.Name, m.Provider, m.Cookie, m.SessionToken, m.RequestURL, m.MaxTokens, m.TimeoutSeconds)
+		if err != nil {
+			return nil, err
+		}
+		a = wa
+	} else {
+		oa, err := NewOpenAICompatible(ctx, m.Vendor, m.APIKey, m.APIEndpoint, m.Name, m.MaxTokens)
+		if err != nil {
+			return nil, err
+		}
+		a = oa
 	}
 
 	r.mu.Lock()
