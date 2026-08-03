@@ -341,6 +341,7 @@ var Composer = {
       } : null,
       cursor_position: cursorPos,
       no_rewrite: noRewrite,
+      style_sample_ids: (Store.state.composer.styleSampleIds || []).slice(),
       context_scope: scope,
       previous_summaries: summaries,
       skip_word_check: Store.state.composer.skipWordCheck,
@@ -480,6 +481,65 @@ var Composer = {
     Store.state.composer.cursorPosition = cursorPos;
     document.getElementById('instructionInput').value = '续写';
     this.generate();
+  },
+  // ========== 多候选续写：一次生成 3 个不同走向，供用户挑选 ==========
+  generateCandidates: async function () {
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择或创建项目', 'warn'); return; }
+    var ch = Store.state.currentChapter;
+    if (!ch) { UI.toast('请先选择章节', 'warn'); return; }
+    var payload = this.buildPayload();
+    if (!payload.user_demand && !payload.selected_text && !payload.history_content) {
+      UI.toast('请先写一些内容或输入续写需求', 'warn'); return;
+    }
+    UI.toast('🎲 正在生成 3 个候选走向，请稍候…', 'warn');
+    try {
+      var d = await API.post('/api/generate/candidates', {
+        project_id: payload.project_id,
+        chapter_id: payload.chapter_id,
+        user_demand: payload.user_demand,
+        selected_text: payload.selected_text,
+        history_content: payload.history_content,
+        world_setting: payload.world_setting,
+        character_setting: payload.character_setting,
+        material_text: payload.material_text,
+        target_word: 750
+      });
+      var cands = d.candidates || [];
+      if (!cands.length) { UI.toast('未生成到候选，请重试', 'error'); return; }
+      this._cands = cands;
+      this.showCandidates(cands);
+    } catch (e) {
+      UI.toast('生成失败: ' + e.message, 'error');
+    }
+  },
+  showCandidates: function (cands) {
+    var self = this;
+    var html = cands.map(function (c, i) {
+      return '<div style="border:1px solid var(--border2);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)">' +
+        '<div style="font-weight:600;margin-bottom:6px;color:#f59e0b;font-size:12px">候选 ' + (i + 1) +
+        '<span style="color:var(--muted);font-weight:400;margin-left:6px">' + (i === 0 ? '平稳推进' : i === 1 ? '冲突/反转' : '新线索/伏笔') + '</span></div>' +
+        '<div style="font-size:12.5px;line-height:1.7;white-space:pre-wrap;max-height:200px;overflow:auto">' + esc(c) + '</div>' +
+        '<div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="Composer.useCandidate(' + i + ')">✅ 采用此候选</button>' +
+        '<button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="Composer.copyCandidate(' + i + ')">📋 复制</button></div></div>';
+    }).join('');
+    UI.modal({
+      title: '🎲 多候选续写（点击「采用」插入光标处）',
+      body: html,
+      actions: [{ id: 'ok', label: '关闭', cls: 'btn-ghost' }]
+    });
+  },
+  useCandidate: function (i) {
+    var cands = this._cands || [];
+    if (!cands[i]) return;
+    Editor.insertAtCursor(cands[i]);
+    UI.toast('已插入候选 ' + (i + 1), 'success');
+    UI.closeModal();
+  },
+  copyCandidate: function (i) {
+    var cands = this._cands || [];
+    if (!cands[i]) return;
+    navigator.clipboard.writeText(cands[i]).then(function () { UI.toast('已复制', 'success'); }).catch(function () {});
   },
   refreshStyleChapters: function () {
     var sel = document.getElementById('styleChapter');

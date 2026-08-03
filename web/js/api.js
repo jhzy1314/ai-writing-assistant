@@ -143,5 +143,34 @@ var API = {
   uploadBackground: function (fd) { return this.post('/api/appearance/backgrounds/upload', fd); },
   generateBackground: function (type, theme, prompt) { return this.post('/api/appearance/backgrounds/generate', { type: type, theme: theme, prompt: prompt }); },
   randomBackground: function (type, theme) { return this.post('/api/appearance/backgrounds/random?type=' + type + '&theme=' + theme); },
-  resetBackgrounds: function () { return this.post('/api/appearance/backgrounds/reset', {}); }
+  resetBackgrounds: function () { return this.post('/api/appearance/backgrounds/reset', {}); },
+  // 伏笔
+  listForeshadows: function (pid) { return this.get('/api/foreshadows?project_id=' + pid).then(function (d) { return d.items || []; }); },
+  createForeshadow: function (f) { return this.post('/api/foreshadows', f).then(function (d) { return d.item; }); },
+  updateForeshadow: function (id, f) { return this.put('/api/foreshadows/' + id, f).then(function (d) { return d.item; }); },
+  deleteForeshadow: function (id) { return this.del('/api/foreshadows/' + id); },
+  scanForeshadows: function (pid, chapterId) { return this.post('/api/foreshadows/scan', { project_id: pid, chapter_id: chapterId || '' }).then(function (d) { return d.items || []; }); },
+  // 写作素材库
+  listWritingMaterials: function (pid, cat) { return this.get('/api/materials/writing?project_id=' + pid + (cat ? '&category=' + encodeURIComponent(cat) : '')).then(function (d) { return d.items || []; }); },
+  createWritingMaterial: function (m) { return this.post('/api/materials/writing', m).then(function (d) { return d.item; }); },
+  updateWritingMaterial: function (id, m) { return this.put('/api/materials/writing/' + id, m).then(function (d) { return d.item; }); },
+  deleteWritingMaterial: function (id) { return this.del('/api/materials/writing/' + id); },
+  extractMaterials: function (pid, chapterId, content, clear) { return this.post('/api/materials/extract', { project_id: pid, chapter_id: chapterId || '', content: content || '', clear: !!clear }); },
+  searchMaterials: function (pid, query, topK) { return this.post('/api/materials/search', { project_id: pid, query: query, top_k: topK || 5 }).then(function (d) { return d.items || []; }); },
+  // 场景节拍
+  listSceneBeats: function (chid, pid) { return this.get('/api/scenebeats?chapter_id=' + (chid || '') + (chid ? '' : '&project_id=' + (pid || ''))).then(function (d) { return d.items || []; }); },
+  createSceneBeat: function (b) { return this.post('/api/scenebeats', b).then(function (d) { return d.item; }); },
+  updateSceneBeat: function (id, b) { return this.put('/api/scenebeats/' + id, b).then(function (d) { return d.item; }); },
+  deleteSceneBeat: function (id) { return this.del('/api/scenebeats/' + id); },
+  // 构思Agent
+  conceptAsk: function (idea) { return this.post('/api/concept/ask', { idea: idea }); },
+  conceptComplete: function (idea, answers, outline) { return this.post('/api/concept/complete', { idea: idea, answers: answers, outline: outline || '' }); },
+  // 角色关系图谱
+  characterRelations: function (pid, content, force) { return this.post('/api/characters/relations', { project_id: pid, content: content || '', force: !!force }); },
+  // 文风样本库（本地知识库）
+  listStyleSamples: function (cat) { return this.get('/api/stylesamples' + (cat ? '?category=' + encodeURIComponent(cat) : '')).then(function (d) { return d.items || []; }); },
+  getStyleSample: function (id) { return this.get('/api/stylesamples/' + id).then(function (d) { return d.item; }); },
+  createStyleSample: function (m) { return this.post('/api/stylesamples', m).then(function (d) { return d.item; }); },
+  updateStyleSample: function (id, m) { return this.put('/api/stylesamples/' + id, m).then(function (d) { return d.item; }); },
+  deleteStyleSample: function (id) { return this.del('/api/stylesamples/' + id); }
 };

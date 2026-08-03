@@ -572,78 +572,7 @@ func (s *Store) SplitByTitles(ctx context.Context, req *SplitChaptersRequest, ti
 	var segments []chapterSeg
 	prevEnd := 0
 
-	for _, title := range titles {
-		// 在剩余文本中搜索标题
-		idx := strings.Index(content[prevEnd:], title)
-		if idx < 0 {
-			// 尝试模糊匹配：去掉前导空白
-			trimmed := strings.TrimSpace(title)
-			idx = strings.Index(content[prevEnd:], trimmed)
-		}
-		if idx < 0 {
-			// 标题未在原文中找到，尝试第一个非标点字符开始的子串
-			for i, r := range []rune(title) {
-				if r > 32 && r != '#' && r != ' ' {
-					sub := string([]rune(title)[i:])
-					idx = strings.Index(content[prevEnd:], sub)
-					break
-				}
-			}
-		}
-		if idx < 0 {
-			continue // 找不到就跳过
-		}
-
-		start := prevEnd + idx
-		if segments != nil {
-			// 上一段从 prevEnd 到 start（不含新标题）
-			segContent := strings.TrimSpace(content[prevEnd:start])
-			if segContent != "" {
-				// 分离标题行和正文
-				bodyStart := strings.Index(segContent, "\n")
-				if bodyStart < 0 {
-					bodyStart = len(segContent)
-				}
-				segTitle := strings.TrimSpace(segContent[:bodyStart])
-				segBody := strings.TrimSpace(segContent[bodyStart:])
-				if segBody == "" && bodyStart < len(segContent) {
-					segBody = strings.TrimSpace(segContent[bodyStart:])
-				}
-				segments = append(segments, chapterSeg{title: segTitle, content: segBody})
-			}
-		}
-
-		// 跳到标题之后继续
-		prevEnd = start
-		if len(segments) == 0 {
-			// 第一个标题：正文从标题行之后开始
-			bodyStart := strings.Index(content[prevEnd:], "\n")
-			if bodyStart >= 0 {
-				prevEnd = start + bodyStart + 1
-			}
-		}
-		segments = append(segments) // placeholder, will be filled below
-		segments = segments[:len(segments)-1]
-	}
-
-	// 最后一段：从 prevEnd 到文末
-	if prevEnd < len(content) {
-		lastContent := strings.TrimSpace(content[prevEnd:])
-		bodyStart := strings.Index(lastContent, "\n")
-		segTitle := "后续章节"
-		segBody := lastContent
-		if bodyStart >= 0 && bodyStart < 40 {
-			segTitle = strings.TrimSpace(lastContent[:bodyStart])
-			segBody = strings.TrimSpace(lastContent[bodyStart:])
-		}
-		if segBody != "" {
-			segments = append(segments, chapterSeg{title: segTitle, content: segBody})
-		}
-	}
-
-	// 重新构建：为每个标题匹配其后的正文段落
-	segments = nil
-	prevEnd = 0
+	// 为每个标题匹配其后的正文段落
 	for i, title := range titles {
 		idx := strings.Index(content[prevEnd:], title)
 		if idx < 0 {
@@ -719,7 +648,7 @@ func (s *Store) commitSegments(ctx context.Context, projectID string, segments [
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO chapter_versions(id, chapter_id, title, content, version, created_at) VALUES(?,?,?,?,1,?)`,
 			vid, cid, title, seg.content, now()); err != nil {
-			return result, nil
+			return result, fmt.Errorf("写入第%d章版本记录失败: %w", i+1, err)
 		}
 		ch := Chapter{ID: cid, ProjectID: projectID, Title: title, Content: seg.content, WordCount: wc, SortOrder: i + 1}
 		result = append(result, ch)

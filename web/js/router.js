@@ -1,6 +1,6 @@
 /* ============ router.js：前端路由管理，页面切换 + 草稿保持 + 主题联动 ============ */
 var Router = {
-  pages: ['editor', 'characters', 'worldbuilding', 'toolbox', 'dashboard', 'outline'],
+  pages: ['editor', 'characters', 'worldbuilding', 'toolbox', 'dashboard', 'outline', 'foreshadow', 'materials', 'stylebank'],
   current: 'editor',
   cache: {},
   init: function () {
@@ -51,7 +51,7 @@ var Router = {
       el.classList.toggle('active', el.getAttribute('data-page') === page);
     });
     // 导航到「更多」组内的页面时自动展开该组
-    if (page === 'toolbox' || page === 'dashboard') {
+    if (page === 'toolbox' || page === 'dashboard' || page === 'foreshadow' || page === 'materials' || page === 'stylebank') {
       var body = document.getElementById('navMoreBody');
       if (body && body.style.display === 'none') {
         body.style.display = 'block';
@@ -79,6 +79,9 @@ var Router = {
       case 'toolbox': if (typeof ToolboxPage !== 'undefined') ToolboxPage.init(); break;
       case 'dashboard': if (typeof DashboardPage !== 'undefined') DashboardPage.init(); break;
       case 'outline': if (typeof OutlinePage !== 'undefined') OutlinePage.init(); break;
+      case 'foreshadow': if (typeof ForeshadowPage !== 'undefined') ForeshadowPage.init(); break;
+      case 'materials': if (typeof MaterialsPage !== 'undefined') MaterialsPage.init(); break;
+      case 'stylebank': if (typeof StyleBankPage !== 'undefined') StyleBankPage.init(); break;
     }
   },
   getParam: function (name) {

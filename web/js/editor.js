@@ -312,6 +312,22 @@ var Editor = {
       setTimeout(function () { document.addEventListener('click', close, true); }, 0);
     }
   },
+  toggleAdvBar: function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var bar = document.getElementById('advBar');
+    if (!bar) return;
+    var showing = bar.style.display !== 'none';
+    bar.style.display = showing ? 'none' : '';
+    if (!showing) {
+      var close = function (e) {
+        if (bar && !bar.contains(e.target) && !e.target.closest('.adv-bar-wrap')) {
+          bar.style.display = 'none';
+          document.removeEventListener('click', close, true);
+        }
+      };
+      setTimeout(function () { document.addEventListener('click', close, true); }, 0);
+    }
+  },
   updateEmptyGuide: function () {
     var g = document.getElementById('emptyGuide');
     if (!g) return;

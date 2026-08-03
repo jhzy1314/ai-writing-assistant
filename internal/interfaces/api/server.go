@@ -100,6 +100,7 @@ func (s *Server) routes() {
 
 	// 1. 创作请求（SSE 流式）
 	s.router.Post("/api/generate", s.HandleGenerate)
+	s.router.Post("/api/generate/candidates", s.HandleGenerateCandidates)
 	// 1.5 需求-字数预检（Helper 轻量分析）
 	s.router.Post("/api/precheck", s.HandlePrecheck)
 	// 7. 逻辑自检独立接口
@@ -110,6 +111,41 @@ func (s *Server) routes() {
 
 	// 8. Helper 工具辅助接口
 	s.router.Post("/api/tools/execute", s.HandleToolExecute)
+
+	// 8.5 创作增强：伏笔 / 素材库 / 场景节拍 / 构思Agent / 角色关系
+	s.router.Get("/api/foreshadows", s.HandleListForeshadows)
+	s.router.Post("/api/foreshadows", s.HandleCreateForeshadow)
+	s.router.Put("/api/foreshadows/{id}", s.HandleUpdateForeshadow)
+	s.router.Delete("/api/foreshadows/{id}", s.HandleDeleteForeshadow)
+	s.router.Post("/api/foreshadows/scan", s.HandleScanForeshadows)
+	s.router.Get("/api/foreshadows/check", s.HandleForeshadowCheck)
+
+	s.router.Get("/api/materials/writing", s.HandleListWritingMaterials)
+	s.router.Post("/api/materials/writing", s.HandleCreateWritingMaterial)
+	s.router.Put("/api/materials/writing/{id}", s.HandleUpdateWritingMaterial)
+	s.router.Delete("/api/materials/writing/{id}", s.HandleDeleteWritingMaterial)
+	s.router.Post("/api/materials/extract", s.HandleExtractMaterials)
+	s.router.Post("/api/materials/search", s.HandleSearchWritingMaterials)
+
+	s.router.Get("/api/scenebeats", s.HandleListSceneBeats)
+	s.router.Post("/api/scenebeats", s.HandleCreateSceneBeat)
+	s.router.Put("/api/scenebeats/{id}", s.HandleUpdateSceneBeat)
+	s.router.Delete("/api/scenebeats/{id}", s.HandleDeleteSceneBeat)
+
+	s.router.Post("/api/concept/ask", s.HandleConceptAsk)
+	s.router.Post("/api/concept/complete", s.HandleConceptComplete)
+
+	s.router.Post("/api/characters/relations", s.HandleCharacterRelations)
+
+	// 8.6 文风样本库（本地知识库）——已有 CRUD 见 /api/stylesamples
+
+	// 8.6 文风样本库（本地知识库）
+	s.router.Get("/api/stylesamples", s.HandleListStyleSamples)
+	s.router.Get("/api/stylesamples/{id}", s.HandleGetStyleSample)
+	s.router.Post("/api/stylesamples", s.HandleCreateStyleSample)
+	s.router.Put("/api/stylesamples/{id}", s.HandleUpdateStyleSample)
+	s.router.Delete("/api/stylesamples/{id}", s.HandleDeleteStyleSample)
+	s.router.Post("/api/stylesamples/import", s.HandleImportStyleSamples)
 
 	// 2. 项目管理
 	s.router.Get("/api/projects", s.HandleListProjects)

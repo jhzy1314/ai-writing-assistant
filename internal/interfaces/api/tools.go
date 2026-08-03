@@ -71,7 +71,12 @@ func (s *Server) HandleToolExecute(w http.ResponseWriter, r *http.Request) {
 // callHelperTool 调用 Helper 角色非流式生成，含备用模型降级；preferredModel 非空时优先使用该模型（失败再回退角色绑定）
 // 提取/总结类工具（summarize/extract_*/count 等）自动关闭深度思考以提速
 func (s *Server) callHelperTool(ctx context.Context, userPrompt, preferredModel, tool string) (string, string, error) {
-	agent := roles.NewRoleAgent(llm.RoleHelper, "light")
+	return s.callRoleTool(ctx, llm.RoleHelper, userPrompt, preferredModel, tool)
+}
+
+// callRoleTool 调用指定角色非流式生成，含备用模型降级；preferredModel 非空时优先使用该模型（失败再回退角色绑定）
+func (s *Server) callRoleTool(ctx context.Context, role llm.Role, userPrompt, preferredModel, tool string) (string, string, error) {
+	agent := roles.NewRoleAgent(role, "light")
 	var adapters []llm.ModelAdapter
 	if preferredModel != "" {
 		if a, err := s.registry.AdapterByName(ctx, preferredModel); err == nil {
@@ -80,9 +85,9 @@ func (s *Server) callHelperTool(ctx context.Context, userPrompt, preferredModel,
 	}
 	if len(adapters) == 0 {
 		var err error
-		adapters, err = s.registry.AdaptersForRole(ctx, llm.RoleHelper)
+		adapters, err = s.registry.AdaptersForRole(ctx, role)
 		if err != nil {
-			return "", "", fmt.Errorf("Helper 无可用模型: %w", err)
+			return "", "", fmt.Errorf("%s 无可用模型: %w", role, err)
 		}
 	}
 	// 提取/总结类工具关闭深度思考（简单任务不需要推理，提速明显）

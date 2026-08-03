@@ -63,6 +63,7 @@ var OutlinePage = {
           html += '<span class="ot-ch-name">' + esc(ch.title || '未命名章节') + '</span>';
           html += '<span class="ot-ch-wc">' + (ch.word_count || 0) + ' 字</span>';
           html += '<span class="ot-ch-acts">';
+          html += '<span class="link-btn" onclick="event.stopPropagation();SceneBeatUI.show(\'' + ch.id + '\',\'' + esc(ch.title || '未命名章节').replace(/'/g, '\\\'') + '\')" title="场景节拍">🎬</span>';
           html += '<span class="link-btn" onclick="event.stopPropagation();OutlinePage.moveUp(\'' + ch.id + '\')" title="上移">▲</span>';
           html += '<span class="link-btn" onclick="event.stopPropagation();OutlinePage.moveDown(\'' + ch.id + '\')" title="下移">▼</span>';
           html += '<span class="link-btn" onclick="event.stopPropagation();OutlinePage.renameChapter(\'' + ch.id + '\')" title="重命名">✏</span>';
@@ -85,6 +86,7 @@ var OutlinePage = {
         html += '<span class="ot-ch-name">' + esc(ch.title || '未命名章节') + '</span>';
         html += '<span class="ot-ch-wc">' + (ch.word_count || 0) + ' 字</span>';
         html += '<span class="ot-ch-acts">';
+        html += '<span class="link-btn" onclick="event.stopPropagation();SceneBeatUI.show(\'' + ch.id + '\',\'' + esc(ch.title || '未命名章节').replace(/'/g, '\\\'') + '\')" title="场景节拍">🎬</span>';
         html += '<span class="link-btn" onclick="event.stopPropagation();OutlinePage.renameChapter(\'' + ch.id + '\')">✏</span>';
         html += '<span class="link-btn" onclick="event.stopPropagation();OutlinePage.delChapter(\'' + ch.id + '\')">✕</span>';
         html += '</span></div>';

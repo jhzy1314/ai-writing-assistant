@@ -365,6 +365,56 @@ CREATE TABLE IF NOT EXISTS rag_chunks (
 CREATE INDEX IF NOT EXISTS idx_ragchunks_project ON rag_chunks(project_id);
 CREATE INDEX IF NOT EXISTS idx_ragchunks_chapter ON rag_chunks(chapter_id);
 
+CREATE TABLE IF NOT EXISTS foreshadows (
+    id                 TEXT PRIMARY KEY,
+    project_id         TEXT NOT NULL,
+    title              TEXT NOT NULL DEFAULT '',
+    description        TEXT NOT NULL DEFAULT '',
+    setup_chapter_id   TEXT NOT NULL DEFAULT '',
+    payoff_chapter_id  TEXT NOT NULL DEFAULT '',
+    status             TEXT NOT NULL DEFAULT 'pending',
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_foreshadows_project ON foreshadows(project_id, status);
+
+CREATE TABLE IF NOT EXISTS writing_materials (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    category    TEXT NOT NULL DEFAULT '其他',
+    content     TEXT NOT NULL DEFAULT '',
+    source      TEXT NOT NULL DEFAULT '',
+    vector      TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_wm_project ON writing_materials(project_id, category);
+
+CREATE TABLE IF NOT EXISTS scene_beats (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    chapter_id  TEXT NOT NULL DEFAULT '',
+    title       TEXT NOT NULL DEFAULT '',
+    summary     TEXT NOT NULL DEFAULT '',
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_scenebeats_chapter ON scene_beats(chapter_id, sort_order);
+
+CREATE TABLE IF NOT EXISTS style_samples (
+    id          TEXT PRIMARY KEY,
+    title       TEXT NOT NULL DEFAULT '',
+    author      TEXT NOT NULL DEFAULT '',
+    category    TEXT NOT NULL DEFAULT '',
+    source_file TEXT NOT NULL DEFAULT '',
+    content     TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ss_category ON style_samples(category);
+
 CREATE TABLE IF NOT EXISTS configs (
     id          TEXT PRIMARY KEY,
     key         TEXT NOT NULL UNIQUE,

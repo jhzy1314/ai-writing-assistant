@@ -99,9 +99,12 @@ window.initTiptap = async function () {
       <div class="nav-more" id="navMore">
         <div class="nav-more-head" onclick="Sidebar.toggleNavMore(event)" role="button" tabindex="0" aria-expanded="false">
           <span class="nav-more-caret" id="navMoreCaret">▸</span><span>更多</span>
-          <span class="nav-more-count" id="navMoreCount">2</span>
+          <span class="nav-more-count" id="navMoreCount">4</span>
         </div>
         <div class="nav-more-body" id="navMoreBody" style="display:none">
+          <a class="nav-link" data-page="foreshadow" onclick="Router.navigate('foreshadow')">🔮 伏笔看板</a>
+          <a class="nav-link" data-page="materials" onclick="Router.navigate('materials')">📚 素材库</a>
+          <a class="nav-link" data-page="stylebank" onclick="Router.navigate('stylebank')">🎨 文风样本库</a>
           <a class="nav-link" data-page="toolbox" onclick="Router.navigate('toolbox')">🧰 AI工具箱</a>
           <a class="nav-link" data-page="dashboard" onclick="Router.navigate('dashboard')">📊 仪表盘</a>
         </div>
@@ -167,15 +170,20 @@ window.initTiptap = async function () {
           <option value="recent">最近2章全文</option>
           <option value="withSummary">前面章节摘要</option>
         </select>
-        <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="禁止AI改写已有前文">
-          <input type="checkbox" id="noRewriteToggle" onchange="Composer.onNoRewriteChange()"> <span>禁改写</span>
-        </label>
-        <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer;margin-left:6px" title="关闭需求字数双层校验（重新开启需刷新页面或重新选中项目）">
-          <input type="checkbox" id="skipWordCheck" onchange="Composer.onSkipWordCheck(this.checked)"> <span>跳过字数校验</span>
-        </label>
-        <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer;margin-left:6px" title="一键全开/全关思考。默认推荐：仅规划师开（快）；全开=所有角色都思考（更慢但更稳）">
-          <input type="checkbox" id="thinkingToggle" onchange="Composer.onThinkingChange(this.checked)"> <span>🧠 思考·全开</span>
-        </label>
+        <span class="adv-bar-wrap">
+          <button class="tool-btn" style="font-size:11px;padding:3px 7px" onclick="Editor.toggleAdvBar(event)" title="上下文/思考等高级开关">⚙</button>
+          <div class="adv-bar" id="advBar" style="display:none">
+            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="禁止AI改写已有前文">
+              <input type="checkbox" id="noRewriteToggle" onchange="Composer.onNoRewriteChange()"> <span>禁改写</span>
+            </label>
+            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="关闭需求字数双层校验（重新开启需刷新页面或重新选中项目）">
+              <input type="checkbox" id="skipWordCheck" onchange="Composer.onSkipWordCheck(this.checked)"> <span>跳过字数校验</span>
+            </label>
+            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="一键全开/全关思考。默认推荐：仅规划师开（快）；全开=所有角色都思考（更慢但更稳）">
+              <input type="checkbox" id="thinkingToggle" onchange="Composer.onThinkingChange(this.checked)"> <span>🧠 思考·全开</span>
+            </label>
+          </div>
+        </span>
       </div>
       <span class="tool-divider"></span>
       <div class="grp">
@@ -212,11 +220,8 @@ window.initTiptap = async function () {
         <button class="tool-btn" onclick="Editor.insertH('### ')" title="三级标题">H3</button>
         <span class="tool-divider"></span>
         <button class="tool-btn" onclick="ManualSave.saveDraft()" title="保存为版本(Ctrl+S)" data-shortcut="Ctrl+S">💾 保存版本</button>
-        <button class="tool-btn" onclick="VersionUI.open()" title="版本历史">📜 版本历史</button>
-        <span class="tool-divider"></span>
-        <button class="tool-btn" onclick="ChapterUI.splitChapterAtCursor()" title="从光标处拆分章节">✂️拆分</button>
         <button class="tool-btn on" id="btnCursorCont" onclick="Composer.continueFromCursor()" title="从光标位置续写">✍️从光标续写</button>
-        <button class="tool-btn" id="previewBtn2" onclick="Editor.togglePreview()" title="实时预览">👁 预览</button>
+        <button class="tool-btn" id="btnCandidates" onclick="Composer.generateCandidates()" title="一次生成 3 个不同走向的续写候选，供你挑选">🎲 多候选</button>
         <span class="tool-divider"></span>
         <button class="tool-btn" onclick="ChapterUI.prevChapter()" title="上一章">◀ 上一章</button>
         <button class="tool-btn" onclick="ChapterUI.nextChapter()" title="下一章">下一章 ▶</button>
@@ -225,6 +230,10 @@ window.initTiptap = async function () {
           <div class="more-menu-wrap" id="moreMenuWrap">
             <button class="tool-btn" onclick="Editor.toggleMoreMenu(event)" title="更多工具">⋯ 更多</button>
             <div class="more-menu" id="moreMenu" style="display:none">
+              <button class="tool-btn mm-item" onclick="VersionUI.open()">📜 版本历史</button>
+              <button class="tool-btn mm-item" onclick="ChapterUI.splitChapterAtCursor()">✂️ 从光标拆分章节</button>
+              <button class="tool-btn mm-item" id="previewBtn2" onclick="Editor.togglePreview()">👁 实时预览</button>
+              <div class="mm-divider"></div>
               <button class="tool-btn mm-item" onclick="Editor.importFile()">📥 导入文档</button>
               <button class="tool-btn mm-item" onclick="Editor.exportFile()">📤 导出文档</button>
               <div class="mm-divider"></div>
@@ -384,6 +393,7 @@ window.initTiptap = async function () {
         <div class="page-head">
           <h2>📖 章节大纲</h2>
           <div class="page-head-acts">
+            <button class="btn btn-ghost btn-sm" onclick="ConceptAgent.start()" title="对话式打磨创意，生成完整构思方案">💡 构思Agent</button>
             <button class="btn btn-primary btn-sm" onclick="OutlinePage.addVolume()">＋ 新建卷</button>
             <button class="btn btn-ghost btn-sm" onclick="OutlinePage.addChapter()">＋ 新建章节</button>
             <button class="btn btn-ghost btn-sm" onclick="OutlinePage.expandAll()">展开全部</button>
@@ -416,6 +426,7 @@ window.initTiptap = async function () {
         <div class="page-head">
           <h2>👤 人物卡管理</h2>
           <div class="page-head-acts">
+            <button class="btn btn-ghost btn-sm" onclick="RelationGraph.show()" title="AI 分析正文，绘制人物关系图谱">🕸 关系图谱</button>
             <button class="btn btn-primary btn-sm" onclick="CharacterPage.showCreate()">＋ 新建人物</button>
             <button class="btn btn-ghost btn-sm" onclick="ResourceUI.autoImportSettings()" title="AI 通读本项目全部章节，自动提取并保存人物卡/世界观（重复自动跳过）">🤖 自动导入</button>
             <span class="spacer" style="flex:1"></span>
@@ -450,6 +461,95 @@ window.initTiptap = async function () {
             <div class="page-empty-state">
               <div class="page-empty-icon">🌍</div>
               <div>请先在左侧选中一个项目</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: Foreshadow ================= -->
+    <div class="router-page" id="routerPage-foreshadow">
+      <div class="page-foreshadow">
+        <div class="page-head">
+          <h2>🔮 伏笔看板</h2>
+          <div class="page-head-acts">
+            <button class="btn btn-ghost btn-sm" onclick="ForeshadowPage.scan()" title="AI 通读全书，识别候选伏笔，确认后入库">🤖 AI 扫描</button>
+            <button class="btn btn-primary btn-sm" onclick="ForeshadowPage.create()">＋ 手动添加</button>
+            <span class="spacer" style="flex:1"></span>
+            <span class="page-stats" id="foreshadowStats"></span>
+          </div>
+        </div>
+        <div class="page-body">
+          <div id="foreshadowList">
+            <div class="page-empty-state">
+              <div class="page-empty-icon">🔮</div>
+              <div>请先在左侧选中一个项目</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: Writing Materials ================= -->
+    <div class="router-page" id="routerPage-materials">
+      <div class="page-materials">
+        <div class="page-head">
+          <h2>📚 素材库</h2>
+          <div class="page-head-acts">
+            <button class="btn btn-ghost btn-sm" onclick="MaterialsPage.extract()" title="AI 拆解全书章节，提取句式/动作描写/对话标签等表达素材">🤖 拆书提取</button>
+            <button class="btn btn-primary btn-sm" onclick="MaterialsPage.create()">＋ 手动添加</button>
+            <select class="page-search" id="matCatFilter" style="width:120px" onchange="MaterialsPage.load()">
+              <option value="">全部分类</option>
+              <option>句式</option>
+              <option>动作描写</option>
+              <option>对话标签</option>
+              <option>环境描写</option>
+              <option>词汇</option>
+              <option>其他</option>
+            </select>
+            <span class="spacer" style="flex:1"></span>
+            <input type="text" class="page-search" id="matSearch" placeholder="🔍 语义搜索素材" oninput="MaterialsPage.search(this.value)">
+            <span class="page-stats" id="materialsStats"></span>
+          </div>
+        </div>
+        <div class="page-body">
+          <div id="materialsList">
+            <div class="page-empty-state">
+              <div class="page-empty-icon">📚</div>
+              <div>请先在左侧选中一个项目</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Router Page: 文风样本库（本地知识库） ================= -->
+    <div class="router-page" id="routerPage-stylebank">
+      <div class="page-stylebank">
+        <div class="page-head">
+          <h2>🎨 文风样本库</h2>
+          <div class="page-head-acts">
+            <button class="btn btn-primary btn-sm" onclick="StyleBankPage.create()">＋ 手动添加</button>
+            <select class="page-search" id="sbCatFilter" style="width:130px" onchange="StyleBankPage.load()">
+              <option value="">全部风格</option>
+              <option>热血燃向</option>
+              <option>克苏鲁悬疑</option>
+              <option>无限流惊悚</option>
+              <option>校园青春</option>
+              <option>史诗奇幻</option>
+              <option>悬疑暗黑</option>
+              <option>其他</option>
+            </select>
+            <span class="spacer" style="flex:1"></span>
+            <span class="page-stats" id="stylebankStats"></span>
+          </div>
+        </div>
+        <div class="page-body">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">选中的样本会在生成时作为「文风参考」注入（仅借鉴表达方式，不整段照抄）。最多同时选 3 段。</div>
+          <div id="stylebankList">
+            <div class="page-empty-state">
+              <div class="page-empty-icon">📚</div>
+              <div>文风样本库为空</div>
             </div>
           </div>
         </div>
@@ -1303,6 +1403,8 @@ window.initTiptap = async function () {
       <a class="nav-link" data-page="outline" onclick="MobileUI.closeDrawer();Router.navigate('outline')">🌳 章节大纲</a>
       <a class="nav-link" data-page="characters" onclick="MobileUI.closeDrawer();Router.navigate('characters')">👤 人物卡</a>
       <a class="nav-link" data-page="worldbuilding" onclick="MobileUI.closeDrawer();Router.navigate('worldbuilding')">🌍 世界观</a>
+      <a class="nav-link" data-page="foreshadow" onclick="MobileUI.closeDrawer();Router.navigate('foreshadow')">🔮 伏笔看板</a>
+      <a class="nav-link" data-page="materials" onclick="MobileUI.closeDrawer();Router.navigate('materials')">📚 素材库</a>
       <a class="nav-link" data-page="toolbox" onclick="MobileUI.closeDrawer();Router.navigate('toolbox')">🧰 AI工具箱</a>
       <a class="nav-link" data-page="dashboard" onclick="MobileUI.closeDrawer();Router.navigate('dashboard')">📊 仪表盘</a>
     </div>
@@ -1377,6 +1479,7 @@ window.initTiptap = async function () {
 <script src="/static/js/tools.js"></script>
 <script src="/static/js/router.js"></script>
 <script src="/static/js/pages-outline.js"></script>
+<script src="/static/js/novel-panels.js"></script>
 <script src="/static/js/pages-characters.js"></script>
 <script src="/static/js/pages-world.js"></script>
 <script src="/static/js/pages-toolbox.js"></script>

@@ -252,3 +252,36 @@ h1:first-child, h2:first-child, h3:first-child, h4:first-child { margin-top: 0; 
     flex-shrink: 0;
   }
 }
+
+/* ============ 伏笔看板 / 素材库 / 场景节拍 / 关系图谱（novel-panels.js） ============ */
+.fs-card { background: var(--panel2, var(--panel)); border: 1px solid var(--border, #333); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; border-left: 3px solid #3b82f6; }
+.fs-card.fs-recollected { border-left-color: #10b981; }
+.fs-card.fs-dropped { border-left-color: #64748b; opacity: .6; }
+.fs-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.fs-badge { font-size: 10.5px; padding: 1px 8px; border-radius: 999px; background: rgba(59,130,246,.15); color: #60a5fa; }
+.fs-recollected .fs-badge { background: rgba(16,185,129,.15); color: #34d399; }
+.fs-dropped .fs-badge { background: rgba(100,116,139,.15); color: #94a3b8; }
+.fs-desc { font-size: 12.5px; line-height: 1.6; margin-bottom: 6px; }
+.fs-meta { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.fs-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.fs-scan-item { background: var(--panel2, var(--panel)); border: 1px solid var(--border, #333); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 12.5px; line-height: 1.6; }
+.fs-scan-item strong { display: block; margin-bottom: 4px; }
+
+.mat-card { background: var(--panel2, var(--panel)); border: 1px solid var(--border, #333); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.mat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.mat-cat { font-size: 10.5px; color: #fff; padding: 1px 8px; border-radius: 4px; }
+.mat-src { font-size: 10.5px; color: var(--muted); flex: 1; }
+.mat-acts { display: flex; gap: 2px; }
+.mat-content { font-size: 12.5px; line-height: 1.7; }
+
+.sb-card { background: var(--panel2, var(--panel)); border: 1px solid var(--border, #333); border-left: 3px solid #f59e0b; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.sb-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.sb-summary { font-size: 12px; color: var(--muted); line-height: 1.6; margin-top: 5px; }
+.sb-acts { display: flex; gap: 2px; }
+
+#rgBody svg { background: var(--panel2, var(--panel)); border-radius: 10px; }
+
+/* ============ 顶栏高级开关折叠（adv-bar） ============ */
+.adv-bar-wrap { position: relative; display: inline-block; margin-left: 6px; }
+.adv-bar { position: absolute; top: calc(100% + 4px); right: 0; z-index: 60; min-width: 190px; background: var(--panel); border: 1px solid var(--border2); border-radius: 8px; padding: 8px 10px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 8px; }
+.adv-bar label { margin: 0; }
