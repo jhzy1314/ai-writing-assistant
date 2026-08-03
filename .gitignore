@@ -1,6 +1,6 @@
 # Binary
 server.exe
-server
+/server
 *.exe
 *.exe~
 
@@ -114,3 +114,8 @@ vendor/
 
 web-legacy-bak/
 
+
+# 数据备份/评测报告/工具本地配置（含用户数据，不提交）
+data_backup_*/
+eval_*.md
+reasonix.toml
