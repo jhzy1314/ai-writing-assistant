@@ -10,6 +10,7 @@ import (
 	"github.com/ai-novel/studio/internal/domain/roles"
 	"github.com/ai-novel/studio/internal/infrastructure/database"
 	"github.com/ai-novel/studio/internal/infrastructure/llm"
+	"github.com/ai-novel/studio/internal/infrastructure/quality"
 	"github.com/ai-novel/studio/internal/infrastructure/quota"
 	"github.com/ai-novel/studio/internal/infrastructure/rag"
 	"github.com/ai-novel/studio/internal/infrastructure/search"
@@ -123,6 +124,16 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 		if execErr != nil {
 			emit(ProgressEvent{Type: EventError, Text: execErr.Error()})
 			return
+		}
+
+		// 6.5 零成本 AI 味检测（确定性规则，不调模型；命中仅提示，不阻塞输出）
+		// 把 Worker 去AI味规约/Verifier AI味清单代码化，生成完成即检查
+		if a := quality.Analyze(finalText); len(a.Issues) > 0 {
+			parts := make([]string, 0, len(a.Issues))
+			for _, is := range a.Issues {
+				parts = append(parts, is.Details)
+			}
+			emit(ProgressEvent{Type: EventWarning, Text: "AI味检测：" + strings.Join(parts, "；") + "（可在生成后手动润色）"})
 		}
 
 		// 6. 汇总终稿
