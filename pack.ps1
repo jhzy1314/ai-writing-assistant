@@ -12,7 +12,7 @@ $configLines = @(
     '# The setup wizard will auto-popup on first launch.',
     '',
     'server:',
-    '  listen_addr: "0.0.0.0"',
+    '  listen_addr: "127.0.0.1"',
     '  port: 8081',
     '  sqlite_path: "data/ai-novel.db"',
     '  log_dir: "log"',
