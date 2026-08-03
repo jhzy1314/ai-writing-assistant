@@ -1227,3 +1227,37 @@ func (s *Store) CreateChapterWithVersion(ctx context.Context, projectID, volumeI
 	_, _ = s.SaveChapterVersion(ctx, ch.ID, title+" (初始)", content)
 	return ch, nil
 }
+
+// RecountAllWordCounts 按新口径（非空白字符数，含标点）批量重算全部章节 word_count。
+// 幂等：可安全重复执行；用于 v5 数据迁移（旧口径"中文字符+英文按词"升级为新口径）。
+func (s *Store) RecountAllWordCounts(ctx context.Context) (int, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, content FROM chapters WHERE is_deleted = 0`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var updated int
+	var ids []string
+	var counts []int
+	for rows.Next() {
+		var id, content string
+		if err := rows.Scan(&id, &content); err != nil {
+			return updated, err
+		}
+		ids = append(ids, id)
+		counts = append(counts, wordCount(content))
+	}
+	if err := rows.Err(); err != nil {
+		return updated, err
+	}
+
+	for i := range ids {
+		if _, err := s.db.ExecContext(ctx, "UPDATE chapters SET word_count=? WHERE id=?", counts[i], ids[i]); err != nil {
+			return updated, err
+		}
+		updated++
+	}
+	return updated, nil
+}
+
