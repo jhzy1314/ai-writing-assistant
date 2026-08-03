@@ -119,3 +119,6 @@ web-legacy-bak/
 data_backup_*/
 eval_*.md
 reasonix.toml
+
+# exe 备份产物
+*.exe.*
