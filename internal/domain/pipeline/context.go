@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -49,8 +50,12 @@ func (d *Dispatcher) buildContext(ctx context.Context, req GenerateRequest) Cont
 				}
 			}
 			for i := total - 3; i >= 0 && i >= total-7; i-- {
-				if chs[i].Content != "" {
-					summary := strings.Join(strings.Split(chs[i].Content, "。")[:3], "。") + "。"
+				// 优先使用章节 Synopsis（人工/AI 维护的摘要），无则退化取前 3 句
+				summary := strings.TrimSpace(chs[i].Synopsis)
+				if summary == "" && chs[i].Content != "" {
+					summary = strings.Join(strings.Split(chs[i].Content, "。")[:3], "。") + "。"
+				}
+				if summary != "" {
 					builder.WriteString("【" + chs[i].Title + "（摘要）】" + summary + "\n\n")
 				}
 			}
@@ -106,6 +111,77 @@ func (d *Dispatcher) buildContext(ctx context.Context, req GenerateRequest) Cont
 	if strings.TrimSpace(bundle.HistoryContent) == "" {
 		if v, err := d.store.LatestVersion(ctx, req.ProjectID); err == nil && v != nil && v.Content != "" {
 			bundle.HistoryContent = v.Content
+		}
+	}
+	// ========== 素材库融合：按需求语义检索写作素材注入（去AI味） ==========
+	if req.ProjectID != "" {
+		if items, err := d.store.ListAllWritingMaterialVectors(ctx, req.ProjectID); err == nil && len(items) > 0 {
+			query := req.UserDemand + "\n" + req.SelectedText
+			qvec := rag.Embed(query)
+			type scored struct {
+				m     database.WritingMaterial
+				score float64
+			}
+			var results []scored
+			for _, m := range items {
+				vec, err := rag.Deserialize([]byte(m.Vector))
+				if err != nil || len(vec) == 0 {
+					continue
+				}
+				score := rag.Cosine(qvec, vec)
+				if score > 0.05 {
+					results = append(results, scored{m, score})
+				}
+			}
+			if len(results) > 0 {
+				sort.Slice(results, func(i, j int) bool { return results[i].score > results[j].score })
+				if len(results) > 3 {
+					results = results[:3]
+				}
+				var b strings.Builder
+				for _, r := range results {
+					b.WriteString(fmt.Sprintf("[%s] %s", r.m.Category, r.m.Content))
+					if r.m.Source != "" {
+						b.WriteString("（来源:" + r.m.Source + "）")
+					}
+					b.WriteString("\n")
+				}
+				bundle.MaterialText = bundle.MaterialText + "\n\n【素材库融合（仿写参考，仅借鉴表达方式，不得整段照抄）】\n" + b.String()
+			}
+		}
+	}
+	// ========== 文风样本库注入：用户自选样本作为风格参考（本地知识库） ==========
+	if len(req.StyleSampleIDs) > 0 {
+		if samples, err := d.store.GetStyleSamplesByIDs(ctx, req.StyleSampleIDs); err == nil && len(samples) > 0 {
+			var b strings.Builder
+			b.WriteString("\n\n【文风参考样本（来自本地知识库，仅借鉴表达方式与叙事节奏，不得整段照抄）】\n")
+			for _, sm := range samples {
+				header := sm.Title
+				if sm.Author != "" {
+					header += "（" + sm.Author + "）"
+				}
+				if sm.Category != "" {
+					header += "【" + sm.Category + "】"
+				}
+				b.WriteString("《" + header + "》\n")
+				b.WriteString(truncateRunes(strings.TrimSpace(sm.Content), 600) + "\n\n")
+			}
+			bundle.MaterialText = bundle.MaterialText + b.String()
+		}
+	}
+
+	// ========== 伏笔提醒：未回收伏笔注入续写上下文 ==========
+	if req.ProjectID != "" {
+		if fs, err := d.store.ListForeshadows(ctx, req.ProjectID); err == nil {
+			var b strings.Builder
+			for _, f := range fs {
+				if f.Status == database.ForeshadowPending {
+					b.WriteString(fmt.Sprintf("· %s：%s\n", f.Title, f.Description))
+				}
+			}
+			if b.Len() > 0 {
+				bundle.HistoryContent = bundle.HistoryContent + "\n\n【未回收伏笔提醒（请在适当情节中回收，勿遗忘）】\n" + b.String()
+			}
 		}
 	}
 	return bundle
@@ -177,6 +253,15 @@ func containsAny(s string, subs ...string) bool {
 }
 
 func runeLen(s string) int { return len([]rune(s)) }
+
+// truncateRunes 截断到 n 个 rune（中文安全）
+func truncateRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}
 
 func trimSpace(s string) string { return strings.TrimSpace(s) }
 

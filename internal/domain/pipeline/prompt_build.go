@@ -21,15 +21,17 @@ func writeWebRef(b *strings.Builder, req GenerateRequest) {
 }
 
 // buildThinkerUserPrompt 构造规划师的用户提示词
+// 注意：稳定上下文（人物卡/世界观，经 AssembledText）放在最前以命中提供商前缀缓存；
+// 每次变化的【用户创作需求】置于其后（见 AssembledText 注释）。
 func buildThinkerUserPrompt(req GenerateRequest, bundle ContextBundle, pl PipelineName) string {
 	var b strings.Builder
-	b.WriteString("【用户创作需求】\n")
-	b.WriteString(req.UserDemand)
-	b.WriteString("\n\n")
 	if bundle.HasContext() {
 		b.WriteString(bundle.AssembledText())
 		b.WriteString("\n")
 	}
+	b.WriteString("【用户创作需求】\n")
+	b.WriteString(req.UserDemand)
+	b.WriteString("\n\n")
 	// 人设保持约束：规划剧情时人物行为必须基于人物卡设定
 	if strings.TrimSpace(bundle.CharacterSetting) != "" {
 		b.WriteString("【人设铁律】上方【人物卡】是角色设定基准。规划剧情/动机/对话时，所有角色的行为必须符合其人物卡设定（性格、背景、关系、说话方式）。人物可随剧情合理成长，但成长线要有铺垫。\n\n")
@@ -99,11 +101,8 @@ func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline st
 	b.WriteString("【创作框架（来自规划师）】\n")
 	b.WriteString(outline)
 	b.WriteString("\n\n")
-	if req.MaterialText != "" {
-		b.WriteString("【参考文风素材-严格学习以下文本的叙事视角、句式、对话节奏、文笔风格，在续写中保持一致】\n")
-		b.WriteString(req.MaterialText)
-		b.WriteString("\n\n")
-	}
+	// 参考素材已由 bundle.AssembledText() 统一注入（含前端 material_text 与素材库融合），
+	// 此处不再重复注入，避免同一份素材在 prompt 中出现两次
 	if req.NoRewrite {
 		b.WriteString("【重要约束：禁止改写已有前文】严格禁止修改、删除、压缩已有历史内容，仅允许在末尾追加续写新内容，保持与前文风格一致。\n\n")
 	}
@@ -165,6 +164,11 @@ func buildVerifierUserPrompt(req GenerateRequest, bundle ContextBundle, content 
 	// 世界观+大纲审查约束
 	if strings.TrimSpace(bundle.WorldSetting) != "" {
 		b.WriteString("【世界观审查】上方【世界观设定】是世界规则基准。核查正文是否违背世界规则/力量体系/势力设定；世界观演化必须有逻辑铺垫，前后矛盾列为缺陷。\n\n")
+	}
+	// 文风审查约束：有参考素材/前文时核查文风一致性（防"一章一个味道"；显式区分剧情需要与真实漂移，避免机械判定）
+	// 文艺模式跳过：该模式不干涉文学表达与叙事节奏
+	if pl != PipelineArt && (strings.TrimSpace(bundle.MaterialText) != "" || strings.TrimSpace(bundle.HistoryContent) != "") {
+		b.WriteString("【文风审查】对照上方【参考素材】（若提供）与【历史前文】：核查正文的句式节奏、用词习惯、叙事视角、对话风格是否保持一致。区分「剧情需要的变化」与「真实文风漂移」：因场景/情绪/情节需要的合理变化不算缺陷；与参考素材明显偏离、或与前文出现断层（同一卷内文风突变）才列为缺陷（【次要文字优化建议】级别）。\n\n")
 	}
 	if strings.TrimSpace(outline) != "" {
 		b.WriteString("【大纲审查】上方【创作框架】是大纲基准。核查正文是否偏离大纲骨架（结局方向/关键节点）；合理细化不算偏离，但砍掉关键节点或改结局须标为缺陷。\n\n")

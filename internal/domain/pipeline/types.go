@@ -58,6 +58,7 @@ type GenerateRequest struct {
 	RoleThinking      map[string]bool   `json:"role_thinking"`       // 每个角色是否开启深度思考（key:thinker/worker/verifier/helper；缺省/未指定=开）
 	WebSearch         bool              `json:"web_search"`          // 用户手动开启：联网搜索辅助各 Agent
 	WebInfo           string            `json:"-"`                   // 后端填充：检索到的联网参考信息（已格式化）
+	StyleSampleIDs    []string          `json:"style_sample_ids"`    // 文风样本库样本 ID（本地知识库风格参考）
 }
 
 // ContextBundle 注入到所有子任务的共享上下文（世界观/人物卡/前文/素材）
@@ -69,7 +70,10 @@ type ContextBundle struct {
 	PreviousSummaries string
 }
 
-// AssembledText 将上下文拼装为可注入文本块
+// AssembledText 将上下文拼装为可注入文本块。
+// 顺序按「稳定性优先」排列：人物卡/世界观在同项目内基本不变，放在最前，
+// 使 DeepSeek 等提供商的前缀缓存可命中（官方缓存命中/未命中差价约 40~120 倍，
+// 缓存默认开启、仅前缀完全匹配命中）；变化频繁的【历史前文】【参考素材】置于后缀。
 func (c ContextBundle) AssembledText() string {
 	var b []byte
 	appendSection := func(title, content string) {
@@ -83,8 +87,8 @@ func (c ContextBundle) AssembledText() string {
 		b = append(b, content...)
 		b = append(b, '\n')
 	}
-	appendSection("世界观设定", c.WorldSetting)
 	appendSection("人物卡", c.CharacterSetting)
+	appendSection("世界观设定", c.WorldSetting)
 	appendSection("历史前文", c.HistoryContent)
 	appendSection("参考素材", c.MaterialText)
 	return string(b)
