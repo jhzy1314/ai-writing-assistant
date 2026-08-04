@@ -950,3 +950,142 @@ var Tools = {
   }
 };
 
+
+  /* ============ 📊 项目管理（粗活）：一键取料包 / 出场统计 / 意象追踪 / 钩子检查 / 时间线 / 统计 ============ */
+
+  _pid: function () { return (Store.state.currentProject || {}).id; },
+  _projTool: async function (tool, params) {
+    var pid = this._pid();
+    if (!pid) { UI.toast('请先选择项目', 'warn'); throw new Error('no project'); }
+    return await API.post('/api/project-tools', { tool: tool, project_id: pid, params: params || {} });
+  },
+
+  /* 📦 一键取料包：人物卡+世界观+前情+摘要+伏笔+参考章节 → 一段文本，复制给网页 AI */
+  materialPack: async function () {
+    var pid = this._pid();
+    if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
+    RightPanel.switch('tools');
+    var el = document.getElementById('toolOutput');
+    el.innerHTML = '<div class="res-check-empty"><span class="loading">正在拼装取料包…</span></div>';
+    try {
+      var r = await this._projTool('material_pack', {});
+      var text = r.result || '';
+      el.innerHTML = '<div class="ghead">📦 一键取料包（复制给网页 AI）</div>' +
+        '<textarea readonly style="width:100%;min-height:240px;font-size:12px;line-height:1.6;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px" onclick="this.select()">' + esc(text) + '</textarea>' +
+        '<div style="color:var(--text2);font-size:11px;margin-top:4px">' + text.length + ' 字 · 点击文本框全选后复制</div>';
+      UI.toast('取料包生成完成', 'success');
+    } catch (e) { el.innerHTML = '<div class="res-check-empty" style="color:var(--danger)">取料失败：' + esc(e.message || e) + '</div>'; }
+  },
+
+  /* 👥 人物出场统计：谁多少章没出场 */
+  charAbsence: async function () {
+    var pid = this._pid();
+    if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
+    RightPanel.switch('tools');
+    var el = document.getElementById('toolOutput');
+    el.innerHTML = '<div class="res-check-empty"><span class="loading">正在统计人物出场…</span></div>';
+    try {
+      var r = await this._projTool('char_absence', {});
+      if (typeof r.result === 'string') { el.innerHTML = '<div class="res-check-empty">' + esc(r.result) + '</div>'; return; }
+      var rows = r.result || [];
+      var total = r.total_chapters || 0;
+      var html = '<div class="ghead">👥 人物出场统计（共 ' + total + ' 章）</div>';
+      rows.forEach(function (x) {
+        var warn = x.absent >= 3;
+        html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)' + (warn ? ';background:rgba(255,80,80,.06)' : '') + '">' +
+          '<b style="min-width:60px">' + esc(x.name) + '</b>' +
+          '<span style="color:var(--text2);font-size:11px">出场 ' + x.count + '/' + x.total + ' 章</span>' +
+          (x.absent > 0 ? '<span style="color:' + (warn ? 'var(--danger)' : 'var(--text2)') + ';font-size:11px">连续 ' + x.absent + ' 章未出场' + (warn ? ' ⚠️' : '') + '</span>' : '<span style="color:var(--success);font-size:11px">最近出场</span>') +
+          '</div>';
+      });
+      el.innerHTML = html;
+    } catch (e) { el.innerHTML = '<div class="res-check-empty" style="color:var(--danger)">统计失败：' + esc(e.message || e) + '</div>'; }
+  },
+
+  /* 🔎 意象/梗追踪：搜词在哪些章节出现 */
+  motifTrack: async function () {
+    var pid = this._pid();
+    if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
+    var word = prompt('追踪哪个意象/梗？（如：红绳、橘子糖、窗户）');
+    if (!word || !word.trim()) return;
+    RightPanel.switch('tools');
+    var el = document.getElementById('toolOutput');
+    el.innerHTML = '<div class="res-check-empty"><span class="loading">正在搜索「' + esc(word) + '」…</span></div>';
+    try {
+      var r = await this._projTool('motif_track', { word: word.trim() });
+      var hits = r.result || [];
+      var html = '<div class="ghead">🔎 意象追踪：「' + esc(r.word) + '」共出现 ' + r.total_occurrences + ' 次</div>';
+      if (!hits.length) { html += '<div class="res-check-empty">全书未出现</div>'; }
+      hits.forEach(function (h) {
+        html += '<div style="padding:5px 0;border-bottom:1px solid var(--border)">' +
+          '<div><b>第' + h.chapter + '章</b> <span style="color:var(--text2);font-size:11px">' + esc(h.title || '') + ' · ' + h.count + ' 次</span></div>' +
+          '<div style="color:var(--text2);font-size:11px;font-style:italic">…' + esc(h.context) + '…</div></div>';
+      });
+      el.innerHTML = html;
+    } catch (e) { el.innerHTML = '<div class="res-check-empty" style="color:var(--danger)">搜索失败：' + esc(e.message || e) + '</div>'; }
+  },
+
+  /* 🎣 章末钩子检查：每章结尾是否留悬念 */
+  hookCheck: async function () {
+    var pid = this._pid();
+    if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
+    RightPanel.switch('tools');
+    var el = document.getElementById('toolOutput');
+    el.innerHTML = '<div class="res-check-empty"><span class="loading">正在检查章末钩子…</span></div>';
+    try {
+      var r = await this._projTool('hook_check', {});
+      var rows = r.result || [];
+      var html = '<div class="ghead">🎣 章末钩子检查</div>';
+      rows.forEach(function (h) {
+        var ok = h.is_hook;
+        html += '<div style="padding:5px 0;border-bottom:1px solid var(--border)">' +
+          '<div><b>第' + h.chapter + '章</b> ' + esc(h.title || '') +
+          (ok ? ' <span style="color:var(--success);font-size:11px">✓ 有钩子（' + esc(h.reason) + '）</span>' : ' <span style="color:var(--danger);font-size:11px">✗ 结尾平收，无钩子</span>') + '</div>' +
+          '<div style="color:var(--text2);font-size:11px;font-style:italic">…' + esc(h.ending) + '</div></div>';
+      });
+      el.innerHTML = html;
+    } catch (e) { el.innerHTML = '<div class="res-check-empty" style="color:var(--danger)">检查失败：' + esc(e.message || e) + '</div>'; }
+  },
+
+  /* 📅 时间线：按章列事件 */
+  timelineView: async function () {
+    var pid = this._pid();
+    if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
+    RightPanel.switch('tools');
+    var el = document.getElementById('toolOutput');
+    el.innerHTML = '<div class="res-check-empty"><span class="loading">正在生成时间线…</span></div>';
+    try {
+      var r = await this._projTool('timeline', {});
+      var rows = r.result || [];
+      var html = '<div class="ghead">📅 时间线（' + rows.length + ' 章）</div>';
+      rows.forEach(function (e) {
+        html += '<div style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:6px">' +
+          '<b style="min-width:52px;color:var(--text2)">第' + e.chapter + '章</b>' +
+          '<div style="flex:1"><div>' + esc(e.title || '') + ' <span style="color:var(--text2);font-size:11px">' + (e.word_count || 0) + ' 字 · ' + esc(e.updated_at || '') + '</span></div>' +
+          (e.synopsis ? '<div style="color:var(--text2);font-size:11px">' + esc(e.synopsis) + '</div>' : '') + '</div></div>';
+      });
+      el.innerHTML = html;
+    } catch (e) { el.innerHTML = '<div class="res-check-empty" style="color:var(--danger)">生成失败：' + esc(e.message || e) + '</div>'; }
+  },
+
+  /* 📈 写作统计日历：按天统计字数 */
+  statsCalendar: async function () {
+    var pid = this._pid();
+    if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
+    RightPanel.switch('tools');
+    var el = document.getElementById('toolOutput');
+    el.innerHTML = '<div class="res-check-empty"><span class="loading">正在统计…</span></div>';
+    try {
+      var r = await this._projTool('stats_calendar', {});
+      var rows = r.result || [];
+      var html = '<div class="ghead">📈 写作统计（共 ' + (r.total_words || 0) + ' 字）</div>';
+      rows.forEach(function (d) {
+        html += '<div style="display:flex;align-items:center;gap:6px;padding:2px 0">' +
+          '<span style="min-width:90px;color:var(--text2)">' + esc(d.date) + '</span>' +
+          '<div style="flex:1;height:12px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;background:var(--accent);width:' + Math.min(100, Math.round(d.words / 500 * 100)) + '%"></div></div>' +
+          '<span style="font-size:11px;color:var(--text2)">' + d.words + '</span></div>';
+      });
+      el.innerHTML = html;
+    } catch (e) { el.innerHTML = '<div class="res-check-empty" style="color:var(--danger)">统计失败：' + esc(e.message || e) + '</div>'; }
+  }
+};

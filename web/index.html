@@ -1264,6 +1264,17 @@ window.initTiptap = async function () {
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.batchSummarize()" id="btnBatchSummary">📝 批量章节摘要</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.extractCharacters()" id="btnExtractChars">👥 自动提取设定</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.verifyFullBook()" id="btnVerifyFull">🔍 全书逐章校对</button>
+          <div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:6px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">📊 项目管理（粗活）</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">
+              <button class="btn btn-ghost" style="flex:1;min-width:45%" onclick="Tools.materialPack()">📦 一键取料包</button>
+              <button class="btn btn-ghost" style="flex:1;min-width:45%" onclick="Tools.charAbsence()">👥 人物出场统计</button>
+              <button class="btn btn-ghost" style="flex:1;min-width:45%" onclick="Tools.motifTrack()">🔎 意象/梗追踪</button>
+              <button class="btn btn-ghost" style="flex:1;min-width:45%" onclick="Tools.hookCheck()">🎣 章末钩子检查</button>
+              <button class="btn btn-ghost" style="flex:1;min-width:45%" onclick="Tools.timelineView()">📅 时间线</button>
+              <button class="btn btn-ghost" style="flex:1;min-width:45%" onclick="Tools.statsCalendar()">📈 写作统计</button>
+            </div>
+          </div>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="VersionUI.open()">📜 版本历史</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.clearContext()">🧹 清空上下文勾选</button>
           <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="Tools.verifyCrossChapter()" id="btnCrossAudit">🔍 跨章一致性审计</button>

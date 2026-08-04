@@ -115,6 +115,7 @@ func (s *Server) routes() {
 
 	// 8. Helper 工具辅助接口
 	s.router.Post("/api/tools/execute", s.HandleToolExecute)
+	s.router.Post("/api/project-tools", s.HandleProjectTools)
 	s.router.Post("/api/tools/analyze-file", s.HandleAnalyzeFile)
 	s.router.Get("/api/library", s.HandleListLibrary)
 	s.router.Post("/api/library/analyze", s.HandleAnalyzeLibrary)
