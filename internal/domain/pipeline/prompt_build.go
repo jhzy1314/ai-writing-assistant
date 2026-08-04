@@ -90,24 +90,21 @@ func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline st
 		b.WriteString(bundle.AssembledText())
 		b.WriteString("\n")
 	}
-	// 人设+世界观+大纲保持约束：人物卡已注入时，强制遵守人设并允许合理成长；世界观/大纲同样约束
-	if strings.TrimSpace(bundle.CharacterSetting) != "" {
-		b.WriteString("【人设铁律】必须严格遵守上方【人物卡】中的人物设定：外貌、性格、说话方式、背景、人际关系等核心特质不得偏离。人物可以随剧情事件合理成长变化（如性格渐变、关系发展），但必须有前文铺垫，禁止突然的性情大变或行为崩坏。若剧情需要人设发展，要在行文中自然过渡并保持人物可识别性。\n\n")
-	}
-	if strings.TrimSpace(bundle.WorldSetting) != "" {
-		b.WriteString("【世界观铁律】必须遵守上方【世界观设定】中的世界规则、力量体系、势力格局、地理设定。世界观可随故事发展合理演化（如新势力崛起、规则被打破），但必须逻辑自洽、有前文铺垫，禁止前后矛盾或随意推翻既有设定。\n\n")
-	}
+	// 人设/世界观无需重复"铁律"：设定本体已由 AssembledText 注入，Worker system 已要求保持人设设定
+	// （2026-08-05 A/B 实测：约束堆叠压制文笔，精简后文笔/情节双达标）
 	if strings.TrimSpace(outline) != "" {
-		b.WriteString("【大纲约束】上方【创作框架】是规划师定的大纲。应按大纲推进剧情，但可随写作自然合理调整细节（如对话走向、过渡方式）；重大偏离（改变结局、砍掉关键节点）需在行文中自然承接，不得生硬跳跃。\n\n")
+		b.WriteString("【大纲提示】上方【创作框架】供剧情参考：按其推进主线，细节可随写作自然发挥，不必机械照搬每个节点。\n\n")
 	}
 	if req.SelectedText != "" {
 		b.WriteString("【编辑器选中文字】\n")
 		b.WriteString(req.SelectedText)
 		b.WriteString("\n\n")
 	}
-	b.WriteString("【创作框架（来自规划师）】\n")
-	b.WriteString(outline)
-	b.WriteString("\n\n")
+	if strings.TrimSpace(outline) != "" {
+		b.WriteString("【创作框架（来自规划师，剧情参考）】\n")
+		b.WriteString(outline)
+		b.WriteString("\n\n")
+	}
 	// 参考素材已由 bundle.AssembledText() 统一注入（含前端 material_text 与素材库融合），
 	// 此处不再重复注入，避免同一份素材在 prompt 中出现两次
 	if req.NoRewrite {
@@ -126,32 +123,7 @@ func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline st
 	} else if req.TargetWord > 0 {
 		b.WriteString(fmt.Sprintf("【字数要求】约 %d 字，完成后需经审稿校验，请尽量接近目标。\n\n", req.TargetWord))
 	}
-	b.WriteString("【叙事原则（硬性，对照本章逐条自检——标准是像本项目前文那样把一件事写透）】\n\n")
-
-	b.WriteString("1. 过程优先：每个场景必须展开成过程而不是结果——写人物怎么经历（动作、等待、身体感受、心理活动、视角移动），禁止事件列举、禁止快剪式跳接；本章宁可少写一件事，也要把写的那件事写到前文（如第12章社团文化节）那样的密度\n")
-
-	b.WriteString("2. 时间要有流动感：事件之间要让读者感到时间在流逝（过渡、天气、身体状态、天色），禁止三个孤立片段生硬拼接；时间必须承担叙事功能，读者要能复述本章先后顺序\n")
-
-	b.WriteString("3. 纸上/隔空对话要密集推进：多轮来回（写一句、推过去、等她回、再推过来），写每句之间的等待与紧张；禁止两三句就收\n")
-
-	b.WriteString("4. 限知视角：只用当前视角人物（惊鸿）能知道的信息——他不知道的事（如某人物某物品放在哪、家里发生了什么）不能写；禁止作者跳出来用全知补信息\n")
-
-	b.WriteString("5. 人物不可全知：对话要试探、不确定、小心（她看到了他，但不确认他是否看到自己、不确定他为何不过来）；禁止角色洞悉一切（知道他躲在哪根柱子、站了多久）\n")
-
-	b.WriteString("6. 新人物出场必须有交集：与主角产生直接互动（说话/对视/回应），禁止存在-看一眼-消失的路过式出场\n")
-
-	b.WriteString("7. 结尾收一条线：一章收一条线即可，禁止多条线叠着收尾；重要动作（如署名）必须前文有铺垫\n")
-
-	b.WriteString("8. 去掉作者解释：不写“不用递，两个人同桌”这类解释句，让动作和场景自己说话。\n\n")
-
-	b.WriteString("【上下文使用要求（硬性，逐条自检）】\n")
-
-	b.WriteString("1. 【参考素材】中的素材库融合内容：必须主动借鉴其中的表达方式、句式节奏、细节描写手法来消除AI腔，自然地融入本段文字，禁止忽略它们\n")
-
-	b.WriteString("2. 【历史前文】中的【未回收伏笔提醒】：本段若情节可自然承接，必须推进或回收其中至少一个伏笔（或为后续埋下新线索），禁止无视伏笔\n")
-
-	b.WriteString("3. 【RAG相关记忆】与人物卡/世界观设定：凡与本段相关者必须遵守并体现，不得与已建立设定冲突。\n\n")
-
+	b.WriteString("【写作要点】1) 用具体动作、细节、对话展开场景，避免概括式一笔带过；2) 只写当前视角人物所知所见；3) 结尾收一条线，重要情节有铺垫。\n\n")
 	b.WriteString("【输出要求】直接输出正文本身：不要任何开场白、标题、思考过程、解释或多余说明，从故事正文第一句开始写。\n")
 	writeWebRef(&b, req)
 	b.WriteString("请撰写正文：")

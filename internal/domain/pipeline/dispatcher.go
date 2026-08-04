@@ -67,15 +67,10 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 			}
 		}
 
-		// 1. token 预估 + 长上下文预检
+		// 1. token 预估（仅展示，不做截断——用户明确要求上下文无上限、读全文只求质量）
 		ctxText := req.UserDemand + req.WorldSetting + req.CharacterSetting + req.HistoryContent + req.MaterialText + req.SelectedText
 		estTokens := quota.EstimateRequestTokens(ctxText, req.TargetWord)
 		emit(ProgressEvent{Type: EventEstimate, Tokens: estTokens})
-		// 预检：单模型上下文窗口上限约65536 tokens（deepseek），超过则警告
-		perReqLimit := d.store.GetConfigInt(ctx, "per_request_token_limit", 32000)
-		if perReqLimit > 0 && estTokens > perReqLimit {
-			emit(ProgressEvent{Type: EventWarning, Text: fmt.Sprintf("上下文约 %d tokens，已超单请求上限 %d，已自动截断", estTokens, perReqLimit)})
-		}
 
 		// 2. 组装共享上下文
 		bundle := d.buildContext(ctx, req)

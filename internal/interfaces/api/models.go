@@ -176,7 +176,7 @@ func (s *Server) HandleTestModelConnection(w http.ResponseWriter, r *http.Reques
 		}
 		adapter = webAdapter
 	} else {
-		a, err := llm.NewOpenAICompatible(ctx, m.Vendor, m.APIKey, m.APIEndpoint, m.Name, m.MaxTokens)
+		a, err := llm.NewOpenAICompatible(ctx, m.Vendor, m.APIKey, m.APIEndpoint, m.Name, m.MaxTokens, m.Temperature, m.TopP)
 		if err != nil {
 			writeError(w, http.StatusServiceUnavailable, "API 密钥或地址配置有误，请在模型管理中检查并重新填写")
 			return

@@ -128,3 +128,6 @@ reasonix.toml
 node_modules/
 server.log
 *.log
+
+# 开源对标参考仓库（第三方源码，勿提交）
+reference/

@@ -23,7 +23,7 @@ func (d *Dispatcher) buildContext(ctx context.Context, req GenerateRequest) Cont
 	if req.ProjectID == "" {
 		return bundle
 	}
-	// 历史前文：加载项目全部章节正文（agent 读全文，避免遗漏早期章节已交代的信息）
+	// 历史前文：加载项目全部章节正文（用户明确要求：读全文、不设预算，保证剧情一致性）
 	var allChs []database.ChapterWithVolume
 	if chs, err := d.store.ListChapters(ctx, req.ProjectID, ""); err == nil && len(chs) > 0 {
 		allChs = chs

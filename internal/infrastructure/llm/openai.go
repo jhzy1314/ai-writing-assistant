@@ -25,20 +25,41 @@ type OpenAICompatibleAdapter struct {
 	maxTokens      int
 	apiKey         string
 	baseURL        string
+	temperature    float64 // 采样参数（models 表配置，<=0 表示用服务端默认）
+	topP           float64
 	supportsThinking bool // 该模型是否支持 thinking 参数（仅 DeepSeek v4-flash/pro）
 	mu             sync.RWMutex
 	thinkingEnabled bool // 当前请求是否开启思考（默认开=高质量）
+}
+
+// samplingOptions 将模型配置里的 temperature/top_p 转为 SDK 指针参数
+// （<=0 表示未配置，不设置，由模型/服务端用默认值）
+func samplingOptions(temperature, topP float64) (*float32, *float32) {
+	var t, p *float32
+	if temperature > 0 {
+		v := float32(temperature)
+		t = &v
+	}
+	if topP > 0 {
+		v := float32(topP)
+		p = &v
+	}
+	return t, p
 }
 
 // NewOpenAICompatible 构造适配器。
 //   - vendor: 厂商标识，如 "DeepSeek" / "Kimi"
 //   - apiKey / baseURL / modelName 来自 models 表配置（由 config.yaml 管理，禁止硬编码）
 //   - maxTokens: 单次最大输出 token（<=0 时用默认 4096）
-func NewOpenAICompatible(ctx context.Context, vendor, apiKey, baseURL, modelName string, maxTokens int) (*OpenAICompatibleAdapter, error) {
+//   - temperature / topP: 采样参数（来自 models 表；<=0 时用服务端默认值）
+func NewOpenAICompatible(ctx context.Context, vendor, apiKey, baseURL, modelName string, maxTokens int, temperature, topP float64) (*OpenAICompatibleAdapter, error) {
+	tPtr, pPtr := samplingOptions(temperature, topP)
 	cm, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
-		APIKey:  apiKey,
-		BaseURL: baseURL,
-		Model:   modelName,
+		APIKey:      apiKey,
+		BaseURL:     baseURL,
+		Model:       modelName,
+		Temperature: tPtr,
+		TopP:        pPtr,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("初始化 %s 模型 %s 失败: %w", vendor, modelName, err)
@@ -56,6 +77,8 @@ func NewOpenAICompatible(ctx context.Context, vendor, apiKey, baseURL, modelName
 		maxTokens:        maxTokens,
 		apiKey:           apiKey,
 		baseURL:          baseURL,
+		temperature:      temperature,
+		topP:             topP,
 		supportsThinking: supportsThinking,
 		thinkingEnabled:  true, // 默认开启思考（高质量）
 	}, nil
@@ -92,10 +115,13 @@ func (a *OpenAICompatibleAdapter) thinkingModel(ctx context.Context) (model.Chat
 	if a.chatModelNoThink != nil {
 		return a.chatModelNoThink, nil
 	}
+	tPtr, pPtr := samplingOptions(a.temperature, a.topP)
 	cm, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
 		APIKey:      a.apiKey,
 		BaseURL:     a.baseURL,
 		Model:       a.name,
+		Temperature: tPtr,
+		TopP:        pPtr,
 		ExtraFields: map[string]any{"thinking": map[string]any{"type": "disabled"}},
 	})
 	if err != nil {

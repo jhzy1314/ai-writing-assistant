@@ -111,7 +111,7 @@ func (r *Registry) adapterForName(ctx context.Context, name string) (ModelAdapte
 		}
 		a = wa
 	} else {
-		oa, err := NewOpenAICompatible(ctx, m.Vendor, m.APIKey, m.APIEndpoint, m.Name, m.MaxTokens)
+		oa, err := NewOpenAICompatible(ctx, m.Vendor, m.APIKey, m.APIEndpoint, m.Name, m.MaxTokens, m.Temperature, m.TopP)
 		if err != nil {
 			return nil, err
 		}
