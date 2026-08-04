@@ -70,6 +70,7 @@ type ContextBundle struct {
 	HistoryContent    string
 	MaterialText      string
 	PreviousSummaries string
+	NarrativeHint     string // 自动提炼的本书叙事特征（视角框架/口吻/群像/节奏），有前文时生成
 }
 
 // AssembledText 将上下文拼装为可注入文本块。

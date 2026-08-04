@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ai-novel/studio/internal/infrastructure/database"
+	"github.com/ai-novel/studio/internal/infrastructure/llm"
 	"github.com/ai-novel/studio/internal/infrastructure/rag"
 )
 
@@ -38,6 +39,11 @@ func (d *Dispatcher) buildContext(ctx context.Context, req GenerateRequest) Cont
 		if hb.Len() > 0 {
 			bundle.HistoryContent = hb.String()
 		}
+	}
+	// 本书叙事特征自动提炼（转述体/口吻/群像/节奏）——模型需要"理解这本书的叙事框架"而不只是把前文当背景。
+	// 失败静默降级（不阻塞）；有前文且本项目含多章时才有意义。
+	if len(allChs) >= 2 && strings.TrimSpace(bundle.HistoryContent) != "" {
+		bundle.NarrativeHint = d.extractNarrativeHint(ctx, req, bundle.HistoryContent)
 	}
 	// 叙事视角识别：统计第一人称叙述者标记（"后来惊鸿跟我说"这类框架句），识别项目主导视角
 	if len(allChs) > 0 {
@@ -331,6 +337,45 @@ func collectSynopses(chs []database.ChapterWithVolume) string {
 		return "【前文已发生的一次性事件（严禁在本章重新发生，只能作为既成事实延续）】" + once.String() + "\n" + b.String()
 	}
 	return b.String()
+}
+
+// extractNarrativeHint 从历史前文自动提炼本书叙事特征（叙事框架/口吻/群像/节奏），
+// 供 Worker 续写时保持同一本书的叙事结构。失败静默返回空串（不阻塞）。
+// 教训（2026-08-05）：固定风格锚定对"转述体+群像幽默"的书写帮倒忙，
+// 必须从书本身提炼——不同书的叙事框架差异巨大（转述体 vs 第三人称直叙）。
+func (d *Dispatcher) extractNarrativeHint(ctx context.Context, req GenerateRequest, history string) string {
+	if strings.TrimSpace(history) == "" {
+		return ""
+	}
+	// 采样：开头 2500 字（全书定调）+ 最近 2500 字（当前叙事状态）
+	sample := sampleHistoryText(history, 2500, 2500)
+	prompt := fmt.Sprintf(`通读下面这部小说的片段，提炼它的叙事特征（150字以内），用于续写时与全书保持一致。
+
+【小说片段】
+%s
+
+请严格按以下固定格式输出（不要多余说明、不要 JSON）：
+视角框架：<如：第一人称朋友转述往事 / 第三人称直叙 / 其他，并说明叙述者是谁>
+叙述口吻：<如：幽默吐槽 / 克制留白 / 冷峻 / 轻松调侃，一句话>
+群像互动：<有没有朋友群像与插科打诨，他们怎么参与叙事，一句话>
+节奏句式：<短句密集 / 长句铺陈 / 对话推进 / 场景白描，一句话>
+独特手法：<如：先讲结局再回忆、人物外号、化用典故、心理外化处理，有则写，无则写"无明显特殊手法">`, sample)
+	hint, _, _, _, _, err := d.callRole(ctx, llm.RoleHelper, PipelineStandard, req.ProjectID, prompt, req.RoleThinking)
+	if err != nil || strings.TrimSpace(hint) == "" {
+		return ""
+	}
+	return "【本书叙事特征（自动提炼自历史前文，续写必须严格保持同一本书的叙事结构）】\n" + strings.TrimSpace(hint) + "\n"
+}
+
+// sampleHistoryText 取文本头部 headRunes + 尾部 tailRunes（用于叙事特征采样，不改变历史全量注入）
+func sampleHistoryText(text string, headRunes, tailRunes int) string {
+	r := []rune(text)
+	if len(r) <= headRunes+tailRunes {
+		return text
+	}
+	head := string(r[:headRunes])
+	tail := string(r[len(r)-tailRunes:])
+	return "【开头部分】\n" + head + "\n\n【最近部分】\n" + tail
 }
 
 // truncateRunes 截断到 n 个 rune（中文安全）

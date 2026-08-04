@@ -124,9 +124,11 @@ func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline st
 		b.WriteString(fmt.Sprintf("【字数要求】约 %d 字，完成后需经审稿校验，请尽量接近目标。\n\n", req.TargetWord))
 	}
 	b.WriteString("【写作要点】1) 用具体动作、细节、对话展开场景，避免概括式一笔带过；2) 只写当前视角人物所知所见；3) 结尾收一条线，重要情节有铺垫。\n")
-	// 风格锚定（实测有效）：有历史前文时，显式要求对标前文风格，而非仅当背景事实
-	if strings.TrimSpace(bundle.HistoryContent) != "" || strings.TrimSpace(bundle.MaterialText) != "" {
-		b.WriteString("【文风】延续上方【历史前文】的写作风格：短句与留白、用具体动作和物件细节代替心理直述、情绪克制不点破、对话欲言又止、时间线索明确。\n")
+	// 叙事框架锚定：优先用自动提炼的"本书叙事特征"（最准），提炼失败时退回通用锚定
+	if strings.TrimSpace(bundle.NarrativeHint) != "" {
+		b.WriteString(bundle.NarrativeHint)
+	} else if strings.TrimSpace(bundle.HistoryContent) != "" || strings.TrimSpace(bundle.MaterialText) != "" {
+		b.WriteString("【叙事框架】必须延续上方【历史前文】的叙事结构与口吻：叙述视角与叙述者（如第一人称朋友转述/第三人称）、转述语气（幽默/克制/吐槽）、群像互动方式，一律与历史前文保持一致，不得改变叙事结构。\n")
 	}
 	b.WriteString("\n")
 	b.WriteString("【输出要求】直接输出正文本身：不要任何开场白、标题、思考过程、解释或多余说明，从故事正文第一句开始写。\n")
