@@ -59,6 +59,47 @@ var Annotations = {
     if (ed) ed.view.dispatch(ed.state.tr.setMeta('addToHistory', false));
   },
 
+  /* ===== 编辑后锚定对齐（快照匹配）：正文增删后按 selected_text 就近重新定位 ===== */
+  scheduleRealign: function () {
+    if (this._rlTimer) clearTimeout(this._rlTimer);
+    var self = this;
+    this._rlTimer = setTimeout(function () { self.realign(); }, 800);
+  },
+  realign: function () {
+    var ed = Editor.tiptap;
+    if (!ed || !this.items.length) return;
+    var doc = ed.state.doc;
+    var text = doc.textBetween(0, doc.content.size, '\n\n', '');
+    var changed = [];
+    this.items.forEach(function (a) {
+      var st = a.selected_text || '';
+      if (st.length < 2) return; // 快照太短（1字）不匹配，避免误对齐
+      var idx = text.indexOf(st);
+      if (idx < 0) return; // 快照已被改掉：保留原偏移，渲染越界时自动跳过
+      // 就近匹配：取距原 start 最近的一次出现（章节内重复句少，防误对齐）
+      var best = idx, bestDist = Math.abs(idx - a.start);
+      var from = idx;
+      while (true) {
+        var n = text.indexOf(st, from + 1);
+        if (n < 0) break;
+        var d = Math.abs(n - a.start);
+        if (d < bestDist) { bestDist = d; best = n; from = n; } else break;
+      }
+      var nend = best + st.length;
+      if (nend > text.length) return;
+      if (best === a.start && nend === a.end) return;
+      changed.push({ id: a.id, start: best, end: nend });
+      a.start = best;
+      a.end = nend;
+    });
+    if (!changed.length) return;
+    var self = this;
+    changed.forEach(function (c) {
+      API.updateAnnotation(c.id, { start: c.start, end: c.end }).catch(function () {});
+    });
+    this.refresh();
+  },
+
   /* 当前选中文字 → {start, end, selected_text}（基于保存格式 '\n\n' 分隔） */
   selRange: function () {
     var ed = Editor.tiptap;

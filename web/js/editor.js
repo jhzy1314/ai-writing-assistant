@@ -93,6 +93,8 @@ var Editor = {
     this.scheduleDbSave();
     this.toggleEmptyState();
     this.resetIdleTimer();
+    // 2026-08-05 阅读工具：正文编辑后重对齐批注/高亮锚点
+    if (typeof Annotations !== 'undefined') Annotations.scheduleRealign();
     document.getElementById('draftSavedTag').style.display = 'none';
   },
   resetIdleTimer: function () {
@@ -505,6 +507,9 @@ var Editor = {
         document.querySelector('.editor-pane')?.classList.add('has-content');
       }
     }, 150);
+    // 2026-08-05 阅读工具：所有 setContent 路径统一加载批注/高亮 + 阅读进度
+    if (typeof Annotations !== 'undefined') Annotations.load(ch ? ch.id : '');
+    if (typeof ReaderProgress !== 'undefined') { ReaderProgress.record(); ReaderProgress.markList(); }
   },
   execFmt: function (cmd) {
     if (this.mode === 'rich' && this.tiptap) {

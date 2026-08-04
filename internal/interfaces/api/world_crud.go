@@ -355,6 +355,8 @@ func (s *Server) HandleUpdateAnnotation(w http.ResponseWriter, r *http.Request) 
 	var req struct {
 		Note  *string `json:"note"`
 		Color *string `json:"color"`
+		Start *int    `json:"start"`
+		End   *int    `json:"end"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -367,7 +369,7 @@ func (s *Server) HandleUpdateAnnotation(w http.ResponseWriter, r *http.Request) 
 	if req.Color != nil {
 		color = *req.Color
 	}
-	if err := s.store.UpdateAnnotation(r.Context(), id, note, color); err != nil {
+	if err := s.store.UpdateAnnotation(r.Context(), id, note, color, req.Start, req.End); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 // Character characters 表一行（人物卡）
@@ -541,8 +542,30 @@ func (s *Store) CreateAnnotation(ctx context.Context, a *Annotation) (*Annotatio
 	return a, nil
 }
 
-func (s *Store) UpdateAnnotation(ctx context.Context, id, note, color string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE annotations SET note=?, color=?, updated_at=? WHERE id=?`, note, color, now(), id)
+func (s *Store) UpdateAnnotation(ctx context.Context, id, note, color string, start, end *int) error {
+	// 快照对齐：start/end 为 nil 时不改偏移（普通改 note/color 场景）
+	if start == nil && end == nil {
+		_, err := s.db.ExecContext(ctx, `UPDATE annotations SET note=?, color=?, updated_at=? WHERE id=?`, note, color, now(), id)
+		return err
+	}
+	cur := &Annotation{}
+	err := s.db.QueryRowContext(ctx,
+		`SELECT start, end FROM annotations WHERE id=?`, id).Scan(&cur.Start, &cur.End)
+	if err != nil {
+		return err
+	}
+	ns, ne := cur.Start, cur.End
+	if start != nil {
+		ns = *start
+	}
+	if end != nil {
+		ne = *end
+	}
+	if ns < 0 || ne < ns {
+		return fmt.Errorf("invalid annotation offset: start=%d end=%d", ns, ne)
+	}
+	_, err = s.db.ExecContext(ctx,
+		`UPDATE annotations SET note=?, color=?, start=?, end=?, updated_at=? WHERE id=?`, note, color, ns, ne, now(), id)
 	return err
 }
 
