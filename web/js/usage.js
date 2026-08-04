@@ -82,10 +82,11 @@ var Usage = {
     } else if ((cl && cp >= 80) || (tl && tp >= 80)) {
       hint.textContent = '⚠ 额度即将用尽';
       hint.style.color = 'var(--warning)';
-      document.getElementById('btnGenerate').disabled = SSE.active;
+      // 生成中禁用由 Composer.setGenerating 统一管理，这里不再干预（SSE.active 会卡死导致按钮黑）
+      document.getElementById('btnGenerate').disabled = false;
     } else {
       hint.textContent = '';
-      document.getElementById('btnGenerate').disabled = SSE.active;
+      document.getElementById('btnGenerate').disabled = false;
     }
   }
 };
