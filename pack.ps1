@@ -3,12 +3,12 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptDir
 
 $now = Get-Date -Format "yyyyMMdd"
-$zipName = "AI-Novel-Studio_${now}.zip"
+$zipName = "AI辅助写作助手_${now}.zip"
 $buildDir = Join-Path $env:TEMP "ai-novel-pack"
 
 # Config template with placeholder key (triggers setup wizard on first run)
 $configLines = @(
-    '# AI Novel Studio config',
+    '# AI辅助写作助手 config',
     '# The setup wizard will auto-popup on first launch.',
     '',
     'server:',
@@ -45,7 +45,7 @@ $configLines = @(
 )
 
 Write-Host ""
-Write-Host "  AI Novel Studio - Packager" -ForegroundColor Cyan
+Write-Host "  AI辅助写作助手 - Packager" -ForegroundColor Cyan
 Write-Host "  ===========================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -89,7 +89,7 @@ Write-Host "  [OK] All required files present" -ForegroundColor Green
 
 # Step 2: Create output directory
 if (Test-Path $buildDir) { Remove-Item $buildDir -Recurse -Force }
-$outDir = Join-Path $buildDir "AI-Novel-Studio"
+$outDir = Join-Path $buildDir "AI辅助写作助手"
 $null = New-Item -ItemType Directory -Path $outDir -Force
 $null = New-Item -ItemType Directory -Path (Join-Path $outDir "configs") -Force
 $null = New-Item -ItemType Directory -Path (Join-Path $outDir "data") -Force

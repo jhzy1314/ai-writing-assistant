@@ -1,9 +1,9 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul 2>&1
 cd /d "%~dp0"
 setlocal enabledelayedexpansion
 
-title AI Novel Studio · 一键启动向导
+title AI辅助写作助手 · 一键启动向导
 
 :: ══════════════════════════════════════════════════════════════
 ::  第 0 步：欢迎 + 自检
@@ -11,7 +11,7 @@ title AI Novel Studio · 一键启动向导
 cls
 echo.
 echo   ╔══════════════════════════════════════════════════╗
-echo   ║        AI Novel Studio · 一键启动              ║
+echo   ║        AI辅助写作助手 · 一键启动              ║
 echo   ║      多模型角色调度 AI 写作协作平台            ║
 echo   ╚══════════════════════════════════════════════════╝
 echo.
@@ -109,7 +109,7 @@ if %NEED_CONFIG%==1 (
 ::  第 2 步：启动服务
 :: ══════════════════════════════════════════════════════════════
 echo.
-echo   正在启动 AI Novel Studio…
+echo   正在启动 AI辅助写作助手…
 start "" "%~dp0server.exe"
 timeout /t 3 /nobreak >nul
 
@@ -127,7 +127,7 @@ if exist "新手操作指南.html" (
 
 echo.
 echo   ==========================================
-echo   AI Novel Studio 已启动！
+echo   AI辅助写作助手 已启动！
 echo.
 echo   · 写作界面：http://localhost:8081/
 echo   · 新手指南：双击 新手操作指南.html

@@ -43,6 +43,6 @@ for ($i = 0; $i -lt $maxWait; $i++) {
 Write-Host "[Open] Opening browser..." -ForegroundColor Green
 Start-Process $url
 
-Write-Host "[Ready] AI Novel Studio is running!" -ForegroundColor Cyan
+Write-Host "[Ready] AI辅助写作助手 is running!" -ForegroundColor Cyan
 Write-Host "URL: $url" -ForegroundColor White
 Start-Sleep -Seconds 2

@@ -1,4 +1,4 @@
-# Binary
+﻿# Binary
 server.exe
 /server
 *.exe
@@ -32,8 +32,8 @@ data/
 /ai-novel-main/
 
 # Temp reports
-AI_Novel_Studio_*.html
-AI_Novel_Studio_*.md
+AI辅助写作助手_*.html
+AI辅助写作助手_*.md
 补充评测报告_*.md
 
 # Build artifacts

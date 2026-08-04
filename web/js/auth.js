@@ -1,4 +1,4 @@
-/* ============ auth.js：密码认证 ============ */
+﻿/* ============ auth.js：密码认证 ============ */
 var Auth = {
   check: async function () {
     try {
@@ -10,7 +10,7 @@ var Auth = {
     var root = document.getElementById('modalRoot');
     root.innerHTML = '<div class="auth-overlay" id="authOverlay"><div class="auth-card">' +
       '<div class="auth-logo">✦</div>' +
-      '<h2 style="margin:0 0 4px;font-size:20px">AI Novel Studio</h2>' +
+      '<h2 style="margin:0 0 4px;font-size:20px">AI辅助写作助手</h2>' +
       '<p style="color:var(--muted);font-size:12px;margin:0 0 18px">请输入访问密码</p>' +
       '<input type="password" id="authPassword" class="auth-input" placeholder="密码" onkeydown="if(event.key===\'Enter\')Auth.login()" autofocus>' +
       '<div class="auth-error" id="authError" style="display:none"></div>' +

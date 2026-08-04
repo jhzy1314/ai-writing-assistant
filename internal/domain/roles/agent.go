@@ -1,4 +1,4 @@
-package roles
+﻿package roles
 
 import (
 	"context"
@@ -31,7 +31,7 @@ func VerifierPromptForPipeline(pipeline string) string {
 	case "art":
 		return VerifierPromptArt
 	case "light":
-		return `你是AI Novel Studio系统Verifier校验官（轻量模式）。仅快速扫读确认无明显事实错误即输出【校验通过】。`
+		return `你是AI辅助写作助手系统Verifier校验官（轻量模式）。仅快速扫读确认无明显事实错误即输出【校验通过】。`
 	default:
 		return VerifierPrompt
 	}

@@ -1,5 +1,5 @@
-[Unit]
-Description=AI Novel Studio Backend
+﻿[Unit]
+Description=AI辅助写作助手 Backend
 After=network.target
 
 [Service]

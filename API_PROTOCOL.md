@@ -1,4 +1,4 @@
-# AI Novel Studio 标准化接口协议文档
+﻿# AI辅助写作助手 标准化接口协议文档
 
 > 基于 `internal/interfaces/api` 实际实现整理。协议版本：v1.0
 

@@ -1,18 +1,18 @@
-@echo off
+﻿@echo off
 cd /d "%~dp0"
 setlocal enabledelayedexpansion
 
-title AI Novel Studio - One Click Setup
+title AI辅助写作助手 - One Click Setup
 
 :: ================================================================
-::  AI Novel Studio - One Click Launcher
+::  AI辅助写作助手 - One Click Launcher
 ::  Double-click this file to start everything.
 :: ================================================================
 
 cls
 echo.
 echo   +-------------------------------------------------------+
-echo   ^|     AI Novel Studio - Multi-Agent Novel Writing     ^|
+echo   ^|     AI辅助写作助手 - Multi-Agent Novel Writing     ^|
 echo   ^|           One-Click Launcher                        ^|
 echo   +-------------------------------------------------------+
 echo.
@@ -115,7 +115,7 @@ if %NEED_CONFIG%==1 (
 ::  Step 2: Start Server
 :: ================================================================
 echo.
-echo   Starting AI Novel Studio...
+echo   Starting AI辅助写作助手...
 start "" "%~dp0server.exe"
 timeout /t 4 /nobreak >nul
 
@@ -135,7 +135,7 @@ if exist "Beginner-Guide.html" (
 
 echo.
 echo   ===========================================
-echo   AI Novel Studio is running!
+echo   AI辅助写作助手 is running!
 echo.
 echo   Writing app : http://localhost:8081/
 echo   Beginner guide : open Beginner-Guide.html

@@ -1,4 +1,4 @@
-/* ============ ui.js：通用 UI（toast / modal / 主题 / 折叠 / 右键菜单） ============ */
+﻿/* ============ ui.js：通用 UI（toast / modal / 主题 / 折叠 / 右键菜单） ============ */
 var UI = {
   toast: function (msg, type, opts) {
     var wrap = document.getElementById('toastWrap');
@@ -43,7 +43,7 @@ var UI = {
       step('6', '保存与导出', '内容自动保存；工具栏「📥 导入文档 / 📤 导出文档」支持 docx / md / txt。右上角「🧼 纯净」可切换专注模式。') +
       '</div>';
     this.modal({
-      title: '📖 新手指南 · 三步上手 AI Novel Studio',
+      title: '📖 新手指南 · 三步上手 AI辅助写作助手',
       wide: '620px',
       body: body,
       actions: [{ id: 'ok', label: '开始创作 ✍️', cls: 'btn-primary' }]

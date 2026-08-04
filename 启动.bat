@@ -1,10 +1,10 @@
 @echo off
-title AI Novel Studio 启动器
+title AI辅助写作助手 启动器
 cd /d "%~dp0"
 
 echo.
 echo  ============================================
-echo    AI Novel Studio - 本地 AI 小说创作软件
+echo    AI辅助写作助手 - 本地 AI 小说创作软件
 echo  ============================================
 echo.
 
@@ -18,13 +18,13 @@ if not exist "server.exe" (
 rem ---- 防重复启动：检查端口 8081 是否已被本程序占用 ----
 netstat -ano | findstr ":8081" | findstr "LISTENING" >nul 2>&1
 if %errorlevel%==0 (
-    echo [提示] 检测到 AI Novel Studio 已在运行（端口 8081），
+    echo [提示] 检测到 AI辅助写作助手 已在运行（端口 8081），
     echo        将直接打开浏览器，无需重复启动。
     start "" http://localhost:8081
     exit /b 0
 )
 
-echo [启动] 正在启动 AI Novel Studio...
+echo [启动] 正在启动 AI辅助写作助手...
 start "" "server.exe"
 
 rem ---- 等待服务就绪（最多 20 秒）----

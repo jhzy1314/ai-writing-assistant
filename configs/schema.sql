@@ -1,5 +1,5 @@
--- ============================================================
--- AI Novel Studio 数据库表结构 DDL (SQLite)
+﻿-- ============================================================
+-- AI辅助写作助手 数据库表结构 DDL (SQLite)
 -- 对应规格第六章。运行时由 internal/infrastructure/database/db.go
 -- 的 migrate() 自动执行（CREATE TABLE IF NOT EXISTS，幂等）。
 -- 本文件仅作交付参考，无需手动执行。

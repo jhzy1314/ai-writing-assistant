@@ -6,7 +6,7 @@
 (function(){try{var _t=localStorage.getItem('aiNovel.theme');if(_t==='dark'||_t==='light'||_t==='ink-study'||_t==='gold'||_t==='focus'||_t==='paper-ink'){document.documentElement.setAttribute('data-theme',_t);}}catch(e){}})();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Novel Studio v1.2 · 多模型协同创作</title>
+<title>AI辅助写作助手 v1.2 · 多模型协同创作</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <link rel="stylesheet" href="/static/css/beautify.css">
 <link rel="stylesheet" href="/static/css/themes.css">
@@ -54,7 +54,7 @@ window.initTiptap = async function () {
 <div id="offlineBar" style="display:none;background:#b45309;color:#fff;text-align:center;padding:4px;font-size:12px">🌐 网络已断开 -- AI生成和在线背景不可用，本地写作和数据保存正常</div>
 <!-- ============ Top quota bar ============ -->
 <div class="quota-bar">
-  <div class="brand"><span class="logo">✦</span><span>AI Novel Studio</span></div>
+  <div class="brand"><span class="logo">✦</span><span>AI辅助写作助手</span></div>
   <div class="quota-usage quota-mini" id="quotaCalls" title="今日调用额度（悬停查看）">
     <span style="font-size:9px;opacity:.7">调用</span> <b id="qCalls">0</b>/<span id="qCallsLimit">500</span>
   </div>
@@ -66,7 +66,7 @@ window.initTiptap = async function () {
   <span class="tool" id="usageHint"></span>
   <span class="tool" onclick="ModelSettings.showQuickKey()" title="配置 API 密钥和模型" style="color:var(--accent);font-weight:600">🔑 API</span>
   <span class="tool" onclick="UI.showToastHistory()" title="通知历史">🔔</span>
-  <span class="tool" onclick="UI.showGuide()" title="新手指南：从零开始使用 AI Novel Studio">📖 指南</span>
+  <span class="tool" onclick="UI.showGuide()" title="新手指南：从零开始使用 AI辅助写作助手">📖 指南</span>
   <div class="tool" id="themeToggle" title="切换主题" onclick="Themes.toggleMenu(event)">🌙 深色</div>
   <span class="tool" title="字体大小">
     <input type="range" id="fontSizeSlider" min="12" max="22" value="15" style="width:60px;height:16px;cursor:pointer;vertical-align:middle" oninput="UI.setFontSize(this.value)">
@@ -82,7 +82,7 @@ window.initTiptap = async function () {
   <aside class="sidebar" id="sidebar">
     <div class="side-head">
       <div class="logo">✦</div>
-      <div class="app-name">AI Novel Studio</div>
+      <div class="app-name">AI辅助写作助手</div>
       <div class="collapse-btn" onclick="UI.toggleSidebar()" title="折叠">◀</div>
     </div>
     <div class="side-search">
@@ -261,7 +261,7 @@ window.initTiptap = async function () {
           <div class="empty-guide" id="emptyGuide">
             <div class="eg-card">
               <button class="eg-close" onclick="Editor.dismissGuide(event)" title="关闭引导（不再自动显示）">✕</button>
-              <div class="eg-badge">📖 AI Novel Studio</div>
+              <div class="eg-badge">📖 AI辅助写作助手</div>
               <h2 class="eg-title">开始你的第一部小说</h2>
               <p class="eg-sub">三步完成第一篇 AI 协同创作：</p>
               <div class="eg-steps">
@@ -1424,7 +1424,7 @@ window.initTiptap = async function () {
 <!-- ============ 【移动端专属】顶部导航条 ============ -->
 <div class="mobile-topbar mobile-only">
   <div class="mt-logo">✦</div>
-  <div class="mt-title" id="mtTitle">AI Novel Studio</div>
+  <div class="mt-title" id="mtTitle">AI辅助写作助手</div>
   <span class="mt-btn" onclick="MobileUI.openDrawer()" title="菜单">☰</span>
   <span class="mt-btn" onclick="ManualSave.saveDraft()" title="保存版本">💾</span>
   <span class="mt-btn mt-api" onclick="MobileUI.openModelPanel()" title="API 密钥与模型">🔑</span>
@@ -1436,7 +1436,7 @@ window.initTiptap = async function () {
 <div class="mobile-drawer mobile-only" id="mobileDrawer">
   <div class="md-head">
     <div class="md-logo">✦</div>
-    <div class="md-title">AI Novel Studio</div>
+    <div class="md-title">AI辅助写作助手</div>
     <span class="md-close" onclick="MobileUI.closeDrawer()">✕</span>
   </div>
   <div class="md-body">
