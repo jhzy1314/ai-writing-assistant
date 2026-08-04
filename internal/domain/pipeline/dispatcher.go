@@ -134,6 +134,33 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 			finalText = scrubChapterMeta(finalText)
 		}
 
+		// 6.4b AI 味闭环（2026-08-05 共识第 5/6 条）：规则检测"解释性旁白"→定位到段/句→
+		// 问题句 ≥3 时交 Worker 局部修改（只改问题句，不整段重写——整篇自动润色会磨掉梗/吐槽，
+		// 精准闭环更安全）。单段问题句 ≥5 时额外注明该段可整体重写。白名单：
+		// 引号内对话、第一人称转述体叙述不检测。
+		if finalText != "" {
+			sentIssues := DetectSentenceIssues(finalText)
+			if len(sentIssues) >= 3 {
+				emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("检测到 %d 处解释性旁白，交创作者局部修改", len(sentIssues)), Role: string(llm.RoleWorker)})
+				var sb strings.Builder
+				perPara := map[int]int{}
+				for _, si := range sentIssues {
+					sb.WriteString(fmt.Sprintf("· 第 %d 段：\"%s\"（%s，%s）\n", si.ParaIndex, si.Sentence, si.Category, si.FixHint))
+					perPara[si.ParaIndex]++
+				}
+				for pi, n := range perPara {
+					if n >= 5 {
+						sb.WriteString(fmt.Sprintf("· 第 %d 段问题句达 %d 个，可整体重写该段；其余段落只改问题句。\n", pi, n))
+					}
+				}
+				polished, _, _, _, _, pErr := d.callRole(ctx, llm.RoleWorker, PipelineStandard, req.ProjectID, buildReviseUserPrompt(req, bundle, sb.String(), finalText), req.RoleThinking)
+				if pErr == nil && strings.TrimSpace(polished) != "" && len([]rune(polished)) > 100 {
+					finalText = polished
+					emit(ProgressEvent{Type: EventStage, Stage: "解释性旁白局部修改完成", Role: string(llm.RoleWorker)})
+				}
+			}
+		}
+
 		// 6.5 零成本 AI 味检测（确定性规则，不调模型；命中仅提示，不阻塞输出）
 		// 把 Worker 去AI味规约/Verifier AI味清单代码化，生成完成即检查
 		if a := quality.Analyze(finalText); len(a.Issues) > 0 {

@@ -296,8 +296,26 @@ func (d *Dispatcher) runCollab(ctx context.Context, req GenerateRequest, bundle 
 			emit(ProgressEvent{Type: EventStage, Stage: "审查通过，终稿已定", Role: string(llm.RoleVerifier), Model: vModel, Iteration: iter, DurationMs: vDurMs})
 			break
 		}
-		// 存在缺陷：提取 issues 回传给 Thinker
+		// 存在缺陷：分类处理（2026-08-05 共识第 4 条）——
+		// 纯文字类问题（AI味/对话/文笔/措辞）只回 Worker 局部修改，不回 Thinker 重规划大纲（整段重写会越改越干）；
+		// 人设/剧情/逻辑类问题才走 Thinker 重规划。
 		issues := extractIssues(review)
+		textIssues, plotIssues := classifyReviewIssues(issues)
+		if len(plotIssues) == 0 && len(textIssues) > 0 {
+			emit(ProgressEvent{Type: EventWarning, Stage: fmt.Sprintf("发现 %d 处文字问题（不涉及剧情/人设），直接交创作者局部修改（第 %d/%d 轮）", len(textIssues), iter, maxIter), Role: string(llm.RoleVerifier), Iteration: iter, Issues: textIssues, Text: review})
+			emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("创作者针对问题句局部修改（第 %d/%d 轮）", iter, maxIter), Role: string(llm.RoleWorker), Iteration: iter})
+			emit(ProgressEvent{Type: EventToken, Reset: true, Text: "", Role: string(llm.RoleWorker)})
+			revText, _, wModel3, wDegraded3, wDurMs3, wErr3 := d.callRoleStream(ctx, llm.RoleWorker, PipelineCollab, req.ProjectID, buildReviseUserPrompt(req, bundle, strings.Join(textIssues, "\n"), finalText), emitToken(emit, string(llm.RoleWorker)), req.RoleThinking)
+			if wErr3 != nil {
+				return finalText, wErr3
+			}
+			if wDegraded3 {
+				emit(ProgressEvent{Type: EventWarning, Text: "创作者降级到备用模型", Degraded: true})
+			}
+			finalText = revText
+			emit(ProgressEvent{Type: EventStage, Stage: "局部修改完成", Role: string(llm.RoleWorker), Model: wModel3, Iteration: iter, DurationMs: wDurMs3})
+			continue // 下一轮继续审查（不再重规划大纲）
+		}
 		emit(ProgressEvent{Type: EventWarning, Stage: fmt.Sprintf("发现 %d 处问题，回传规划师重新规划（第 %d/%d 轮）", len(issues), iter, maxIter), Role: string(llm.RoleVerifier), Iteration: iter, Issues: issues, Text: review})
 		// Thinker 根据 Verifier 问题重新规划
 		emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("规划师根据审稿意见重新调整框架（第 %d/%d 轮）", iter, maxIter), Role: string(llm.RoleThinker), Iteration: iter})
@@ -457,6 +475,38 @@ func buildSummaryPrompt(content string) string {
 【关键细节】后续可能用到的具体信息（物件/地点/时间/对话要点等）
 
 直接按以上格式输出，不要其他任何说明。`, content)
+}
+
+// classifyReviewIssues 把 Verifier 问题分为"文字类"（AI味/对话/文笔，只回 Worker 局部改）
+// 与"剧情类"（人设/剧情/逻辑/世界观，才回 Thinker 重规划）。
+// 无法归类的默认按剧情类保守处理（走完整重规划，避免漏掉设定问题）。
+func classifyReviewIssues(issues []string) (textIssues, plotIssues []string) {
+	textKw := []string{"AI味", "AI 味", "对话", "文笔", "措辞", "语句", "书面", "套话", "啰嗦", "重复", "解释性", "干巴", "旁白", "节奏", "语句通顺", "通顺"}
+	plotKw := []string{"人设", "剧情", "逻辑", "世界观", "设定", "大纲", "伏笔", "时间线", "矛盾", "行为", "身份", "称呼", "关系", "崩", "不一致", "冲突"}
+	for _, is := range issues {
+		classified := false
+		for _, k := range textKw {
+			if strings.Contains(is, k) {
+				textIssues = append(textIssues, is)
+				classified = true
+				break
+			}
+		}
+		if classified {
+			continue
+		}
+		for _, k := range plotKw {
+			if strings.Contains(is, k) {
+				plotIssues = append(plotIssues, is)
+				classified = true
+				break
+			}
+		}
+		if !classified {
+			plotIssues = append(plotIssues, is)
+		}
+	}
+	return textIssues, plotIssues
 }
 
 // extractIssues 从 Verifier 输出中提取问题列表

@@ -179,6 +179,73 @@ func splitSentences(s string) []string {
 	return out
 }
 
+// ========== 句子级解释性旁白检测（供 AI 味闭环定位问题句） ==========
+
+// SentenceIssue 规则检测定位到具体句子（让 Worker 只改问题句，不整段重写）
+type SentenceIssue struct {
+	ParaIndex int    `json:"para_index"` // 段落索引（从1）
+	Sentence  string `json:"sentence"`   // 问题句原文（截断）
+	Category  string `json:"category"`
+	FixHint   string `json:"fix_hint"`
+}
+
+var (
+	// 第三人称解说模式（作者跳出来替读者总结/点破心理）
+	thirdPersonExplainRe = []*regexp.Regexp{
+		regexp.MustCompile(`[他她](知道|明白|意识到|清楚|心想)[^，。！？!?]{2,14}`),
+		regexp.MustCompile(`[他她](心里|内心)(明白|清楚)[^，。！？!?]{2,14}`),
+		regexp.MustCompile(`这意味着[^，。！？!?]{2,14}`),
+		regexp.MustCompile(`(实际上|事实上)[^，。！？!?]{2,14}`),
+		regexp.MustCompile(`其实[他她][^，。！？!?]{2,14}`),
+	}
+	// 无主语总结词（任何视角下都偏 AI 腔，第一人称段也检测）
+	authorSummaryRe = []*regexp.Regexp{
+		regexp.MustCompile(`这意味着[^，。！？!?]{2,14}`),
+		regexp.MustCompile(`(实际上|事实上)[^，。！？!?]{2,14}`),
+	}
+	// 引号内对话内容（白名单：人物说话不算作者旁白）
+	quoteContentRe = regexp.MustCompile(`["“”'‘’「」『』][^"“”'‘’「」『』]{0,80}["“”'‘’「」『』]`)
+)
+
+// DetectSentenceIssues 规则检测"解释性旁白"并定位到段/句。
+// 白名单（不误杀）：①引号内对话内容；②第一人称叙述段（转述体"我知道/我后来才明白"是正常写法，
+// 只检测"这意味着/实际上/事实上"这类无主语总结词）。
+func DetectSentenceIssues(content string) []SentenceIssue {
+	var out []SentenceIssue
+	paras := splitParagraphs(content)
+	for i, p := range paras {
+		noQuote := quoteContentRe.ReplaceAllString(p, " ") // 剥离对话
+		if strings.TrimSpace(noQuote) == "" {
+			continue
+		}
+		patterns := thirdPersonExplainRe
+		if isFirstPersonPara(noQuote) {
+			patterns = authorSummaryRe // 第一人称段只查无主语总结词
+		}
+		for _, s := range splitSentences(noQuote) {
+			for _, re := range patterns {
+				if re.MatchString(s) {
+					out = append(out, SentenceIssue{
+						ParaIndex: i + 1,
+						Sentence:  truncateRunes(strings.TrimSpace(s), 40),
+						Category:  "解释性旁白",
+						FixHint:   "改为具体动作/细节，不要直接点破人物心理或总结含义",
+					})
+					break
+				}
+			}
+		}
+	}
+	return out
+}
+
+// isFirstPersonPara 段内"我"出现≥2次且多于"他/她"，判定为第一人称叙述段（转述体/第一人称）
+func isFirstPersonPara(p string) bool {
+	me := strings.Count(p, "我")
+	him := strings.Count(p, "他") + strings.Count(p, "她")
+	return me >= 2 && me >= him
+}
+
 func sentencePrefix(s string) string {
 	r := []rune(strings.TrimSpace(s))
 	if len(r) < 2 {
