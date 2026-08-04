@@ -55,7 +55,7 @@ var Composer = {
     // 深度思考：全局开关（一键全开/全关）+ 角色级开关（默认推荐配置：仅规划师开，写作/审稿/轻活关）
     var thToggle = document.getElementById('thinkingToggle');
     var rt = Store.state.composer.roleThinking;
-    if (!rt || typeof rt !== 'object') { rt = { thinker: true, worker: false, verifier: false, helper: false }; Store.state.composer.roleThinking = rt; }
+    if (!rt || typeof rt !== 'object') { rt = { thinker: true, worker: true, verifier: false, helper: false }; Store.state.composer.roleThinking = rt; }
     var allOn = rt.thinker !== false && rt.worker !== false && rt.verifier !== false && rt.helper !== false;
     if (thToggle) thToggle.checked = allOn;
     var map = { thinker: 'thinkThinker', worker: 'thinkWorker', verifier: 'thinkVerifier', helper: 'thinkHelper' };
@@ -120,7 +120,7 @@ var Composer = {
     UI.toast(checked ? '🧠 深度思考已开启（全部角色，更慢但质量最稳）' : '⚡ 深度思考已全部关闭（最快）', '');
   },
   onRoleThinkingChange: function (role, checked) {
-    var rt = Store.state.composer.roleThinking || { thinker: true, worker: false, verifier: false, helper: false };
+    var rt = Store.state.composer.roleThinking || { thinker: true, worker: true, verifier: false, helper: false };
     rt[role] = checked;
     Store.state.composer.roleThinking = rt;
     // 同步全局开关状态
@@ -348,7 +348,7 @@ var Composer = {
       context_scope: scope,
       previous_summaries: summaries,
       skip_word_check: Store.state.composer.skipWordCheck,
-      role_thinking: Store.state.composer.roleThinking || { thinker: true, worker: false, verifier: false, helper: false },
+      role_thinking: Store.state.composer.roleThinking || { thinker: true, worker: true, verifier: false, helper: false },
       web_search: !!Store.state.composer.webSearch
     };
   },
