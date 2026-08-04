@@ -1239,3 +1239,115 @@ var StyleBankPage = {
     });
   }
 };
+
+/* ============ RelationManual：手动关系管理（2026-08-05 转型纯作家辅助） ============
+   与 RelationGraph（AI 即时分析）并存：这里是可编辑、持久化的人物关系设定库。 */
+var RelationManual = {
+  show: function () {
+    var p = Store.state.currentProject;
+    if (!p) return UI.toast('请先选中一个项目', 'warn');
+    var self = this;
+    UI.modal({
+      title: '💞 人物关系库（手动维护）',
+      wide: 'min(94vw, 1000px)',
+      body: '<div id="rmBody" class="loading">加载中…</div>',
+      actions: [
+        { id: 'add', label: '＋ 添加关系', cls: 'btn-primary', onClick: function (m, ov) { RelationManual.edit(null); } },
+        { id: 'ok', label: '关闭', cls: 'btn-ghost' }
+      ]
+    });
+    API.listRelations(p.id).then(function (items) {
+      self.items = items;
+      self.render();
+    }).catch(function (e) {
+      var b = document.getElementById('rmBody');
+      if (b) b.innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">⚠️</div><div>' + esc(e.message) + '</div></div>';
+    });
+  },
+  items: [],
+  render: function () {
+    var b = document.getElementById('rmBody');
+    if (!b) return;
+    var items = this.items;
+    // 图谱：收集人物 + 关系
+    var names = {};
+    var rels = items.map(function (r) {
+      names[r.char_a] = 1; names[r.char_b] = 1;
+      return { from: r.char_a, to: r.char_b, type: r.relation || '认识' };
+    });
+    var chars = Object.keys(names).map(function (n) {
+      var c = null;
+      (Store.state.characters || []).forEach(function (x) { if (x.name === n) c = x; });
+      return { name: n, desc: c ? c.description : '' };
+    });
+    var graphHtml = items.length ? RelationGraph.renderSVG({ characters: chars, relations: rels }) :
+      '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12.5px">还没有手动关系，点「＋ 添加关系」录入第一条</div>';
+    var listHtml = '';
+    items.forEach(function (r) {
+      listHtml += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border2);border-radius:8px;margin-bottom:6px;background:var(--panel2);font-size:12.5px">';
+      listHtml += '<b>' + esc(r.char_a) + '</b> <span style="color:var(--accent)">' + esc(r.relation || '认识') + '</span> <b>' + esc(r.char_b) + '</b>';
+      if (r.note) listHtml += '<span style="color:var(--muted);font-size:11px;margin-left:4px">' + esc(r.note) + '</span>';
+      listHtml += '<span style="flex:1"></span>';
+      listHtml += '<span class="char-act-btn" onclick="RelationManual.edit(\'' + r.id + '\')" title="编辑">✏️</span>';
+      listHtml += '<span class="char-act-btn" onclick="RelationManual.del(\'' + r.id + '\')" title="删除">🗑</span>';
+      listHtml += '</div>';
+    });
+    b.innerHTML = graphHtml + '<div style="margin-top:14px;font-weight:600;font-size:12.5px;color:var(--muted)">关系列表（' + items.length + '）</div>' + listHtml;
+  },
+  edit: function (id) {
+    var r = null;
+    this.items.forEach(function (x) { if (x.id === id) r = x; });
+    var isNew = !r;
+    var charNames = (Store.state.characters || []).map(function (c) { return c.name; });
+    function selOptions(sel) {
+      var h = '';
+      charNames.forEach(function (n) { h += '<option value="' + escAttr(n) + '"' + (n === sel ? ' selected' : '') + '>' + esc(n) + '</option>'; });
+      return h;
+    }
+    var html = '<div class="form-group"><label>人物 A *</label><select id="relA">' + selOptions(r ? r.char_a : '') + '</select></div>';
+    html += '<div class="form-group"><label>关系</label><input id="relType" value="' + escAttr(r ? r.relation : '') + '" placeholder="如：暗恋 / 发小 / 敌对 / 师徒"></div>';
+    html += '<div class="form-group"><label>人物 B *</label><select id="relB">' + selOptions(r ? r.char_b : '') + '</select></div>';
+    html += '<div class="form-group"><label>备注</label><input id="relNote" value="' + escAttr(r ? r.note : '') + '" placeholder="可选，补充说明"></div>';
+    var self = this;
+    UI.modal({
+      title: (isNew ? '添加' : '编辑') + '人物关系',
+      body: html,
+      actions: [
+        { id: 'cancel', label: '取消' },
+        { id: 'ok', label: isNew ? '创建' : '保存', cls: 'btn-primary', onClick: function (m, ov) {
+          var a = document.getElementById('relA').value, b = document.getElementById('relB').value;
+          if (!a || !b) { UI.toast('请选择人物', 'warn'); return; }
+          if (a === b) { UI.toast('A 和 B 不能是同一人', 'warn'); return; }
+          ov.remove();
+          self.save(id, {
+            char_a: a, char_b: b,
+            relation: document.getElementById('relType').value.trim(),
+            note: document.getElementById('relNote').value.trim()
+          });
+        }}
+      ]
+    });
+  },
+  save: async function (id, data) {
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择项目', 'warn'); return; }
+    try {
+      if (id) { await API.updateRelation(id, data); } else { await API.createRelation(Object.assign({ project_id: p.id }, data)); }
+      UI.toast(id ? '已保存' : '已创建', 'success');
+      this.items = await API.listRelations(p.id);
+      this.render();
+    } catch (e) { UI.toast('保存失败: ' + e.message, 'error'); }
+  },
+  del: function (id) {
+    var self = this;
+    UI.confirm('删除关系', '确定删除这条关系？', function () {
+      API.deleteRelation(id).then(function () {
+        UI.toast('已删除', 'success');
+        self.items = [];
+        API.listRelations(Store.state.currentProject.id).then(function (items) {
+          self.items = items; self.render();
+        });
+      }).catch(function (e) { UI.toast('删除失败: ' + e.message, 'error'); });
+    });
+  }
+};

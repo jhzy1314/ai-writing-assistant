@@ -449,6 +449,7 @@ window.initTiptap = async function () {
           <h2>👤 人物卡管理</h2>
           <div class="page-head-acts">
             <button class="btn btn-ghost btn-sm" onclick="RelationGraph.show()" title="AI 分析正文，绘制人物关系图谱">🕸 关系图谱</button>
+            <button class="btn btn-ghost btn-sm" onclick="RelationManual.show()" title="手动维护人物关系（可编辑、持久化保存）">💞 关系库</button>
             <button class="btn btn-ghost btn-sm" onclick="CharacterPage.dedup()" title="检测重复人物卡（同名/别名变体），可一键合并">🔍 去重合并</button>
             <button class="btn btn-primary btn-sm" onclick="CharacterPage.showCreate()">＋ 新建人物</button>
             <button class="btn btn-ghost btn-sm" onclick="ResourceUI.autoImportSettings()" title="AI 通读本项目全部章节，自动提取并保存人物卡/世界观（重复自动跳过）">🤖 自动导入</button>
@@ -472,13 +473,19 @@ window.initTiptap = async function () {
       <div class="page-world">
         <div class="page-head">
           <h2>🌍 世界观设定</h2>
-          <div class="page-head-acts">
+          <div class="page-head-acts" id="worldHeadActs">
             <button class="btn btn-primary btn-sm" onclick="WorldPage.showCreate()">＋ 新建设定</button>
             <button class="btn btn-ghost btn-sm" onclick="ResourceUI.autoImportSettings()" title="AI 通读本项目全部章节，自动提取并保存人物卡/世界观（重复自动跳过）">🤖 自动导入</button>
             <button class="btn btn-ghost btn-sm" onclick="WorldPage.suggest()" title="AI 分析现有世界观，建议可丰富方向，预览后可一键保存">✨ 丰富建议</button>
             <span class="spacer" style="flex:1"></span>
             <input type="text" class="page-search" id="worldSearch" placeholder="🔍 搜索设定" oninput="WorldPage.render()">
           </div>
+        </div>
+        <div class="world-tabs" id="worldTabs">
+          <span class="world-tab active" data-tab="setting" onclick="WorldPage.switchTab('setting')">📖 设定</span>
+          <span class="world-tab" data-tab="faction" onclick="WorldPage.switchTab('faction')">⚔️ 势力</span>
+          <span class="world-tab" data-tab="location" onclick="WorldPage.switchTab('location')">📍 地点</span>
+          <span class="world-tab" data-tab="timeline" onclick="WorldPage.switchTab('timeline')">📅 时间线</span>
         </div>
         <div class="page-body">
           <div class="world-grid" id="worldGrid">
@@ -487,6 +494,9 @@ window.initTiptap = async function () {
               <div>请先在左侧选中一个项目</div>
             </div>
           </div>
+          <div class="world-grid" id="factionGrid" style="display:none"></div>
+          <div class="world-grid" id="locationGrid" style="display:none"></div>
+          <div id="timelineList" style="display:none"></div>
         </div>
       </div>
     </div>

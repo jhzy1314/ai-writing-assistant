@@ -265,5 +265,273 @@ var WorldPage = {
   },
   showEmpty: function (msg) {
     document.getElementById('worldGrid').innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">🌍</div><div>' + msg + '</div></div>';
+  },
+  /* ============ 4-tab：设定 / 势力 / 地点 / 时间线（2026-08-05 转型纯作家辅助） ============ */
+  curTab: 'setting',
+  switchTab: function (tab) {
+    this.curTab = tab;
+    document.querySelectorAll('#worldTabs .world-tab').forEach(function (el) {
+      el.classList.toggle('active', el.getAttribute('data-tab') === tab);
+    });
+    var show = { setting: 'worldGrid', faction: 'factionGrid', location: 'locationGrid', timeline: 'timelineList' }[tab];
+    ['worldGrid', 'factionGrid', 'locationGrid', 'timelineList'].forEach(function (id) {
+      document.getElementById(id).style.display = (id === show) ? '' : 'none';
+    });
+    // 头部按钮随 tab 切换
+    var acts = document.getElementById('worldHeadActs');
+    var headHtml = '';
+    if (tab === 'setting') {
+      headHtml = '<button class="btn btn-primary btn-sm" onclick="WorldPage.showCreate()">＋ 新建设定</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="ResourceUI.autoImportSettings()" title="AI 通读全部章节自动提取人物卡/世界观">🤖 自动导入</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="WorldPage.suggest()" title="AI 建议可丰富方向">✨ 丰富建议</button>' +
+        '<span class="spacer" style="flex:1"></span>' +
+        '<input type="text" class="page-search" id="worldSearch" placeholder="🔍 搜索设定" oninput="WorldPage.render()">';
+    } else if (tab === 'faction') {
+      headHtml = '<button class="btn btn-primary btn-sm" onclick="WorldPage.editFaction(null)">＋ 新势力</button><span class="spacer" style="flex:1"></span>';
+    } else if (tab === 'location') {
+      headHtml = '<button class="btn btn-primary btn-sm" onclick="WorldPage.editLocation(null)">＋ 新地点</button><span class="spacer" style="flex:1"></span>';
+    } else if (tab === 'timeline') {
+      headHtml = '<button class="btn btn-primary btn-sm" onclick="WorldPage.editTimelineEvent(null)">＋ 新事件</button><span class="spacer" style="flex:1"></span>';
+    }
+    acts.innerHTML = headHtml;
+    if (tab === 'faction') this.renderFactions();
+    if (tab === 'location') this.renderLocations();
+    if (tab === 'timeline') this.renderTimeline();
+  },
+  load: async function () {
+    var p = Store.state.currentProject;
+    if (!p) { this.showEmpty('请先在左侧选中一个项目'); return; }
+    try {
+      Store.state.worldSettings = await API.listWorldSettings(p.id);
+      Store.state.factions = await API.listFactions(p.id);
+      Store.state.locations = await API.listLocations(p.id);
+      Store.state.timelineEvents = await API.listTimeline(p.id);
+      this.render();
+      if (this.curTab === 'faction') this.renderFactions();
+      if (this.curTab === 'location') this.renderLocations();
+      if (this.curTab === 'timeline') this.renderTimeline();
+    } catch (e) {
+      document.getElementById('worldGrid').innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">⚠️</div><div>加载失败</div></div>';
+    }
+  },
+  /* ---- 势力 ---- */
+  renderFactions: function () {
+    var grid = document.getElementById('factionGrid');
+    var items = Store.state.factions || [];
+    if (!items.length) {
+      grid.innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">⚔️</div><div>暂无势力/组织，点击「＋ 新势力」创建</div></div>';
+      return;
+    }
+    var html = '';
+    items.forEach(function (f) {
+      html += '<div class="world-card" onclick="WorldPage.editFaction(\'' + f.id + '\')">';
+      html += '<div class="world-card-icon">⚔️</div><div class="world-card-body">';
+      html += '<div class="world-card-name">' + esc(f.name) + '</div>';
+      if (f.leader) html += '<span class="world-tag">👑 ' + esc(f.leader) + '</span>';
+      var d = f.description || '';
+      if (d.length > 100) d = d.substring(0, 100) + '...';
+      html += '<div class="world-card-desc">' + esc(d) + '</div>';
+      html += '</div><div class="world-card-acts">';
+      html += '<span class="char-act-btn" onclick="event.stopPropagation();WorldPage.editFaction(\'' + f.id + '\')" title="编辑">✏️</span>';
+      html += '<span class="char-act-btn" onclick="event.stopPropagation();WorldPage.delFaction(\'' + f.id + '\')" title="删除">🗑</span>';
+      html += '</div></div>';
+    });
+    grid.innerHTML = html;
+  },
+  editFaction: function (id) {
+    var f = null;
+    (Store.state.factions || []).forEach(function (x) { if (x.id === id) f = x; });
+    var isNew = !f;
+    var html = '<div class="form-group"><label>名称 *</label><input id="facName" value="' + escAttr(f ? f.name : '') + '"></div>';
+    html += '<div class="form-group"><label>首领/负责人</label><input id="facLeader" value="' + escAttr(f ? f.leader : '') + '" placeholder="可选"></div>';
+    html += '<div class="form-group"><label>描述</label><textarea id="facDesc" rows="4" placeholder="组织目标、规模、行事风格...">' + esc(f ? f.description : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>主要成员</label><input id="facMembers" value="' + escAttr(f ? f.members : '') + '" placeholder="逗号分隔人名"></div>';
+    html += '<div class="form-group"><label>与其他势力的关系</label><textarea id="facRelations" rows="2" placeholder="如：与皇族敌对 / 暗中支持主角">' + esc(f ? f.relations : '') + '</textarea></div>';
+    var self = this;
+    UI.modal({
+      title: (isNew ? '新建' : '编辑') + '势力',
+      body: html,
+      actions: [
+        { id: 'cancel', label: '取消' },
+        { id: 'ok', label: isNew ? '创建' : '保存', cls: 'btn-primary', onClick: function (m, ov) {
+          var name = document.getElementById('facName').value.trim();
+          if (!name) { UI.toast('请输入名称', 'warn'); return; }
+          ov.remove();
+          self.saveFaction(id, {
+            name: name, leader: document.getElementById('facLeader').value.trim(),
+            description: document.getElementById('facDesc').value.trim(),
+            members: document.getElementById('facMembers').value.trim(),
+            relations: document.getElementById('facRelations').value.trim()
+          });
+        }}
+      ]
+    });
+  },
+  saveFaction: async function (id, data) {
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择项目', 'warn'); return; }
+    try {
+      if (id) { await API.updateFaction(id, data); } else { await API.createFaction(Object.assign({ project_id: p.id }, data)); }
+      UI.toast(id ? '已保存' : '已创建', 'success');
+      Store.state.factions = await API.listFactions(p.id);
+      this.renderFactions();
+    } catch (e) { UI.toast('保存失败: ' + e.message, 'error'); }
+  },
+  delFaction: function (id) {
+    var self = this;
+    UI.confirm('删除势力', '确定删除此势力？', function () {
+      API.deleteFaction(id).then(function () {
+        UI.toast('已删除', 'success');
+        Store.state.factions = [];
+        self.load();
+      }).catch(function (e) { UI.toast('删除失败: ' + e.message, 'error'); });
+    });
+  },
+  /* ---- 地点 ---- */
+  renderLocations: function () {
+    var grid = document.getElementById('locationGrid');
+    var items = Store.state.locations || [];
+    if (!items.length) {
+      grid.innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">📍</div><div>暂无地点，点击「＋ 新地点」创建</div></div>';
+      return;
+    }
+    var html = '';
+    items.forEach(function (l) {
+      html += '<div class="world-card" onclick="WorldPage.editLocation(\'' + l.id + '\')">';
+      html += '<div class="world-card-icon">📍</div><div class="world-card-body">';
+      html += '<div class="world-card-name">' + esc(l.name) + '</div>';
+      if (l.type) html += '<span class="world-tag">' + esc(l.type) + '</span>';
+      var d = l.description || '';
+      if (d.length > 100) d = d.substring(0, 100) + '...';
+      html += '<div class="world-card-desc">' + esc(d) + '</div>';
+      html += '</div><div class="world-card-acts">';
+      html += '<span class="char-act-btn" onclick="event.stopPropagation();WorldPage.editLocation(\'' + l.id + '\')" title="编辑">✏️</span>';
+      html += '<span class="char-act-btn" onclick="event.stopPropagation();WorldPage.delLocation(\'' + l.id + '\')" title="删除">🗑</span>';
+      html += '</div></div>';
+    });
+    grid.innerHTML = html;
+  },
+  editLocation: function (id) {
+    var l = null;
+    (Store.state.locations || []).forEach(function (x) { if (x.id === id) l = x; });
+    var isNew = !l;
+    var html = '<div class="form-group"><label>名称 *</label><input id="locName" value="' + escAttr(l ? l.name : '') + '"></div>';
+    html += '<div class="form-group"><label>类型</label><input id="locType" value="' + escAttr(l ? l.type : '') + '" placeholder="如：城市/学校/秘境/酒馆"></div>';
+    html += '<div class="form-group"><label>描述</label><textarea id="locDesc" rows="4">' + esc(l ? l.description : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>关联</label><input id="locRelated" value="' + escAttr(l ? l.related : '') + '" placeholder="关联人物/势力/事件"></div>';
+    var self = this;
+    UI.modal({
+      title: (isNew ? '新建' : '编辑') + '地点',
+      body: html,
+      actions: [
+        { id: 'cancel', label: '取消' },
+        { id: 'ok', label: isNew ? '创建' : '保存', cls: 'btn-primary', onClick: function (m, ov) {
+          var name = document.getElementById('locName').value.trim();
+          if (!name) { UI.toast('请输入名称', 'warn'); return; }
+          ov.remove();
+          self.saveLocation(id, {
+            name: name, type: document.getElementById('locType').value.trim(),
+            description: document.getElementById('locDesc').value.trim(),
+            related: document.getElementById('locRelated').value.trim()
+          });
+        }}
+      ]
+    });
+  },
+  saveLocation: async function (id, data) {
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择项目', 'warn'); return; }
+    try {
+      if (id) { await API.updateLocation(id, data); } else { await API.createLocation(Object.assign({ project_id: p.id }, data)); }
+      UI.toast(id ? '已保存' : '已创建', 'success');
+      Store.state.locations = await API.listLocations(p.id);
+      this.renderLocations();
+    } catch (e) { UI.toast('保存失败: ' + e.message, 'error'); }
+  },
+  delLocation: function (id) {
+    var self = this;
+    UI.confirm('删除地点', '确定删除此地？', function () {
+      API.deleteLocation(id).then(function () {
+        UI.toast('已删除', 'success');
+        self.load();
+      }).catch(function (e) { UI.toast('删除失败: ' + e.message, 'error'); });
+    });
+  },
+  /* ---- 时间线事件 ---- */
+  renderTimeline: function () {
+    var box = document.getElementById('timelineList');
+    var items = Store.state.timelineEvents || [];
+    if (!items.length) {
+      box.innerHTML = '<div class="timeline-empty">暂无时间线事件，点击「＋ 新事件」录入重要剧情节点<br>（可填发生时间/对应章节/出场人物）</div>';
+      return;
+    }
+    var chMap = {};
+    (Store.state.chapters || []).forEach(function (c) { chMap[c.id] = c.title; });
+    var html = '';
+    items.forEach(function (t) {
+      html += '<div class="timeline-item">';
+      html += '<div class="timeline-time">' + esc(t.event_time || '—') + '</div>';
+      html += '<div class="timeline-body">' + esc(t.event) + '</div>';
+      html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">';
+      if (t.chapter_id && chMap[t.chapter_id]) html += '<span class="world-tag">📄 ' + esc(chMap[t.chapter_id]) + '</span>';
+      if (t.characters) html += '<span class="timeline-chars">👤 ' + esc(t.characters) + '</span>';
+      html += '<div class="timeline-acts">';
+      html += '<span class="char-act-btn" onclick="WorldPage.editTimelineEvent(\'' + t.id + '\')" title="编辑">✏️</span>';
+      html += '<span class="char-act-btn" onclick="WorldPage.delTimelineEvent(\'' + t.id + '\')" title="删除">🗑</span>';
+      html += '</div></div></div>';
+    });
+    box.innerHTML = html;
+  },
+  editTimelineEvent: function (id) {
+    var t = null;
+    (Store.state.timelineEvents || []).forEach(function (x) { if (x.id === id) t = x; });
+    var isNew = !t;
+    var chs = Store.state.chapters || [];
+    var html = '<div class="form-group"><label>事件 *</label><textarea id="tlEvent" rows="3" placeholder="发生了什么事">' + esc(t ? t.event : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>发生时间</label><input id="tlTime" value="' + escAttr(t ? t.event_time : '') + '" placeholder="如：第1章 / 高一开学 / 三年前"></div>';
+    html += '<div class="form-group"><label>关联章节</label><select id="tlChapter"><option value="">— 不关联 —</option>';
+    chs.forEach(function (c) {
+      html += '<option value="' + c.id + '"' + (t && t.chapter_id === c.id ? ' selected' : '') + '>' + esc(c.title || '未命名') + '</option>';
+    });
+    html += '</select></div>';
+    html += '<div class="form-group"><label>出场人物</label><input id="tlChars" value="' + escAttr(t ? t.characters : '') + '" placeholder="逗号分隔"></div>';
+    var self = this;
+    UI.modal({
+      title: (isNew ? '新建' : '编辑') + '时间线事件',
+      body: html,
+      actions: [
+        { id: 'cancel', label: '取消' },
+        { id: 'ok', label: isNew ? '创建' : '保存', cls: 'btn-primary', onClick: function (m, ov) {
+          var ev = document.getElementById('tlEvent').value.trim();
+          if (!ev) { UI.toast('请输入事件内容', 'warn'); return; }
+          ov.remove();
+          self.saveTimelineEvent(id, {
+            event: ev,
+            event_time: document.getElementById('tlTime').value.trim(),
+            chapter_id: document.getElementById('tlChapter').value,
+            characters: document.getElementById('tlChars').value.trim()
+          });
+        }}
+      ]
+    });
+  },
+  saveTimelineEvent: async function (id, data) {
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择项目', 'warn'); return; }
+    try {
+      if (id) { await API.updateTimelineEvent(id, data); } else { await API.createTimelineEvent(Object.assign({ project_id: p.id }, data)); }
+      UI.toast(id ? '已保存' : '已创建', 'success');
+      Store.state.timelineEvents = await API.listTimeline(p.id);
+      this.renderTimeline();
+    } catch (e) { UI.toast('保存失败: ' + e.message, 'error'); }
+  },
+  delTimelineEvent: function (id) {
+    var self = this;
+    UI.confirm('删除事件', '确定删除此事件？', function () {
+      API.deleteTimelineEvent(id).then(function () {
+        UI.toast('已删除', 'success');
+        self.load();
+      }).catch(function (e) { UI.toast('删除失败: ' + e.message, 'error'); });
+    });
   }
 };

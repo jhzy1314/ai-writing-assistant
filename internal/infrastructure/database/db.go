@@ -326,6 +326,45 @@ CREATE TABLE IF NOT EXISTS world_settings (
     updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
+
+-- 2026-08-05 转型纯作家辅助：势力 / 地点 实体表
+CREATE TABLE IF NOT EXISTS factions (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    leader      TEXT NOT NULL DEFAULT '',
+    members     TEXT NOT NULL DEFAULT '',
+    relations   TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS locations (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    type        TEXT NOT NULL DEFAULT '',
+    related     TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+-- 人物关系（存角色名而非 id：角色删除后关系仍保留、展示直观）
+CREATE TABLE IF NOT EXISTS relations (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    char_a      TEXT NOT NULL,
+    char_b      TEXT NOT NULL,
+    relation    TEXT NOT NULL DEFAULT '',
+    note        TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
 CREATE INDEX IF NOT EXISTS idx_worldsettings_project ON world_settings(project_id);
 
 CREATE TABLE IF NOT EXISTS materials (

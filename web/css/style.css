@@ -1736,3 +1736,32 @@ body.desktop .quota-bar { display:flex; }
 
 
 
+
+/* ============ 2026-08-05 转型：纯作家辅助工具，砍掉 AI 生成入口 ============ */
+/* 隐藏 AI 生成 UI（模式选择、生成控制区、预估、多候选、生成状态）；编辑器/主题/文件管理/设定全保留 */
+#modeSelect,
+.composer,
+#btnAutoTitle,
+#btnCandidates,
+.gen-status,
+#btnGenerate,
+.gen-opt-toggle,
+.pro-mode-toggle,
+.think-toggle,
+#thinkingPanel {
+  display: none !important;
+}
+/* 状态栏保留字数统计；顶部工具栏收敛 */
+.topbar .grp select { display: none; }
+
+/* 世界观页 4-tab（2026-08-05 转型纯作家辅助：设定/势力/地点/时间线） */
+.world-tabs { display:flex; gap:4px; padding:0 16px 10px; border-bottom:1px solid var(--border); margin-bottom:12px; flex-wrap:wrap; }
+.world-tab { padding:5px 14px; border-radius:16px; font-size:12.5px; cursor:pointer; color:var(--muted); background:var(--panel2); border:1px solid transparent; user-select:none; }
+.world-tab:hover { color:var(--text); }
+.world-tab.active { background:var(--accent); color:#fff; font-weight:600; }
+.timeline-item { display:flex; gap:10px; padding:10px 12px; border:1px solid var(--border2); border-radius:8px; margin-bottom:8px; background:var(--panel2); align-items:flex-start; }
+.timeline-time { min-width:110px; font-size:11.5px; color:var(--accent); font-weight:600; padding-top:2px; }
+.timeline-body { flex:1; font-size:12.5px; line-height:1.6; }
+.timeline-chars { font-size:11px; color:var(--muted); margin-top:2px; }
+.timeline-acts { display:flex; gap:4px; }
+.timeline-empty { color:var(--muted); text-align:center; padding:40px 0; font-size:13px; }

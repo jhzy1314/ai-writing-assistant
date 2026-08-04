@@ -272,3 +272,223 @@ func (s *Store) DeleteMaterial(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM materials WHERE id=?`, id)
 	return err
 }
+
+// ===== factions（势力，2026-08-05 转型纯作家辅助新增） =====
+
+// Faction 势力/组织实体
+type Faction struct {
+	ID          string `json:"id"`
+	ProjectID   string `json:"project_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Leader      string `json:"leader"`
+	Members     string `json:"members"`
+	Relations   string `json:"relations"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+func (s *Store) ListFactions(ctx context.Context, projectID string) ([]Faction, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, project_id, name, description, leader, members, relations, created_at, updated_at FROM factions WHERE project_id=? ORDER BY created_at`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Faction{}
+	for rows.Next() {
+		var f Faction
+		if err := rows.Scan(&f.ID, &f.ProjectID, &f.Name, &f.Description, &f.Leader, &f.Members, &f.Relations, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) CreateFaction(ctx context.Context, projectID, name, description, leader, members, relations string) (*Faction, error) {
+	f := &Faction{ID: newID(), ProjectID: projectID, Name: name, Description: description, Leader: leader, Members: members, Relations: relations, CreatedAt: now(), UpdatedAt: now()}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO factions (id, project_id, name, description, leader, members, relations, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)`,
+		f.ID, f.ProjectID, f.Name, f.Description, f.Leader, f.Members, f.Relations, f.CreatedAt, f.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+func (s *Store) UpdateFaction(ctx context.Context, id, name, description, leader, members, relations string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE factions SET name=?, description=?, leader=?, members=?, relations=?, updated_at=? WHERE id=?`,
+		name, description, leader, members, relations, now(), id)
+	return err
+}
+
+func (s *Store) DeleteFaction(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM factions WHERE id=?`, id)
+	return err
+}
+
+// ===== locations（地点，2026-08-05 转型纯作家辅助新增） =====
+
+// Location 地点实体
+type Location struct {
+	ID          string `json:"id"`
+	ProjectID   string `json:"project_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+	Related     string `json:"related"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+func (s *Store) ListLocations(ctx context.Context, projectID string) ([]Location, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, project_id, name, description, type, related, created_at, updated_at FROM locations WHERE project_id=? ORDER BY created_at`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Location{}
+	for rows.Next() {
+		var l Location
+		if err := rows.Scan(&l.ID, &l.ProjectID, &l.Name, &l.Description, &l.Type, &l.Related, &l.CreatedAt, &l.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) CreateLocation(ctx context.Context, projectID, name, description, typ, related string) (*Location, error) {
+	l := &Location{ID: newID(), ProjectID: projectID, Name: name, Description: description, Type: typ, Related: related, CreatedAt: now(), UpdatedAt: now()}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO locations (id, project_id, name, description, type, related, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
+		l.ID, l.ProjectID, l.Name, l.Description, l.Type, l.Related, l.CreatedAt, l.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return l, nil
+}
+
+func (s *Store) UpdateLocation(ctx context.Context, id, name, description, typ, related string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE locations SET name=?, description=?, type=?, related=?, updated_at=? WHERE id=?`,
+		name, description, typ, related, now(), id)
+	return err
+}
+
+func (s *Store) DeleteLocation(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM locations WHERE id=?`, id)
+	return err
+}
+
+// ===== timeline（时间线事件，2026-08-05 补齐 CRUD） =====
+
+// TimelineEvent 时间线事件
+type TimelineEvent struct {
+	ID         string `json:"id"`
+	ProjectID  string `json:"project_id"`
+	ChapterID  string `json:"chapter_id"`
+	Event      string `json:"event"`
+	EventTime  string `json:"event_time"`
+	Characters string `json:"characters"`
+	CreatedAt  string `json:"created_at"`
+}
+
+func (s *Store) ListTimelineEvents(ctx context.Context, projectID string) ([]TimelineEvent, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, project_id, chapter_id, event, event_time, characters, created_at FROM timeline WHERE project_id=? ORDER BY event_time, created_at`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []TimelineEvent{}
+	for rows.Next() {
+		var t TimelineEvent
+		if err := rows.Scan(&t.ID, &t.ProjectID, &t.ChapterID, &t.Event, &t.EventTime, &t.Characters, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) CreateTimelineEvent(ctx context.Context, projectID, chapterID, event, eventTime, characters string) (*TimelineEvent, error) {
+	t := &TimelineEvent{ID: newID(), ProjectID: projectID, ChapterID: chapterID, Event: event, EventTime: eventTime, Characters: characters, CreatedAt: now()}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO timeline (id, project_id, chapter_id, event, event_time, characters, created_at) VALUES (?,?,?,?,?,?,?)`,
+		t.ID, t.ProjectID, t.ChapterID, t.Event, t.EventTime, t.Characters, t.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+func (s *Store) UpdateTimelineEvent(ctx context.Context, id, chapterID, event, eventTime, characters string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE timeline SET chapter_id=?, event=?, event_time=?, characters=? WHERE id=?`,
+		chapterID, event, eventTime, characters, id)
+	return err
+}
+
+func (s *Store) DeleteTimelineEvent(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM timeline WHERE id=?`, id)
+	return err
+}
+
+// ===== relations（人物关系，2026-08-05 转型纯作家辅助新增） =====
+
+// Relation 人物关系（char_a ↔ char_b，存角色名）
+type Relation struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	CharA     string `json:"char_a"`
+	CharB     string `json:"char_b"`
+	Relation  string `json:"relation"`
+	Note      string `json:"note"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+func (s *Store) ListRelations(ctx context.Context, projectID string) ([]Relation, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, project_id, char_a, char_b, relation, note, created_at, updated_at FROM relations WHERE project_id=? ORDER BY created_at`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Relation{}
+	for rows.Next() {
+		var r Relation
+		if err := rows.Scan(&r.ID, &r.ProjectID, &r.CharA, &r.CharB, &r.Relation, &r.Note, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) CreateRelation(ctx context.Context, projectID, charA, charB, relation, note string) (*Relation, error) {
+	r := &Relation{ID: newID(), ProjectID: projectID, CharA: charA, CharB: charB, Relation: relation, Note: note, CreatedAt: now(), UpdatedAt: now()}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO relations (id, project_id, char_a, char_b, relation, note, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
+		r.ID, r.ProjectID, r.CharA, r.CharB, r.Relation, r.Note, r.CreatedAt, r.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (s *Store) UpdateRelation(ctx context.Context, id, charA, charB, relation, note string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE relations SET char_a=?, char_b=?, relation=?, note=?, updated_at=? WHERE id=?`,
+		charA, charB, relation, note, now(), id)
+	return err
+}
+
+func (s *Store) DeleteRelation(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM relations WHERE id=?`, id)
+	return err
+}
