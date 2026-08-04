@@ -1,9 +1,0 @@
-- Top bar: “文风样本书库” (left), red button “🔍 折书解析”, white button “+ 手动添加”, dropdown “全部风格”, stats “0 段 • 0 部作品 • 已选 0 段作参考”
-- Below top bar: small text — “选中的样本会在生成时作为「文风参考」注入（仅借鉴表达方式，不整段照抄）。最多同时选 3 段。”
-- Center: icon of 3 overlapping books (green, red, blue), then “文风样本书库为空”
-- Red button: “🔍 折书解析（从本地书籍提取）”
-- Smaller text below: “也可用「+ 手动添加」录入片段”
-- Background: monochrome ink-wash landscape (mountains, pine trees, mist)
-- Left/right side: partial navigation arrows (left: `<`, right: `>`), partially visible on edges
-
-[Model: qwen3-vl-flash | Tokens: in=2581 out=208]

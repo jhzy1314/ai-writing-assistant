@@ -122,3 +122,9 @@ reasonix.toml
 
 # exe 备份产物
 *.exe.*
+
+# 会话数据/附件/依赖/日志（不入库）
+.reasonix/
+node_modules/
+server.log
+*.log

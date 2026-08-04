@@ -1,9 +1,0 @@
-Dropdown menu with title “前面章节摘要” (Front section summary) and options:  
-- 智能分层（推荐） (Smart layering (recommended))  
-- 仅当前章节 (Only current chapter)  
-- 最近2章全文 (Last 2 chapters full text)  
-- 前面章节摘要 (Front section summary) — highlighted in gray, selected  
-
-UI: Light beige background, red-outlined dropdown header, dark gray selected item. No code or error text visible.
-
-[Model: qwen3-vl-flash | Tokens: in=131 out=106]

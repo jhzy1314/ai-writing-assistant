@@ -1,9 +1,0 @@
-2026/08/04 10:12:32 main.go:53: ⚠️  未设置 auth_password，认证关闭（公网部署必须设置）
-2026/08/04 10:12:32 main.go:75: 🔒 Cookie加密已启用
-2026/08/04 10:12:32 main.go:126: word_count migration: recount 34 chapters
-2026/08/04 10:12:32 main.go:186: 🚀 AI Novel Studio 后端已启动: http://localhost:8081
-2026/08/04 10:12:32 main.go:187:    SQLite: data/ai-novel.db
-2026/08/04 10:12:32 main.go:188:    日志: log
-2026/08/04 10:12:32 main.go:189:    模型池: 2 个，角色: thinker/worker/verifier/helper
-2026/08/04 10:12:32 main.go:222: ✅ 数据库已备份（一致性快照）: data\backups\ai-novel-2026-08-04-101232.db
-2026/08/04 10:12:33 "GET http://127.0.0.1:8081/api/projects HTTP/1.1" from 127.0.0.1:13960 - 200 9570B in 1.0387ms

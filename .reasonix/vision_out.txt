@@ -1,6 +1,0 @@
-- Dropdown: “智能分层（推荐）” with downward arrow (gray text on beige background)  
-- Adjacent button: gear icon (settings) in red-outlined square  
-- Background: light beige; top bar: dark brown  
-- No code, error messages, or stack traces visible.
-
-[Model: qwen3-vl-flash | Tokens: in=139 out=63]

@@ -1,7 +1,0 @@
-- Red button: “✨ 生成 Ctrl+Enter”  
-- Gray buttons: “🧠 思考”, “⚙️ 选项”, “⚡ 专业模式”  
-- Footer text (red): “协同闭环: Thinker规划 → Worker写作 → Verifier审查 → Thinker重规划 → …”  
-
-All text is Chinese. No code, errors, or stack traces visible. Colors: red for primary action and footer; gray for secondary actions; gold/yellow for icons.
-
-[Model: qwen3-vl-flash | Tokens: in=199 out=101]

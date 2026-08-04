@@ -1,9 +1,0 @@
-- UI top bar: `指南` (Guide), `墨韵书斋`, volume slider with `15`, `纯净` (Clean) mode icon.
-- Chat bubbles (AI responses, light beige):
-  - `🤖 AI 预估字数中...`
-  - `🤖 AI 预估本章 1300~4100 字（当前目标 2800 字）。如需采纳，请把 🎯 字数改为 1300~4100 区间内的值`
-  - Repeats same two messages.
-- Left sidebar: `?` button, search box with `deepseek-`.
-- Text uses black on light background; 🎯 is a red target icon. No code or error messages visible.
-
-[Model: qwen3-vl-flash | Tokens: in=421 out=166]

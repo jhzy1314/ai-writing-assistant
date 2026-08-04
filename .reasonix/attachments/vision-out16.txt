@@ -1,5 +1,0 @@
-- Top row: “扩写” “缩写” “改写文风” “润色” | “续写” “摘要” “调整氛围”  
-- Left side: vertical red rectangle with white “11”  
-- All text in black, thin line grid below headers; background beige. No code, errors, or UI elements beyond the listed Chinese labels.
-
-[Model: qwen3-vl-flash | Tokens: in=173 out=79]

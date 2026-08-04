@@ -1,4 +1,0 @@
-Red error banner: “保存失败: project_id 与 title 必填” (Save failed: project_id and title required).  
-Top bar: “指南” (Guide), “墨韵书斋”, slider with value “15”, “纯净” (Pure) with pink icon.
-
-[Model: qwen3-vl-flash | Tokens: in=208 out=61]
