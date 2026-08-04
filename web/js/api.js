@@ -91,6 +91,13 @@ var API = {
   createRelation: function (r) { return this.post('/api/relations', r).then(function (d) { return d.item; }); },
   updateRelation: function (id, r) { return this.put('/api/relations/' + id, r); },
   deleteRelation: function (id) { return this.del('/api/relations/' + id); },
+  // 批注/高亮 + 阅读进度（2026-08-05 阅读工具）
+  listAnnotations: function (chapterId) { return this.get('/api/annotations?chapter_id=' + chapterId).then(function (d) { return d.items || []; }); },
+  createAnnotation: function (a) { return this.post('/api/annotations', a).then(function (d) { return d.item; }); },
+  updateAnnotation: function (id, a) { return this.put('/api/annotations/' + id, a); },
+  deleteAnnotation: function (id) { return this.del('/api/annotations/' + id); },
+  getReadingProgress: function (pid) { return this.get('/api/reading_progress?project_id=' + pid).then(function (d) { return d.item; }); },
+  setReadingProgress: function (p) { return this.post('/api/reading_progress', p); },
   // 素材
   listMaterials: function (pid) { return this.get('/api/materials?project_id=' + pid).then(function (d) { return d.items || []; }); },
   uploadMaterial: function (fd) { return this.post('/api/materials/upload', fd).then(function (d) { return d.item; }); },

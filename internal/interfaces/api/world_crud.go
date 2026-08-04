@@ -3,6 +3,7 @@ package api
 // 2026-08-05 转型纯作家辅助工具：势力 / 地点 / 时间线事件 CRUD handlers
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 
@@ -313,4 +314,108 @@ func (s *Server) HandleDeleteRelation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, map[string]interface{}{"deleted": true})
+}
+
+// ===== annotations（批注/高亮） =====
+
+func (s *Server) HandleListAnnotations(w http.ResponseWriter, r *http.Request) {
+	cid := r.URL.Query().Get("chapter_id")
+	if cid == "" {
+		writeError(w, http.StatusBadRequest, "缺少 chapter_id 查询参数")
+		return
+	}
+	items, err := s.store.ListAnnotations(r.Context(), cid)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeOK(w, map[string]interface{}{"items": items})
+}
+
+func (s *Server) HandleCreateAnnotation(w http.ResponseWriter, r *http.Request) {
+	var req database.Annotation
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if strings.TrimSpace(req.ProjectID) == "" || strings.TrimSpace(req.ChapterID) == "" || req.End <= req.Start {
+		writeError(w, http.StatusBadRequest, "project_id/chapter_id 必填，end 必须大于 start")
+		return
+	}
+	item, err := s.store.CreateAnnotation(r.Context(), &req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeCreated(w, map[string]interface{}{"item": item})
+}
+
+func (s *Server) HandleUpdateAnnotation(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req struct {
+		Note  *string `json:"note"`
+		Color *string `json:"color"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	note, color := "", ""
+	if req.Note != nil {
+		note = *req.Note
+	}
+	if req.Color != nil {
+		color = *req.Color
+	}
+	if err := s.store.UpdateAnnotation(r.Context(), id, note, color); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeOK(w, map[string]interface{}{"id": id})
+}
+
+func (s *Server) HandleDeleteAnnotation(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := s.store.DeleteAnnotation(r.Context(), id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeOK(w, map[string]interface{}{"deleted": true})
+}
+
+// ===== reading_progress（阅读进度） =====
+
+func (s *Server) HandleGetReadingProgress(w http.ResponseWriter, r *http.Request) {
+	pid := r.URL.Query().Get("project_id")
+	if pid == "" {
+		writeError(w, http.StatusBadRequest, "缺少 project_id 查询参数")
+		return
+	}
+	item, err := s.store.GetReadingProgress(r.Context(), pid)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			writeOK(w, map[string]interface{}{"item": nil})
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeOK(w, map[string]interface{}{"item": item})
+}
+
+func (s *Server) HandleSetReadingProgress(w http.ResponseWriter, r *http.Request) {
+	var req database.ReadingProgress
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if strings.TrimSpace(req.ProjectID) == "" {
+		writeError(w, http.StatusBadRequest, "project_id 必填")
+		return
+	}
+	if err := s.store.SetReadingProgress(r.Context(), req.ProjectID, req.ChapterID, req.ScrollPct); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeOK(w, map[string]interface{}{"saved": true})
 }

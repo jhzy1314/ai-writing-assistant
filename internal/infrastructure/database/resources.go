@@ -492,3 +492,90 @@ func (s *Store) DeleteRelation(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM relations WHERE id=?`, id)
 	return err
 }
+
+// ===== annotations（批注/高亮，2026-08-05 阅读工具新增，纯文本偏移锚定） =====
+
+// Annotation 批注/高亮：锚定章节纯文本偏移 [start, end)
+type Annotation struct {
+	ID           string `json:"id"`
+	ProjectID    string `json:"project_id"`
+	ChapterID    string `json:"chapter_id"`
+	Start        int    `json:"start"`
+	End          int    `json:"end"`
+	SelectedText string `json:"selected_text"`
+	Type         string `json:"type"` // highlight | comment
+	Color        string `json:"color"`
+	Note         string `json:"note"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+func (s *Store) ListAnnotations(ctx context.Context, chapterID string) ([]Annotation, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, project_id, chapter_id, start, end, selected_text, type, color, note, created_at, updated_at FROM annotations WHERE chapter_id=? ORDER BY start`, chapterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Annotation{}
+	for rows.Next() {
+		var a Annotation
+		if err := rows.Scan(&a.ID, &a.ProjectID, &a.ChapterID, &a.Start, &a.End, &a.SelectedText, &a.Type, &a.Color, &a.Note, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) CreateAnnotation(ctx context.Context, a *Annotation) (*Annotation, error) {
+	a.ID = newID()
+	a.CreatedAt = now()
+	a.UpdatedAt = now()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO annotations (id, project_id, chapter_id, start, end, selected_text, type, color, note, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		a.ID, a.ProjectID, a.ChapterID, a.Start, a.End, a.SelectedText, a.Type, a.Color, a.Note, a.CreatedAt, a.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (s *Store) UpdateAnnotation(ctx context.Context, id, note, color string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE annotations SET note=?, color=?, updated_at=? WHERE id=?`, note, color, now(), id)
+	return err
+}
+
+func (s *Store) DeleteAnnotation(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM annotations WHERE id=?`, id)
+	return err
+}
+
+// ===== reading_progress（阅读进度，2026-08-05 阅读工具新增） =====
+
+// ReadingProgress 阅读进度：每项目一条，记录当前读到的章节
+type ReadingProgress struct {
+	ProjectID string `json:"project_id"`
+	ChapterID string `json:"chapter_id"`
+	ScrollPct int    `json:"scroll_pct"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+func (s *Store) GetReadingProgress(ctx context.Context, projectID string) (*ReadingProgress, error) {
+	var rp ReadingProgress
+	err := s.db.QueryRowContext(ctx,
+		`SELECT project_id, chapter_id, scroll_pct, updated_at FROM reading_progress WHERE project_id=?`, projectID).
+		Scan(&rp.ProjectID, &rp.ChapterID, &rp.ScrollPct, &rp.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &rp, nil
+}
+
+func (s *Store) SetReadingProgress(ctx context.Context, projectID, chapterID string, scrollPct int) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO reading_progress (project_id, chapter_id, scroll_pct, updated_at) VALUES (?,?,?,?)
+         ON CONFLICT(project_id) DO UPDATE SET chapter_id=excluded.chapter_id, scroll_pct=excluded.scroll_pct, updated_at=excluded.updated_at`,
+		projectID, chapterID, scrollPct, now())
+	return err
+}

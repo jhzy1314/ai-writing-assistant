@@ -18,7 +18,8 @@
     "@tiptap/core": "https://esm.sh/@tiptap/core@2.9.1",
     "@tiptap/starter-kit": "https://esm.sh/@tiptap/starter-kit@2.9.1",
     "@tiptap/extension-underline": "https://esm.sh/@tiptap/extension-underline@2.9.1",
-    "@tiptap/extension-placeholder": "https://esm.sh/@tiptap/extension-placeholder@2.9.1"
+    "@tiptap/extension-placeholder": "https://esm.sh/@tiptap/extension-placeholder@2.9.1",
+    "prosemirror-view": "https://esm.sh/prosemirror-view@1.34.3"
   }
 }
 </script>
@@ -27,6 +28,7 @@ import { Editor as TiptapEditor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
+import { Decoration, DecorationSet } from 'prosemirror-view';
 
 window.initTiptap = async function () {
   var el = document.getElementById('editorRich');
@@ -39,7 +41,7 @@ window.initTiptap = async function () {
       Placeholder.configure({ placeholder: '📝 开始创作...' })
     ],
     content: '',
-    editorProps: { attributes: { class: 'editor-rich', spellcheck: 'false' } }
+    editorProps: { attributes: { class: 'editor-rich', spellcheck: 'false' }, decorations: function (state) { return Annotations.decorations(state); } }
   });
   // Tiptap creates its own DOM, remove the old contenteditable wrapper
   el.removeAttribute('contenteditable');
@@ -291,14 +293,10 @@ window.initTiptap = async function () {
           <div class="preview-inner" id="previewInner"></div>
         </div>
         <div class="sel-toolbar" id="selToolbar">
-          <button class="st-btn" onclick="SelectionActions.expand()">扩写</button>
-          <button class="st-btn" onclick="SelectionActions.condense()">缩写</button>
-          <button class="st-btn" onclick="SelectionActions.rewrite()">改写文风</button>
-          <button class="st-btn" onclick="SelectionActions.polish()">润色</button>
+          <button class="st-btn" onclick="SelectionActions.highlight()" title="给选中文字加高亮">🎨 高亮</button>
+          <button class="st-btn" onclick="SelectionActions.comment()" title="给选中文字写批注">💬 批注</button>
           <span class="st-div"></span>
-          <button class="st-btn" onclick="SelectionActions.continue_()">续写</button>
           <button class="st-btn" onclick="SelectionActions.summary()">摘要</button>
-          <button class="st-btn" onclick="SelectionActions.atmosphere()">调整氛围</button>
         </div>
       </div>
     </div>
@@ -1514,6 +1512,7 @@ window.initTiptap = async function () {
 <script src="/static/js/state-viewer.js"></script>
 <script src="/static/js/pipeline.js"></script>
 <script src="/static/js/appearance.js"></script>
+<script src="/static/js/annotations.js"></script>
 <script src="/static/js/editor.js"></script>
 <script src="/static/js/chapters.js"></script>
 <script src="/static/js/modelsettings.js"></script>

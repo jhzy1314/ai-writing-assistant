@@ -353,6 +353,29 @@ CREATE TABLE IF NOT EXISTS locations (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+-- 2026-08-05 阅读工具：批注/高亮（纯文本偏移锚定）+ 阅读进度
+CREATE TABLE IF NOT EXISTS annotations (
+    id            TEXT PRIMARY KEY,
+    project_id    TEXT NOT NULL,
+    chapter_id    TEXT NOT NULL,
+    start         INTEGER NOT NULL DEFAULT 0,
+    end           INTEGER NOT NULL DEFAULT 0,
+    selected_text TEXT NOT NULL DEFAULT '',
+    type          TEXT NOT NULL DEFAULT 'highlight',
+    color         TEXT NOT NULL DEFAULT '#fde68a',
+    note          TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS reading_progress (
+    project_id TEXT PRIMARY KEY,
+    chapter_id TEXT NOT NULL DEFAULT '',
+    scroll_pct INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- 人物关系（存角色名而非 id：角色删除后关系仍保留、展示直观）
 CREATE TABLE IF NOT EXISTS relations (
     id          TEXT PRIMARY KEY,

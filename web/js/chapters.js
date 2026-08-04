@@ -9,6 +9,8 @@ var ChapterUI = {
     try {
       Store.state.volumes = await API.listVolumes(p.id);
       Store.state.chapters = await API.listChapters(p.id);
+      // 2026-08-05 阅读工具：章节列表标记上次阅读位置
+      if (typeof ReaderProgress !== 'undefined') ReaderProgress.markList();
     } catch (e) { /* 静默 */ }
   },
   selectChapter: async function (ch) {
@@ -26,6 +28,9 @@ var ChapterUI = {
     var pane = document.querySelector('.editor-pane');
     if (pane) pane.classList.add('has-content');
     Editor.setContent(ch.content || '');
+    // 2026-08-05 阅读工具：加载批注/高亮 + 记录阅读进度
+    if (typeof Annotations !== 'undefined') Annotations.load(ch.id);
+    if (typeof ReaderProgress !== 'undefined') { ReaderProgress.record(); ReaderProgress.markList(); }
     // Tiptap 异步渲染完成后强制 focus
     setTimeout(function () {
       if (Editor.tiptap) Editor.tiptap.commands.focus('start');

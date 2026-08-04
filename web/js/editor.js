@@ -61,6 +61,16 @@ var Editor = {
         });
       }
     });
+    // 2026-08-05 阅读工具：点击高亮/批注标记 → 打开编辑弹窗
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      var el = t.closest('[data-ann-id]');
+      if (el) {
+        e.stopPropagation();
+        if (typeof Annotations !== 'undefined') Annotations.open(el.getAttribute('data-ann-id'));
+      }
+    });
     // 点击编辑器/工具栏之外的区域，直接隐藏选中工具栏（防止残留）
     document.addEventListener('mousedown', function (e) {
       var t = e.target;

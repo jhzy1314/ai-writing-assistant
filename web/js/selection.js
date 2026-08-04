@@ -41,6 +41,48 @@ var SelectionActions = {
   polish: function () { this.fillTemplate('polish'); },
   continue_: function () { this.fillTemplate('continue'); },
   summary: function () { this.fillTemplate('summary'); },
+  /* ===== 2026-08-05 阅读工具：高亮 / 批注（不产出正文，纯标注） ===== */
+  highlight: function () {
+    if (typeof Annotations === 'undefined') { UI.toast('标注功能未加载', 'warn'); return; }
+    if (!Annotations.selRange()) { UI.toast('请先选中需要高亮的文字', 'warn'); return; }
+    var id = 'hl_' + uid();
+    var colors = ['#fde68a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#fed7aa', '#e9d5ff'];
+    var html = '<div class="form-group"><label>选择高亮颜色</label><div style="display:flex;gap:10px;padding:6px 0">';
+    colors.forEach(function (c, i) {
+      html += '<span style="width:28px;height:28px;border-radius:50%;background:' + c + ';cursor:pointer;border:2px solid transparent" onclick="document.getElementById(\'' + id + '\').value=\'' + c + '\';this.style.borderColor=\'var(--accent)\'" title="选此颜色"></span>';
+    });
+    html += '</div></div><input type="hidden" id="' + id + '" value="#fde68a">';
+    UI.modal({
+      title: '🎨 高亮选中文字',
+      body: html,
+      actions: [
+        { id: 'cancel', label: '取消' },
+        { id: 'ok', label: '高亮', cls: 'btn-primary', onClick: function (m, ov) {
+          var color = document.getElementById(id).value;
+          ov.remove();
+          Annotations.add('highlight', color, '');
+        }}
+      ]
+    });
+  },
+  comment: function () {
+    if (typeof Annotations === 'undefined') { UI.toast('标注功能未加载', 'warn'); return; }
+    if (!Annotations.selRange()) { UI.toast('请先选中需要批注的文字', 'warn'); return; }
+    var id = 'cm_' + uid();
+    UI.modal({
+      title: '💬 写批注',
+      body: '<div class="form-group"><label>批注内容</label><textarea id="' + id + '" rows="3" placeholder="写下你的想法…"></textarea></div>',
+      actions: [
+        { id: 'cancel', label: '取消' },
+        { id: 'ok', label: '保存批注', cls: 'btn-primary', onClick: function (m, ov) {
+          var note = document.getElementById(id).value.trim();
+          if (!note) { UI.toast('请输入批注内容', 'warn'); return; }
+          ov.remove();
+          Annotations.add('comment', '', note);
+        }}
+      ]
+    });
+  }
   rewrite: function () {
     var id = 'rw_' + uid();
     UI.modal({

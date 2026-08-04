@@ -202,6 +202,13 @@ func (s *Server) routes() {
 	s.router.Post("/api/relations", s.HandleCreateRelation)
 	s.router.Put("/api/relations/{id}", s.HandleUpdateRelation)
 	s.router.Delete("/api/relations/{id}", s.HandleDeleteRelation)
+	// 2026-08-05 阅读工具：批注/高亮 + 阅读进度
+	s.router.Get("/api/annotations", s.HandleListAnnotations)
+	s.router.Post("/api/annotations", s.HandleCreateAnnotation)
+	s.router.Put("/api/annotations/{id}", s.HandleUpdateAnnotation)
+	s.router.Delete("/api/annotations/{id}", s.HandleDeleteAnnotation)
+	s.router.Get("/api/reading_progress", s.HandleGetReadingProgress)
+	s.router.Post("/api/reading_progress", s.HandleSetReadingProgress)
 
 	s.router.Post("/api/materials/upload", s.HandleUploadMaterial)
 	s.router.Get("/api/materials", s.HandleListMaterials)
