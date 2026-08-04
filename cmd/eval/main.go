@@ -325,7 +325,7 @@ func main() {
 	}
 
 	var b strings.Builder
-	b.WriteString("# AI辅助写作助手 生成质量评测报告\n\n")
+	b.WriteString("# AI 写作助手 生成质量评测报告\n\n")
 	mode := "数据库取样"
 	dbLabel := *dbPath
 	if *golden {

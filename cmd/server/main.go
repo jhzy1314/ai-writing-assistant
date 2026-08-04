@@ -184,7 +184,7 @@ registry := llm.NewRegistry(store)
 		os.Exit(0)
 	}()
 
-	log.Printf("🚀 AI辅助写作助手 后端已启动: http://localhost:%d", port)
+	log.Printf("🚀 AI 写作助手 后端已启动: http://localhost:%d", port)
 	log.Printf("   SQLite: %s", cfg.Server.SQLitePath)
 	log.Printf("   日志: %s", logDir)
 	log.Printf("   模型池: %d 个，角色: thinker/worker/verifier/helper", len(cfg.Models))
