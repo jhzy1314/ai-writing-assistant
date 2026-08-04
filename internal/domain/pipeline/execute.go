@@ -373,7 +373,8 @@ func (d *Dispatcher) checkOutlineAgainstHistory(ctx context.Context, req Generat
 	}
 	conflict, revised := parseOutlineConsistencyResult(out)
 	if conflict && strings.TrimSpace(revised) != "" {
-		emit(ProgressEvent{Type: EventStage, Stage: "✏️ 大纲与前文冲突，已自动修订后继续", Role: string(llm.RoleThinker), Text: revised})
+		// 修订大纲仅在内部使用，不推送 Text 给前端——避免前端把规划事件当"最终大纲"展示
+		emit(ProgressEvent{Type: EventStage, Stage: "✏️ 大纲与前文冲突，已自动修订后继续", Role: string(llm.RoleThinker)})
 		return revised
 	}
 	if conflict {
