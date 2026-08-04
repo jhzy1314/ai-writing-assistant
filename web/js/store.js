@@ -37,6 +37,9 @@ var Store = {
     this.state.composer.skipWordCheck = this.get('skipWordCheck', false);
     this.state.composer.outline = this.get('outline', '');
     this.state.composer.webSearch = this.get('webSearch', false);
+    this.state.composer.orchThinker = this.get('orchThinker', '');
+    this.state.composer.orchWorker = this.get('orchWorker', '');
+    this.state.composer.orchVerifier = this.get('orchVerifier', '');
     this.state.editor.mode = this.get('editorMode', 'rich');
     // 主题：多主题系统（themes.js），经典主题 id 保持 dark/light 兼容旧值
     if (typeof Themes !== 'undefined' && Themes.loadSaved) {
@@ -60,6 +63,9 @@ var Store = {
     this.set('skipWordCheck', this.state.composer.skipWordCheck);
     this.set('webSearch', !!this.state.composer.webSearch);
     this.set('outline', this.state.composer.outline || '');
+    this.set('orchThinker', this.state.composer.orchThinker || '');
+    this.set('orchWorker', this.state.composer.orchWorker || '');
+    this.set('orchVerifier', this.state.composer.orchVerifier || '');
   },
   saveSelection: function (projectId) {
     if (!projectId) return;

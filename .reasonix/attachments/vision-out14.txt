@@ -1,0 +1,31 @@
+- **App**: AI Novel Studio (top-left logo)
+- **Top bar**: “调用 38 / 500”, “Token 602,796 / 2,000,000”, API, notifications, 指南, 墨韵书斋, volume slider, “14”, 用户 icon “纯净”
+- **Active project**: “暗恋这件难过的小事” (light novel, 26,672 chars)
+- **Project sidebar**: 
+  - 编辑器 (Editor) — selected
+  - 章节大纲, 人物卡, 世界观
+  - 项目列表: “暗恋这件难过的小事” with chapters:
+    - 第一章 物是人非 1,394
+    - 第二章 流水落花春去也 2,023
+    - 第三章 人在有心事的时候 1,703
+    - 第四章 林云的物理课代表 2,531
+    - 第五章 赐书消得波茶香 2,953
+    - 第六章 被酒莫惊春睡重  (truncated)
+- **Editor toolbar** (above text area):
+  - “拟标题”, “Ctrl+F”, “第一章 物是人非事休 • 1,394字 | 全书 26,672字 • 16人助 3世界观 0素材 • 13章节”
+  - “指派Agent模型” dropdown, “?”, “模型配置 ▾”, “智能分层（推荐） ▾”, ⚙️
+  - Formatting: B / I / U / H2 / H3 / 保存版本 / Ctrl+5 / 从光标续写 / 多候选
+  - Navigation: ← 上一章, → 下一章
+  - Stats: “… 更多”, 字数 1,394, 字符 1,432
+- **Main text area**: Chinese prose (e.g., “惊鸿后来写过一段话，是这么写的——”, “我的人生，从来到镇海中学那一天就结束了。”)
+- **Bottom panel** (input/commands):
+  - Prompt: “输入创作需求或选中文字后使用快捷指…”
+  - Suggested prompt: “第一章 物是人非事休”
+  - Buttons: “生成 Ctrl+Enter”, “选项”, “专业模式”
+  - Footer: “为每个角色手动指定模型，跑完整 Thinker→Worker→Verifier 流程”
+- **Status bar**: “全书 26,672 字 本章 1,394 字”, “已保存” (right-aligned)
+- **Key UI elements color**: Red buttons (“新建项目”, “生成”), gray for disabled/secondary actions.
+
+No code or error messages visible. All text is Chinese.
+
+[Model: qwen3-vl-flash | Tokens: in=2569 out=641]

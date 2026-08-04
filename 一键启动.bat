@@ -44,6 +44,20 @@ if not errorlevel 1 (
 )
 echo   [OK] 端口 8081 可用
 
+:: --- 自动重建：保证 server.exe 与源码同步（前端 embed，不重建不生效） ---
+if exist "cmd\server\main.go" (
+    where go >nul 2>&1
+    if not errorlevel 1 (
+        echo   [OK] 检测到源码，自动重建最新版…
+        call go build -o server.exe ./cmd/server
+        if errorlevel 1 (
+            echo   [!] 构建失败，使用现有 server.exe
+        ) else (
+            echo   [OK] server.exe 已更新到最新
+        )
+    )
+)
+
 :: ══════════════════════════════════════════════════════════════
 ::  第 1 步：检查 API Key
 :: ══════════════════════════════════════════════════════════════

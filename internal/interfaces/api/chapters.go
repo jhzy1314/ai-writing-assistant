@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -387,17 +388,23 @@ func (s *Server) HandleSplitChapters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// AI 分章：先正则快速切分，失败则调专用 Agent 识别标题后精确切割原文
+	// AI 分章：Helper Agent 阅读全文识别章节标题（能处理段尾标题/残留标题等复杂格式），
+	// 精确切割原文；AI 不可用或识别失败时回退正则切分。
+	// 注意：默认追加（req.Replace=false），不会删除已有章节；replace=true 才替换
 	if req.SplitBy == "" || req.SplitBy == "auto" {
-		if s.store.CountSegments(req.Content, "auto") < 2 {
-			titles, err := s.splitTitlesFromAI(r.Context(), req.Content)
-			if err == nil && len(titles) >= 2 {
-				chapters, splitErr := s.store.SplitByTitles(r.Context(), &req, titles)
-				if splitErr == nil {
-					writeOK(w, map[string]interface{}{"items": chapters, "count": len(chapters)})
-					return
-				}
+		titles, err := s.splitTitlesFromAI(r.Context(), req.Content)
+		if err == nil && len(titles) >= 2 {
+			chapters, splitErr := s.store.SplitByTitles(r.Context(), &req, titles)
+			if splitErr == nil {
+				writeOK(w, map[string]interface{}{"items": chapters, "count": len(chapters), "replaced": req.Replace})
+				return
 			}
+		}
+		// AI 失败或标题不足：回退正则（含段尾标题识别），记日志便于诊断
+		if err != nil {
+			log.Printf("[split] AI 分章失败，回退正则: %v", err)
+		} else {
+			log.Printf("[split] AI 识别标题不足(%d)，回退正则", len(titles))
 		}
 	}
 
@@ -406,10 +413,10 @@ func (s *Server) HandleSplitChapters(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeOK(w, map[string]interface{}{"items": chapters, "count": len(chapters)})
+	writeOK(w, map[string]interface{}{"items": chapters, "count": len(chapters), "replaced": req.Replace})
 }
 
-// splitTitlesFromAI 专用 Agent：只识别章目标题列表，不重写正文（省 Token、保原文）
+// splitTitlesFromAI 专用 Agent：阅读全文识别章目标题列表，不重写正文（省 Token、保原文）
 func (s *Server) splitTitlesFromAI(ctx context.Context, content string) ([]string, error) {
 	adapters, err := s.registry.AdaptersForRole(ctx, llm.RoleHelper)
 	if err != nil || len(adapters) == 0 {
@@ -417,30 +424,42 @@ func (s *Server) splitTitlesFromAI(ctx context.Context, content string) ([]strin
 	}
 	adapter := adapters[0]
 
-	// 取文本首尾各 3000 字做采样，覆盖开头+结尾章节标题
-	runes := []rune(content)
-	sample := string(runes[:min(3000, len(runes))])
-	if len(runes) > 6000 {
-		sample += "\n\n…[中间略]…\n\n" + string(runes[len(runes)-min(2000, len(runes)-3000):])
+	// 分块分次识别标题（与拆书同策略）：全文按 8 万字切块，逐块识别后按原文顺序合并。
+	// 不设上下文上限、不截断——每块都在模型能力范围内，模型自身实力决定能否处理。
+	blocks := splitBlocks(content, analyzeBlockRunes)
+	var all []string
+	for i, blk := range blocks {
+		titles, err := s.recognizeTitles(ctx, adapter, blk)
+		if err != nil {
+			return nil, fmt.Errorf("第 %d/%d 块标题识别失败: %w", i+1, len(blocks), err)
+		}
+		all = append(all, titles...)
 	}
+	return all, nil
+}
 
+// recognizeTitles 单块标题识别：Helper 模型阅读一段文本，输出章节标题 JSON 数组
+func (s *Server) recognizeTitles(ctx context.Context, adapter llm.ModelAdapter, sample string) ([]string, error) {
 	sysPrompt := `你是小说章节分割专家。你的唯一任务：分析文本，列出所有真实的章节标题。
 
 规则：
 1. 真正的章节标题模式："第X章"、"Chapter X"、"第X节"、单独成行的短标题（<25字）
 2. 排除口语化时间状语："第一天"、"第二天"、"几小时后"等不是标题
-3. 排除书中提及但不在章节开头的标题
-4. 按原文出现顺序输出
+3. 排除书中提及但不在章节开头的标题；孤立残留的标题行（前后文明显接不上）也排除
+4. 标题可能出现在段落末尾（如「……正文到此。第十章」），这类也要识别，输出标题本身（不含正文）
+5. 按原文出现顺序输出
+6. "第X卷"、"卷一"等卷名不是章节标题，一律排除
 
 输出格式：纯 JSON 字符串数组。不输出任何其他内容。
 示例：["第一章 雨夜","第二章 初遇","第三章 离别"]`
 
 	subCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	aiText, _, err := adapter.Generate(subCtx, sysPrompt, sample)
+	aiText, usage, err := adapter.Generate(subCtx, sysPrompt, sample)
 	if err != nil {
 		return nil, err
 	}
+	_ = s.store.IncrUsage(ctx, adapter.Name(), 1, usage.Total())
 
 	// 提取 JSON 数组
 	start := strings.Index(aiText, "[")

@@ -10,9 +10,11 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/ai-novel/studio/internal/infrastructure/database"
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
 // ===== 人物卡 =====
@@ -240,6 +242,13 @@ func extractText(filename string, r io.Reader) (string, error) {
 		data, err := io.ReadAll(r)
 		if err != nil {
 			return "", err
+		}
+		// UTF-8 校验失败则按 GB18030 转码（GBK 的超集，兼容旧版 TXT 书源的 GBK/GB18030 编码）
+		if !utf8.Valid(data) {
+			dec := simplifiedchinese.GB18030.NewDecoder()
+			if out, err := dec.Bytes(data); err == nil {
+				return string(out), nil
+			}
 		}
 		return string(data), nil
 	default:

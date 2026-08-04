@@ -41,7 +41,7 @@ var Composer = {
     // 上下文范围
     var scopeEl = document.getElementById('contextScope');
     if (scopeEl) scopeEl.value = Store.state.composer.contextScope || 'current';
-    Store.state.composer.contextScope = Store.state.composer.contextScope || 'current';
+    Store.state.composer.contextScope = Store.state.composer.contextScope || 'full';
     // 禁改写
     var nrToggle = document.getElementById('noRewriteToggle');
     if (nrToggle) nrToggle.checked = Store.state.composer.noRewrite || false;
@@ -50,6 +50,8 @@ var Composer = {
     var swToggle = document.getElementById('skipWordCheck');
     if (swToggle) swToggle.checked = Store.state.composer.skipWordCheck || false;
     Store.state.composer.skipWordCheck = Store.state.composer.skipWordCheck || false;
+    var roChk = document.getElementById('rewriteOutlineChk');
+    if (roChk) roChk.checked = Store.state.composer.rewriteOutline !== false;
     // 深度思考：全局开关（一键全开/全关）+ 角色级开关（默认推荐配置：仅规划师开，写作/审稿/轻活关）
     var thToggle = document.getElementById('thinkingToggle');
     var rt = Store.state.composer.roleThinking;
@@ -326,6 +328,7 @@ var Composer = {
       user_demand: instr,
       selected_text: sel,
       outline: (document.getElementById('genOutline') || {}).value || Store.state.composer.outline || '',
+      rewrite_outline: Store.state.composer.rewriteOutline !== false,
       world_setting: Context.worldSetting(),
       character_setting: Context.characters(),
       history_content: history,
@@ -362,6 +365,10 @@ var Composer = {
     }
     return true;
   },
+  onRewriteOutlineChange: function () {
+    var chk = document.getElementById('rewriteOutlineChk');
+    Store.state.composer.rewriteOutline = chk ? chk.checked : true;
+  },
   onWebSearchChange: function () {
     var el = document.getElementById('webSearchToggle');
     Store.state.composer.webSearch = !!(el && el.checked);
@@ -388,23 +395,26 @@ var Composer = {
         payload.history_content = '';
       } catch (e) { UI.toast('创建章节失败：' + e.message, 'error'); return; }
     }
-    // 第一层预检：需求-字数匹配（除非用户关闭）
+    // 需求-字数预检：改为后台非阻塞（不再弹窗阻断生成，结果以 toast 提示，可继续生成）
     if (!Store.state.composer.skipWordCheck && payload.target_word > 0 && payload.user_demand) {
-      try {
-        var pre = await API.post('/api/precheck', {
-          user_demand: payload.user_demand,
-          target_word: payload.target_word,
-          world_setting: payload.world_setting,
-          character_setting: payload.character_setting,
-          history_content: payload.history_content
-        });
-        if (pre && pre.mismatch) {
-          this.showPrecheckDialog(pre, payload);
-          return;
-        }
-      } catch (e) { /* precheck 失败不阻塞，直接继续 */ }
+      this.runBackgroundPrecheck(payload);
     }
     this.doGenerate(payload);
+  },
+
+  /* 后台预检：生成已开始，预检结果仅 toast 提示，不阻断 */
+  runBackgroundPrecheck: function (payload) {
+    API.post('/api/precheck', {
+      user_demand: payload.user_demand,
+      target_word: payload.target_word,
+      world_setting: payload.world_setting,
+      character_setting: payload.character_setting,
+      history_content: payload.history_content
+    }).then(function (pre) {
+      if (!pre || !pre.mismatch) return;
+      var label = pre.mismatch_type === 'too_low' ? '需求体量较大' : '需求体量较小';
+      UI.toast('⚠️ ' + label + '：AI 预估 ' + pre.recommended_min + '~' + pre.recommended_max + ' 字，当前目标 ' + payload.target_word + ' 字——可在「📝 章节大纲」行调整 🎯 字数', 'warn', 6000);
+    }).catch(function () { /* 预检失败不打扰 */ });
   },
 
   showPrecheckDialog: function (pre, payload) {
@@ -435,8 +445,8 @@ var Composer = {
   doGenerate: function (payload) {
     var estInput = (payload.user_demand + payload.world_setting + payload.character_setting + payload.history_content + payload.material_text + payload.selected_text).length;
     var estTokens = Math.ceil(estInput / 1.5) + Math.ceil(payload.target_word * 1.3);
-    var self = this;
     if (estTokens > 4000 || payload.target_word > 2000) {
+      // 长文本确认：立即弹出（即时反馈），确认后立刻开始生成
       UI.confirm('长文本生成确认',
         '预估 Token 约 <b style="color:var(--accent)">' + estTokens.toLocaleString() + '</b>，目标字数 ' + payload.target_word + '。<br>生成可能耗时较长，是否继续？',
         function () { SSE.start(payload); });
@@ -572,6 +582,14 @@ var Composer = {
     Store.state.composer.newChapterWrite = cb ? cb.checked : false;
     Store.savePrefs();
   },
+  /* 🧠 思考面板：展开/收起每个 agent 的深度思考开关 */
+  toggleThinkingPanel: function (ev) {
+    if (ev) ev.stopPropagation();
+    var p = document.getElementById('thinkingPanel');
+    if (!p) return;
+    p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+  },
+
   toggleGenOptions: function (ev) {
     if (ev && ev.stopPropagation) ev.stopPropagation();
     var box = document.getElementById('genOpts');
@@ -582,6 +600,84 @@ var Composer = {
     if (btn) btn.classList.toggle('active', show);
   },
   /* ===== 专业模式：详细大纲 + AI 辅助设定 ===== */
+
+
+  /* 按项目题材匹配的专业模式示例（动态 placeholder，覆盖多种类型；未匹配用中性示例） */
+  GENRE_EXAMPLES: [
+    { match: /校园|青春|高考|学生|高中|大学/, ph: {
+      proBookName: '例如：盛夏的回声', proHero: '例如：林夜，高二学生，性格隐忍腹黑，观察力惊人',
+      proWorld: '例如：市重点高中，明暗两派学生团体，日常与竞赛交织的校园氛围',
+      proPlot: '例如：\n开局：转学第一天，主角与同桌的意外交集\n发展：社团竞选与月考压力下暗流涌动\n高潮：误会解开，友谊与成绩面临双重考验\n结局：各自成长，迎来新的学期' } },
+    { match: /玄幻|修仙|仙侠|奇幻|修真|武侠/, ph: {
+      proBookName: '例如：风起西陵', proHero: '例如：林夜，外门弟子，实为上古灵脉传人，性格隐忍腹黑',
+      proWorld: '例如：灵气复苏的九州大陆，五大宗门暗中博弈', proPower: '例如：觉醒者九阶：E→D→C→B→A→S→SS→SSS→神阶',
+      proPlot: '例如：\n开局：主角意外觉醒，卷入宗门斗争\n发展：逐步揭开家族秘辛\n高潮：决战幕后黑手，守护宗门\n结局：完成传承，开启新篇章' } },
+    { match: /都市|异能|商战|职场|官场/, ph: {
+      proBookName: '例如：城市之光', proHero: '例如：林夜，普通职员，实为低调的业界天才，性格隐忍腹黑',
+      proWorld: '例如：现代都市，五大企业暗中博弈，表面光鲜暗流涌动',
+      proPlot: '例如：\n开局：主角意外卷入商业风波\n发展：步步为营，揭开对手布局\n高潮：商战对决\n结局：尘埃落定，开启新篇章' } },
+    { match: /悬疑|推理|探案|刑侦|惊悚|灵异/, ph: {
+      proBookName: '例如：雾中谜案', proHero: '例如：林夜，刑警，观察力惊人，性格孤僻',
+      proWorld: '例如：现代都市，连环案件与隐藏多年的真相',
+      proPlot: '例如：\n开局：一桩离奇案件打破平静\n发展：线索交织，嫌疑人逐个浮现\n高潮：真相反转\n结局：案件告破，留下新的悬念' } },
+    { match: /科幻|末世|星际|机甲|赛博/, ph: {
+      proBookName: '例如：星海拾遗', proHero: '例如：林夜，废土幸存者，觉醒特殊能力',
+      proWorld: '例如：末世废土，幸存者据点与变异危机并存',
+      proPlot: '例如：\n开局：末世降临，主角挣扎求生\n发展：发现变异源头\n高潮：直面幕后组织\n结局：找到希望' } },
+    { match: /古代|历史|宫斗|宅斗|种田|穿越/, ph: {
+      proBookName: '例如：盛世长歌', proHero: '例如：林夜，世家庶子，聪慧隐忍',
+      proWorld: '例如：架空古代，朝堂与世家盘根错节',
+      proPlot: '例如：\n开局：家族变故，主角被迫入局\n发展：步步为营，卷入朝堂之争\n高潮：权谋对决\n结局：拨云见日' } }
+  ],
+  /* 根据项目题材设置专业模式字段的动态示例（空字段才生效） */
+  _applyGenrePlaceholder: function () {
+    var p = Store.state.currentProject;
+    if (!p) return;
+    var t = (p.type || '') + ' ' + (p.name || '');
+    var ex = null;
+    for (var i = 0; i < this.GENRE_EXAMPLES.length; i++) {
+      if (this.GENRE_EXAMPLES[i].match.test(t)) { ex = this.GENRE_EXAMPLES[i].ph; break; }
+    }
+    if (!ex) return; // 未匹配：保持通用中性示例
+    Object.keys(ex).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && !el.value.trim()) el.placeholder = ex[id];
+    });
+  },
+  /* 打开专业模式时，自动用当前项目已有信息填充空字段（书名/题材/主角/世界观/力量体系） */
+  fillProModeFromProject: function () {
+    var p = Store.state.currentProject;
+    if (!p) return;
+    var setIf = function (id, val) {
+      if (!val) return;
+      var el = document.getElementById(id);
+      if (el && !el.value.trim()) el.value = val;
+    };
+    setIf('proBookName', p.name);
+    setIf('proGenre', p.type || '');
+    // 主角：人物卡第一条
+    var chars = Store.state.characters || [];
+    if (chars.length) {
+      var hero = chars[0];
+      var heroDesc = (hero.description || '').split('\n').filter(function (s) { return s.trim(); })[0] || '';
+      setIf('proHero', hero.name + (heroDesc ? '：' + heroDesc : ''));
+    }
+    // 世界观：全部条目合并
+    var ws = Store.state.worldSettings || [];
+    if (ws.length) {
+      setIf('proWorld', ws.map(function (w) { return w.title + '：' + w.content; }).join('\n'));
+    }
+    // 力量体系：从世界观中筛含力量/等级/修炼等关键词的条目
+    var powerItems = ws.filter(function (w) {
+      return /力量|等级|修为|修炼|境界|体系|能力|实力/.test((w.title || '') + (w.content || ''));
+    });
+    if (powerItems.length) {
+      setIf('proPower', powerItems.map(function (w) { return w.title + '：' + w.content; }).join('\n'));
+    }
+    // 动态示例（按题材）
+    this._applyGenrePlaceholder();
+  },
+  /* 打开专业模式时收起「更多」菜单（两者互斥，避免悬浮层互相遮挡） */
   toggleProMode: function (ev) {
     if (ev && ev.stopPropagation) ev.stopPropagation();
     var panel = document.getElementById('proModePanel');
@@ -593,8 +689,10 @@ var Composer = {
       // 打开专业模式时收起「更多」菜单（两者互斥，避免悬浮层互相遮挡）
       var mm = document.getElementById('moreMenu');
       if (mm && mm.style.display !== 'none') mm.style.display = 'none';
+      // 项目设定自动填入空字段
+      this.fillProModeFromProject();
       this._positionProPanel();
-      UI.toast('⚡ 专业模式已展开，可填写或让 AI 生成设定', 'success');
+      UI.toast('⚡ 专业模式已展开：项目设定已自动填入，填写「本章续写大纲」即可生成', 'success');
     } else {
       UI.toast('专业模式已关闭', '');
     }
@@ -696,14 +794,12 @@ var Composer = {
     }
   },
   restoreProMode: function () {
+    // 专业模式默认收起，不再自动展开遮挡编辑器（用户需要时点 ⚡ 手动展开）
     var panel = document.getElementById('proModePanel');
     var btn = document.getElementById('proModeBtn');
-    if (panel && Store.get('proModeOpen', false)) {
-      panel.style.display = 'flex';
-      if (btn) btn.classList.add('on');
-      this._positionProPanel();
-      this.syncProOutlineToGen();
-    }
+    if (panel) panel.style.display = 'none';
+    if (btn) btn.classList.remove('on');
+    Store.set('proModeOpen', false);
   },
   /* 将专业模式面板定位为固定悬浮层：锚定在生成栏正上方，宽度对齐，不遮挡工具栏，超高内部滚动 */
   _positionProPanel: function () {
@@ -916,6 +1012,33 @@ var Composer = {
       box.innerHTML = '<div class="ragp-head">🧠 相关记忆</div><div class="ragp-empty">检索失败：' + esc(e.message) + '</div>';
     }
   },
+  /* 🤖 AI 预估本章字数：根据大纲+需求调预检接口，返回推荐区间并设为目标字数 */
+  onEstimate: function () {
+    var outline = (document.getElementById('genOutline') || {}).value || '';
+    var demand = (document.getElementById('instructionInput') || {}).value || '';
+    var tw = Store.state.composer.targetWord || 1000;
+    var body = {
+      user_demand: (demand || outline || '本章').slice(0, 2000),
+      target_word: tw, world_setting: '', character_setting: '', history_content: '',
+      project_id: (Store.state.currentProject || {}).id || ''
+    };
+    UI.toast('🤖 AI 预估字数中…', 'info');
+    var self = this;
+    API.post('/api/precheck', body).then(function (pre) {
+      if (!pre || !pre.recommended_min) { UI.toast('预估失败：模型未返回结果', 'error'); return; }
+      var rec = pre.recommended_max || pre.recommended_min;
+      if (rec) {
+        Store.state.composer.targetWord = rec;
+        var twm = document.getElementById('targetWordMini');
+        if (twm) twm.value = rec;
+        Store.savePrefs();
+        UI.toast('🤖 预估本章约 ' + rec + ' 字（基于本项目近几章平均 + 需求调整），已自动设为目标，可直接改 🎯 框', 'success', 5000);
+      } else {
+        UI.toast('预估失败：模型未返回结果', 'error');
+      }
+    }).catch(function (e) { UI.toast('预估失败：' + (e.message || e), 'error'); });
+  },
+
   onOutlineChange: function () {
     var el = document.getElementById('genOutline');
     Store.state.composer.outline = el ? el.value.trim() : '';
@@ -924,8 +1047,7 @@ var Composer = {
     if (this._outlineTimer) clearTimeout(this._outlineTimer);
     var self = this;
     this._outlineTimer = setTimeout(function () {
-      var p = Store.state.currentProject;
-      if (p && Store.state.composer.outline !== (p.outline || '')) {
+      var p = Store.state.currentProject;      if (p && Store.state.composer.outline !== (p.outline || '')) {
         API.updateProject(p.id, { outline: Store.state.composer.outline }).catch(function () {});
       }
     }, 2000);

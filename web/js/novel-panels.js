@@ -36,28 +36,73 @@ var ForeshadowPage = {
     var el = document.getElementById('foreshadowList');
     var stats = document.getElementById('foreshadowStats');
     var pending = items.filter(function (f) { return f.status === 'pending'; }).length;
-    stats.textContent = items.length + ' 条伏笔 · ' + pending + ' 条待回收';
+    stats.textContent = items.length + ' 条伏笔 · ' + pending + ' 条待回收 · 生成时自动注入（未回收伏笔提醒 + 审稿官检查推进）';
     if (!items.length) {
       el.innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">🔮</div><div>暂无伏笔<br><small style="color:var(--muted)">用「🤖 AI 扫描」通读全书识别伏笔，或手动添加</small></div></div>';
       return;
     }
-    var html = '';
-    items.forEach(function (f) {
-      var st = ForeshadowPage.STATUS[f.status] || ForeshadowPage.STATUS.pending;
-      html += '<div class="fs-card ' + st.cls + '">' +
-        '<div class="fs-head"><strong>' + esc(f.title) + '</strong>' +
-        '<span class="fs-badge">' + st.label + '</span></div>' +
-        (f.description ? '<div class="fs-desc">' + esc(f.description) + '</div>' : '') +
-        '<div class="fs-meta">🔒 埋设于 ' + esc(ForeshadowPage.chLabel(f.setup_chapter_id)) +
-        (f.payoff_chapter_id ? ' · ✅ 回收于 ' + esc(ForeshadowPage.chLabel(f.payoff_chapter_id)) : '') + '</div>' +
-        '<div class="fs-acts">' +
-        (f.status === 'pending' ? '<button class="btn btn-ghost btn-sm" onclick="ForeshadowPage.mark(\'' + f.id + '\',\'recollected\')">✅ 标记回收</button>' : '') +
-        '<button class="btn btn-ghost btn-sm" onclick="ForeshadowPage.edit(\'' + f.id + '\')">✏️ 编辑</button>' +
-        '<button class="btn btn-ghost btn-sm" onclick="ForeshadowPage.mark(\'' + f.id + '\',\'dropped\')">💤 放弃</button>' +
-        '<button class="btn btn-ghost btn-sm" onclick="ForeshadowPage.del(\'' + f.id + '\')">🗑 删除</button>' +
+    // 按状态分类折叠：待回收默认展开，已回收/已放弃收起
+    var order = ['pending', 'recollected', 'dropped'];
+    var groups = { pending: [], recollected: [], dropped: [] };
+    items.forEach(function (f) { (groups[f.status] = groups[f.status] || []).push(f); });
+    this._groups = order.filter(function (k) { return (groups[k] || []).length > 0; });
+    var html = '<div style="margin-bottom:8px;display:flex;gap:6px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost btn-xs" onclick="ForeshadowPage.expandAll()">⇩ 全部展开</button>' +
+      '<button class="btn btn-ghost btn-xs" onclick="ForeshadowPage.collapseAll()">⇧ 全部收起</button></div>';
+    order.forEach(function (k, gi) {
+      var list = groups[k] || [];
+      if (!list.length) return;
+      var st = ForeshadowPage.STATUS[k] || ForeshadowPage.STATUS.pending;
+      var open = k === 'pending';
+      html += '<div class="mat-group" style="margin-bottom:8px;border:1px solid var(--border2);border-radius:8px;overflow:hidden">' +
+        '<div style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel2)" onclick="ForeshadowPage.toggleGroup(' + gi + ')">' +
+        '<span class="fs-badge" style="position:static">' + st.label + '</span>' +
+        '<strong style="font-size:12.5px">' + list.length + ' 条</strong>' +
+        '<span style="margin-left:auto;font-size:11px;color:var(--muted)" id="fgArrow_' + gi + '">' + (open ? '▾' : '▸') + '</span></div>' +
+        '<div id="fgBody_' + gi + '"' + (open ? '' : ' style="display:none"') + '>' +
+        list.map(function (f) {
+          return '<div class="fs-card ' + st.cls + '" style="border-radius:0;margin:0;border-top:1px solid var(--border)">' +
+            '<div class="fs-head"><strong>' + esc(f.title) + '</strong>' +
+            '<span class="fs-badge">' + st.label + '</span></div>' +
+            (f.description ? '<div class="fs-desc">' + esc(f.description) + '</div>' : '') +
+            '<div class="fs-meta">🔒 埋设于 ' + esc(ForeshadowPage.chLabel(f.setup_chapter_id)) +
+            (f.payoff_chapter_id ? ' · ✅ 回收于 ' + esc(ForeshadowPage.chLabel(f.payoff_chapter_id)) : '') + '</div>' +
+            '<div class="fs-acts">' +
+            (f.status === 'pending' ? '<button class="btn btn-ghost btn-sm" onclick="ForeshadowPage.mark(\'' + f.id + '\',\'recollected\')">✅ 标记回收</button>' : '') +
+            '<button class="btn btn-ghost btn-sm" onclick="ForeshadowPage.edit(\'' + f.id + '\')">✏️ 编辑</button>' +
+            (f.status === 'pending' ? '<button class="btn btn-ghost btn-sm" onclick="ForeshadowPage.mark(\'' + f.id + '\',\'dropped\')">💤 放弃</button>' : '') +
+            '<button class="btn btn-ghost btn-sm" onclick="ForeshadowPage.del(\'' + f.id + '\')">🗑 删除</button>' +
+            '</div></div>';
+        }).join('') +
         '</div></div>';
     });
     el.innerHTML = html;
+  },
+  toggleGroup: function (gi) {
+    var body = document.getElementById('fgBody_' + gi);
+    var arrow = document.getElementById('fgArrow_' + gi);
+    if (!body) return;
+    var show = body.style.display !== 'none';
+    body.style.display = show ? 'none' : '';
+    if (arrow) arrow.textContent = show ? '▸' : '▾';
+  },
+  expandAll: function () {
+    var gs = this._groups || [];
+    gs.forEach(function (_, gi) {
+      var body = document.getElementById('fgBody_' + gi);
+      var arrow = document.getElementById('fgArrow_' + gi);
+      if (body) body.style.display = '';
+      if (arrow) arrow.textContent = '▾';
+    });
+  },
+  collapseAll: function () {
+    var gs = this._groups || [];
+    gs.forEach(function (_, gi) {
+      var body = document.getElementById('fgBody_' + gi);
+      var arrow = document.getElementById('fgArrow_' + gi);
+      if (body) body.style.display = 'none';
+      if (arrow) arrow.textContent = '▸';
+    });
   },
   create: function () {
     var self = this;
@@ -162,11 +207,24 @@ var ForeshadowPage = {
 
 /* ---------- 2. 素材库 ---------- */
 var MaterialsPage = {
-  CATS: ['句式', '动作描写', '对话标签', '环境描写', '词汇', '其他'],
-  CAT_COLOR: ['#e11d48', '#0891b2', '#7c3aed', '#059669', '#d97706', '#64748b'],
+  CATS: ['句式', '动作描写', '对话标签', '环境描写', '词汇', '动作', '心理描写', '其他'],
+  CAT_COLOR: ['#e11d48', '#0891b2', '#7c3aed', '#059669', '#d97706', '#0ea5e9', '#a855f7', '#64748b'],
   init: function () {
     var p = Store.state.currentProject;
-    if (!p) { this.showEmpty(); return; }
+    if (!p) {
+      // 启动时项目可能尚未恢复：尝试自动选中上次项目（素材按项目隔离，不选中会显示为空）
+      var lastId = Store.get('lastProjectId', '');
+      if (lastId && typeof ProjectUI !== 'undefined' && ProjectUI.select) {
+        var self = this;
+        ProjectUI.select(lastId).then(function () {
+          if (Store.state.currentProject) self.load();
+          else self.showEmpty();
+        }).catch(function () { self.showEmpty(); });
+        return;
+      }
+      this.showEmpty('请先在左侧选中一个项目');
+      return;
+    }
     this.load();
   },
   showEmpty: function (msg) {
@@ -194,22 +252,70 @@ var MaterialsPage = {
   render: function (items) {
     var el = document.getElementById('materialsList');
     var stats = document.getElementById('materialsStats');
-    stats.textContent = items.length + ' 条素材';
+    stats.textContent = items.length + ' 条素材 · 项目：' + (Store.state.currentProject ? Store.state.currentProject.name : '未选择') + ' · 生成时按需求语义自动检索注入（借表达手法去AI腔）';
     if (!items.length) {
-      el.innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">📚</div><div>暂无素材<br><small style="color:var(--muted)">用「🤖 拆书提取」从已有章节提炼表达素材，生成时自动融合仿写</small></div></div>';
+      el.innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">📚</div><div>当前项目暂无素材<br><small style="color:var(--muted)">素材按项目隔离——若之前拆的素材不在这里，请切换到素材所在项目；或点「🤖 拆书提取」从正文提取</small></div></div>';
       return;
     }
-    var html = '';
+    var self = this;
+    // 按分类分组（分类折叠：默认展开第一类，其余收起，可手动切换）
+    var groups = {};
     items.forEach(function (m) {
-      var color = MaterialsPage.catColor(m.category);
-      html += '<div class="mat-card" style="border-left:3px solid ' + color + '">' +
-        '<div class="mat-head"><span class="mat-cat" style="background:' + color + '">' + esc(m.category) + '</span>' +
-        '<span class="mat-src">' + esc(m.source || '') + '</span>' +
-        '<span class="mat-acts"><button class="btn btn-ghost btn-sm" onclick="MaterialsPage.edit(\'' + m.id + '\')">✏️</button>' +
-        '<button class="btn btn-ghost btn-sm" onclick="MaterialsPage.del(\'' + m.id + '\')">🗑</button></span></div>' +
-        '<div class="mat-content">' + esc(m.content) + '</div></div>';
+      var cat = m.category || '其他';
+      (groups[cat] = groups[cat] || []).push(m);
+    });
+    var cats = Object.keys(groups).sort(function (a, b) { return groups[b].length - groups[a].length; });
+    this._groups = cats;
+    var html = '<div style="margin-bottom:8px;display:flex;gap:6px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost btn-xs" onclick="MaterialsPage.expandAll()">⇩ 全部展开</button>' +
+      '<button class="btn btn-ghost btn-xs" onclick="MaterialsPage.collapseAll()">⇧ 全部收起</button></div>';
+    cats.forEach(function (cat, gi) {
+      var list = groups[cat];
+      var color = self.catColor(cat);
+      var open = gi === 0;
+      html += '<div class="mat-group" style="margin-bottom:8px;border:1px solid var(--border2);border-radius:8px;overflow:hidden">' +
+        '<div style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel2)" onclick="MaterialsPage.toggleGroup(' + gi + ')">' +
+        '<span style="color:' + color + '">🏷</span><strong style="font-size:12.5px">' + esc(cat) + '</strong>' +
+        '<span style="font-size:10.5px;color:var(--muted)">' + list.length + ' 条</span>' +
+        '<span style="margin-left:auto;font-size:11px;color:var(--muted)" id="mgArrow_' + gi + '">' + (open ? '▾' : '▸') + '</span></div>' +
+        '<div id="mgBody_' + gi + '"' + (open ? '' : ' style="display:none"') + '>' +
+        list.map(function (m) {
+          return '<div class="mat-card" style="border-left:3px solid ' + color + ';border-radius:0;margin:0;border-top:1px solid var(--border)">' +
+            '<div class="mat-head"><span class="mat-cat" style="background:' + color + '">' + esc(m.category) + '</span>' +
+            (m.source ? '<span style="font-size:10px;color:var(--faint);margin-left:4px">' + esc(m.source) + '</span>' : '') +
+            '<span class="mat-acts"><button class="btn btn-ghost btn-sm" onclick="MaterialsPage.edit(\'' + m.id + '\')">✏️</button>' +
+            '<button class="btn btn-ghost btn-sm" onclick="MaterialsPage.del(\'' + m.id + '\')">🗑</button></span></div>' +
+            '<div class="mat-content">' + esc(m.content) + '</div></div>';
+        }).join('') +
+        '</div></div>';
     });
     el.innerHTML = html;
+  },
+  toggleGroup: function (gi) {
+    var body = document.getElementById('mgBody_' + gi);
+    var arrow = document.getElementById('mgArrow_' + gi);
+    if (!body) return;
+    var show = body.style.display !== 'none';
+    body.style.display = show ? 'none' : '';
+    if (arrow) arrow.textContent = show ? '▸' : '▾';
+  },
+  expandAll: function () {
+    var cats = this._groups || [];
+    cats.forEach(function (_, gi) {
+      var body = document.getElementById('mgBody_' + gi);
+      var arrow = document.getElementById('mgArrow_' + gi);
+      if (body) body.style.display = '';
+      if (arrow) arrow.textContent = '▾';
+    });
+  },
+  collapseAll: function () {
+    var cats = this._groups || [];
+    cats.forEach(function (_, gi) {
+      var body = document.getElementById('mgBody_' + gi);
+      var arrow = document.getElementById('mgArrow_' + gi);
+      if (body) body.style.display = 'none';
+      if (arrow) arrow.textContent = '▸';
+    });
   },
   create: function () {
     var self = this;
@@ -295,15 +401,16 @@ var MaterialsPage = {
             API.listChapters(p.id).then(function (chs) {
               var seq = Promise.resolve();
               var total = 0;
+              var failCount = 0;
               chs.forEach(function (ch) {
                 if (!ch.content) return;
                 seq = seq.then(function () {
                   return API.extractMaterials(p.id, ch.id, '', false).then(function (d) { total += d.count || 0; })
-                    .catch(function () {});
+                    .catch(function () { failCount++; });
                 });
               });
               seq.then(function () {
-                UI.toast('全书拆解完成：新增 ' + total + ' 条素材', 'success');
+                UI.toast('全书拆解完成：新增 ' + total + ' 条素材' + (failCount ? '，' + failCount + ' 章提取失败（请重试）' : ''), failCount ? 'warn' : 'success');
                 self.load();
               });
             }).catch(function (e) { UI.toast('加载章节失败: ' + e.message, 'error'); });
@@ -584,32 +691,479 @@ var StyleBankPage = {
     return this.selectedIds().indexOf(id) >= 0;
   },
   render: function (items) {
+    this._items = items || [];
+    if (this._work) { this.renderWorkDetail(this._work); return; }
+    this.renderWorks();
+  },
+  /* ---- 主界面：作品卡片网格（横向，同 AI 工具箱风格） ---- */
+  renderWorks: function () {
     var el = document.getElementById('stylebankList');
     var stats = document.getElementById('stylebankStats');
+    var items = this._items || [];
     var sel = this.selectedIds();
-    if (stats) stats.textContent = items.length + ' 段 · 已选 ' + sel.length + ' 段作参考';
+    if (stats) stats.textContent = items.length + ' 条素材 · ' + this._workCount(items) + ' 部作品 · 已选 ' + sel.length + ' 条作参考';
     if (!items.length) {
-      el.innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">📚</div><div>文风样本库为空<br><small style="color:var(--muted)">用导入工具将自购书籍片段入库，或手动添加</small></div></div>';
+      el.innerHTML = '<div class="page-empty-state"><div class="page-empty-icon">📚</div><div>文风样本库为空</div>' +
+        '<div style="margin-top:14px">' +
+        '<button class="btn btn-primary btn-sm" onclick="StyleBankPage.analyzeFile()" title="AI 通读本地书籍，提取标志性片段/角色塑造/世界观/伏笔设计">🔍 拆书解析（从本地书籍提取）</button>' +
+        '</div><div style="margin-top:10px"><small style="color:var(--muted)">也可用「＋ 手动添加」录入片段</small></div></div>';
       return;
     }
+    // 按作品分组
+    var groups = {};
+    items.forEach(function (m) {
+      var work = StyleBankPage.workOf(m);
+      (groups[work] = groups[work] || []).push(m);
+    });
+    var html = '<div class="toolbox-grid">';
+    Object.keys(groups).forEach(function (work) {
+      var list = groups[work];
+      var first = list[0];
+      var selIn = list.filter(function (m) { return sel.indexOf(m.id) >= 0; }).length;
+      html += '<div class="tool-card" onclick="StyleBankPage.openWork(\'' + encodeURIComponent(work) + '\')">' +
+        '<div class="tool-card-icon">📖</div>' +
+        '<div class="tool-card-body">' +
+        '<div class="tool-card-name">' + esc(work) + '</div>' +
+        '<div class="tool-card-desc">' +
+        (first && first.author ? esc(first.author) : '') +
+        (first && first.category ? ' · <span style="color:#8b5cf6">' + esc(first.category) + '</span>' : '') +
+        '<br>' + list.length + ' 条素材' + (selIn ? ' · <span style="color:var(--accent)">已选 ' + selIn + '</span>' : '') +
+        '</div>' +
+        '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">' +
+        '<button class="btn btn-primary btn-sm" onclick="StyleBankPage.selectBook(\'' + encodeURIComponent(work) + '\')" title="把本书全部拆书素材（人物卡/世界观/伏笔/片段）选为生成参考，agent 会全部读取">📖 选为参考书</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="StyleBankPage.deleteBook(\'' + encodeURIComponent(work) + '\')" title="删除整本书的全部拆书素材（人物卡/世界观/伏笔/片段）">🗑 删除整本</button>' +
+        '</div>' +
+        '</div></div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+  },
+  /* ---- 详情界面：某作品的样本列表（可折叠）+ 返回 ---- */
+  openWork: function (enc) {
+    this._work = decodeURIComponent(enc);
+    this.render(this._items);
+  },
+  backToWorks: function () {
+    this._work = '';
+    this.render(this._items);
+  },
+  renderWorkDetail: function (work) {
+    var el = document.getElementById('stylebankList');
+    var stats = document.getElementById('stylebankStats');
+    var items = (this._items || []).filter(function (m) { return StyleBankPage.workOf(m) === work; });
+    var sel = this.selectedIds();
+    if (stats) stats.textContent = items.length + ' 条素材 · 已选 ' + sel.length + ' 条作参考';
+    var first = items[0] || {};
     var self = this;
-    var html = items.map(function (m) {
-      var brief = m.content.replace(/\s+/g, ' ');
-      var r = Array.from(brief);
-      var preview = r.length > 120 ? r.slice(0, 120).join('') + '…' : brief;
-      var on = self.isSelected(m.id);
+    var html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
+      '<button class="btn btn-ghost btn-sm" onclick="StyleBankPage.backToWorks()">← 返回作品列表</button>' +
+      '<button class="btn btn-primary btn-sm" onclick="StyleBankPage.selectBook(\'' + encodeURIComponent(work) + '\')" title="把本书全部拆书素材（人物卡/世界观/伏笔/片段）选为生成参考，agent 会全部读取">📖 选为参考书</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="StyleBankPage.deleteBook(\'' + encodeURIComponent(work) + '\')" title="删除整本书的全部拆书素材">🗑 删除整本</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="StyleBankPage.analyzeBook()" title="AI 通读本书：提取标志性片段/角色塑造/世界观/伏笔设计">🔍 拆书解析</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="StyleBankPage.analyzeFile()" title="选择本地 txt/epub/docx 书籍文件，读取全文拆书（不受样本片段限制）">📄 从本地文件拆书</button>' +
+      '<strong style="font-size:14px">📖 ' + esc(work) + '</strong>' +
+      (first.author ? '<span style="font-size:11px;color:var(--muted)">' + esc(first.author) + '</span>' : '') +
+      (first.category ? '<span class="mat-cat" style="background:#8b5cf6">' + esc(first.category) + '</span>' : '') +
+      '<span style="font-size:11px;color:var(--muted)">' + items.length + ' 条素材</span>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--faint);margin-bottom:8px">点击样本可展开/收起；「📖 选为参考书」= 本书四类素材全部注入生成（不设数量上限）；「选作文风参考」单条注入（最多 3 段）。</div>';
+    html += items.map(function (m) {
+      var on = sel.indexOf(m.id) >= 0;
       return '<div class="mat-card" style="border-left:3px solid #8b5cf6">' +
-        '<div class="mat-head"><strong>' + esc(m.title) + '</strong>' +
-        (m.author ? '<span style="font-size:11px;color:var(--muted)"> ' + esc(m.author) + '</span>' : '') +
-        '<span class="mat-cat" style="background:#8b5cf6;margin-left:6px">' + esc(m.category || '其他') + '</span>' +
-        '<span class="mat-src">' + esc(m.source_file || '') + '</span>' +
+        '<div class="mat-head" style="cursor:pointer" onclick="StyleBankPage.toggleSample(\'' + m.id + '\')">' +
+        '<span style="font-size:11px;color:var(--muted)" id="sbArrow_' + m.id + '">▶</span>' +
+        StyleBankPage._kindBadge(m.kind) +
+        '<strong style="margin-left:6px">' + esc(m.title) + '</strong>' +
         '<span class="mat-acts">' +
-        '<button class="btn ' + (on ? 'btn-primary' : 'btn-ghost') + ' btn-sm" onclick="StyleBankPage.toggleSelect(\'' + m.id + '\')">' + (on ? '✓ 已选' : '选作文风参考') + '</button>' +
-        '<button class="btn btn-ghost btn-sm" onclick="StyleBankPage.edit(\'' + m.id + '\')">✏️</button>' +
-        '<button class="btn btn-ghost btn-sm" onclick="StyleBankPage.del(\'' + m.id + '\')">🗑</button></span></div>' +
-        '<div class="mat-content" style="font-size:12px;line-height:1.7;color:var(--muted)">' + esc(preview) + '</div></div>';
+        '<button class="btn ' + (on ? 'btn-primary' : 'btn-ghost') + ' btn-sm" onclick="event.stopPropagation();StyleBankPage.toggleSelect(\'' + m.id + '\')">' + (on ? '✓ 已选' : '选作文风参考') + '</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();StyleBankPage.edit(\'' + m.id + '\')">✏️</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();StyleBankPage.del(\'' + m.id + '\')">🗑</button>' +
+        '</span></div>' +
+        '<div class="mat-content" id="sbBody_' + m.id + '" style="display:none;font-size:12px;line-height:1.7;color:var(--muted)">' + esc(m.content) + '</div>' +
+        '</div>';
     }).join('');
     el.innerHTML = html;
+  },
+  toggleSample: function (id) {
+    var body = document.getElementById('sbBody_' + id);
+    var arrow = document.getElementById('sbArrow_' + id);
+    if (!body) return;
+    var show = body.style.display === 'none';
+    body.style.display = show ? '' : 'none';
+    if (arrow) arrow.textContent = show ? '▼' : '▶';
+  },
+  workOf: function (m) {
+    // 拆书素材 title 为「书名 · 素材名」，取书名部分归组；兼容旧格式（title 即作品名）
+    var t = (m.title || '').trim();
+    var sep = t.indexOf(' · ');
+    var base = sep > 0 ? t.slice(0, sep) : t;
+    return base.replace(/第[0-9一二三四五六七八九十百千]+章.*$/, '').trim()
+      || m.author || m.source_file || '未分组';
+  },
+  /* 拆书素材类型徽标 */
+  _kindBadge: function (k) {
+    if (k === 'character') return '<span class="mat-cat" style="background:#0ea5e9">👤 角色</span>';
+    if (k === 'world') return '<span class="mat-cat" style="background:#10b981">🌍 世界观</span>';
+    if (k === 'foreshadow') return '<span class="mat-cat" style="background:#f59e0b">🎯 伏笔</span>';
+    return '<span class="mat-cat" style="background:#8b5cf6">📄 片段</span>';
+  },
+  /* 删除整本书的拆书素材（source_file 匹配的全部样本），同时从生成参考中移除 */
+  deleteBook: function (enc) {
+    var work = decodeURIComponent(enc);
+    var items = (this._items || []).filter(function (m) { return StyleBankPage.workOf(m) === work; });
+    UI.confirm('🗑 删除整本书', '确定删除《<b>' + esc(work) + '</b>》的全部 ' + items.length + ' 条拆书素材？（人物卡/世界观/伏笔/片段会一并删除，不可恢复）', function () {
+      API.del('/api/stylesamples/source/' + encodeURIComponent(work)).then(function () {
+        // 从生成参考中移除该书已选样本
+        var ids = items.map(function (m) { return m.id; });
+        var cur = StyleBankPage.selectedIds();
+        Store.state.composer.styleSampleIds = cur.filter(function (id) { return ids.indexOf(id) < 0; });
+        Store.savePrefs();
+        UI.toast('✅ 已删除《' + work + '》全部素材', 'success');
+        if (StyleBankPage._work === work) StyleBankPage._work = '';
+        StyleBankPage.load();
+      }).catch(function (e) { UI.toast('删除失败: ' + e.message, 'error'); });
+    });
+  },
+  /* 把整本书的全部拆书素材（人物卡/世界观/伏笔/片段）选为生成参考 */
+  selectBook: function (enc) {
+    var work = decodeURIComponent(enc);
+    var ids = (this._items || []).filter(function (m) { return StyleBankPage.workOf(m) === work; }).map(function (m) { return m.id; });
+    if (!ids.length) { UI.toast('该书没有可参考的素材', 'warn'); return; }
+    var cur = this.selectedIds();
+    var added = 0;
+    ids.forEach(function (id) { if (cur.indexOf(id) < 0) { cur.push(id); added++; } });
+    if (added) {
+      Store.savePrefs();
+      UI.toast('✅ 已把《' + work + '》全部 ' + ids.length + ' 条素材选为生成参考（人物卡/世界观/伏笔/片段全部注入）', 'success', { duration: 6000 });
+    } else {
+      UI.toast('《' + work + '》的素材已全部选中', '');
+    }
+    this.render(this._items);
+  },
+  /* ---- 拆书解析：AI 通读本书 → 标志性片段/角色塑造/世界观/伏笔设计 ---- */
+  // 统一入口：打开「拆书来源」弹窗（本地文库选书 / 上传文件）
+  analyzeBook: function () { StyleBankPage.analyzeFile(); },
+  // 弹窗内选中的拆书模型（'' = helper 角色绑定默认模型）
+  _selectedAnalyzeModel: function () {
+    var el = document.getElementById('analyzeModelSel');
+    return el ? el.value : '';
+  },
+  /* 拆解当前项目：全部章节正文 → 四类素材入库（source_file=项目名） */
+  _analyzeProject: function (p) {
+    API.post('/api/library/analyze-project', { project_id: p.id, model: StyleBankPage._selectedAnalyzeModel() }).then(function (r) {
+      if (r && r.task_id) { StyleBankPage._watchAnalyzeTask(r.task_id, p.name); return; }
+      UI.toast('拆书解析未返回任务', 'warn');
+    }).catch(function (e) { UI.toast('拆书失败: ' + e.message, 'error'); });
+  },
+  analyzeFile: function () {
+    // 模型下拉：active 的 API 模型；glm-4-flash（智谱免费）默认选中；"默认"即回退 deepseek-v4-flash
+    var opts = '<option value="">默认（deepseek-v4-flash）</option>';
+    (Store.state.models || []).forEach(function (m) {
+      if (m.status !== 'active') return;
+      var free = m.name === 'glm-4-flash' ? ' ⭐免费' : '';
+      opts += '<option value="' + esc(m.name) + '"' + (m.name === 'glm-4-flash' ? ' selected' : '') + '>' +
+        esc(m.name) + (m.vendor ? ' · ' + esc(m.vendor) : '') + free + '</option>';
+    });
+    UI.modal({
+      title: '📚 拆书来源', wide: '560px',
+      body: '<div style="font-size:12px;font-weight:600;margin-bottom:4px">🤖 拆书模型（选免费模型不花钱；免费模型失败会自动回退 deepseek-v4-flash）</div>' +
+        '<select id="analyzeModelSel" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:12px;margin-bottom:12px">' + opts + '</select>' +
+        '<div style="font-size:12px;font-weight:600;margin-bottom:6px">📚 拆当前项目（把项目已有章节正文拆成 片段/角色/世界观/伏笔 素材）</div>' +
+        '<div id="projAnalyzeRow" style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);font-size:12px;margin-bottom:12px">' +
+        '<span style="flex:1">' + (Store.state.currentProject ? esc(Store.state.currentProject.name) : '未选中项目') + '</span>' +
+        '<button class="btn btn-primary btn-sm" id="projAnalyzeBtn" ' + (Store.state.currentProject ? '' : 'disabled') + '>🔍 拆书解析</button></div>' +
+        '<div style="font-size:12px;font-weight:600;margin-bottom:6px">📁 本地文库（library_dir）</div>' +
+        '<div id="libList" style="max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px;font-size:12px;background:var(--panel2)">加载中…</div>' +
+        '<div style="margin-top:10px;font-size:12px;font-weight:600;margin-bottom:4px">📄 或上传本地文件</div>' +
+        '<button class="btn btn-ghost btn-sm" id="libUploadBtn">选择 txt/epub/docx 文件…</button>',
+      actions: [{ id: 'ok', label: '关闭', cls: 'btn-primary' }]
+    });
+    // 上传按钮：事件绑定（不内联 onclick）
+    var up = document.getElementById('libUploadBtn');
+    if (up) up.addEventListener('click', function () { StyleBankPage._pickUpload(); });
+    // 拆当前项目按钮
+    var pab = document.getElementById('projAnalyzeBtn');
+    if (pab) pab.addEventListener('click', function () {
+      var p = Store.state.currentProject;
+      if (!p) { UI.toast('请先选中一个项目', 'warn'); return; }
+      document.querySelectorAll('.modal-overlay').forEach(function (o) { o.remove(); });
+      StyleBankPage._analyzeProject(p);
+    });
+    // 加载文库列表（事件委托，避免内联 onclick 的中文/引号问题）
+    API.get('/api/library').then(function (d) {
+      var el = document.getElementById('libList');
+      if (!el) return;
+      var items = (d && d.items) || [];
+      if (!items.length) {
+        el.innerHTML = '<div style="padding:8px;color:var(--muted)">' + esc((d && d.message) || '文库为空或未配置 library_dir') + '</div>';
+        return;
+      }
+      var html = '';
+      items.forEach(function (b) {
+        var mb = (b.size / 1024 / 1024).toFixed(1);
+        html += '<div class="lib-row" style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-bottom:1px solid var(--border);cursor:pointer">' +
+          '<span>📖</span><span style="flex:1;word-break:break-all">' + esc(b.name) + '</span>' +
+          '<span style="font-size:10.5px;color:var(--muted)">' + mb + 'MB</span>' +
+          '<button class="btn btn-primary btn-sm">拆书</button></div>';
+      });
+      el.innerHTML = html;
+      // 事件委托：行内先存真实文件名（dataset 无转义问题），点击行 → 拆书
+      el.querySelectorAll('.lib-row').forEach(function (row, i) {
+        row.dataset.name = items[i] ? items[i].name : '';
+      });
+      el.querySelectorAll('.lib-row').forEach(function (row) {
+        row.addEventListener('click', function () {
+          if (!row.dataset.name) return;
+          StyleBankPage.analyzeFromLibrary(row.dataset.name);
+        });
+      });
+    }).catch(function (e) {
+      var el = document.getElementById('libList');
+      if (el) el.innerHTML = '<div style="padding:8px;color:var(--error)">加载文库失败: ' + esc(e.message) + '</div>';
+    });
+  },
+  analyzeFromLibrary: function (name) {
+    var title = name.replace(/\.[^.]+$/, '');
+    API.post('/api/library/analyze', { file: name, model: StyleBankPage._selectedAnalyzeModel() }).then(function (r) {
+      if (r && r.task_id) { StyleBankPage._watchAnalyzeTask(r.task_id, title); return; }
+      // 兜底（非任务模式响应）：直接展示
+      var text = (r && (r.result || r.text)) || '';
+      if (!text) { UI.toast('拆书解析未返回内容，请重试', 'warn'); return; }
+      StyleBankPage._showAnalyze(text, title);
+    }).catch(function (e) { UI.toast('拆书失败: ' + e.message, 'error'); });
+  },
+  _pickUpload: function () {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.txt,.md,.epub,.docx,.html,.htm';
+    input.onchange = function () {
+      var f = input.files[0];
+      if (!f) return;
+      var fd = new FormData();
+      fd.append('file', f);
+      fd.append('model', StyleBankPage._selectedAnalyzeModel());
+      UI.toast('已开始解析文件，弹出进度窗口…', '');
+      API.post('/api/tools/analyze-file', fd).then(function (r) {
+        var title = (f.name || '').replace(/\.[^.]+$/, '');
+        if (r && r.task_id) { StyleBankPage._watchAnalyzeTask(r.task_id, title); return; }
+        var text = (r && (r.result || r.text)) || '';
+        if (!text) { UI.toast('拆书解析未返回内容，请重试', 'warn'); return; }
+        StyleBankPage._showAnalyze(text, title);
+      }).catch(function (e) { UI.toast('拆书失败: ' + e.message, 'error'); });
+    };
+    input.click();
+  },
+  /* 拆书进度弹窗：轮询任务状态，AI 通读阶段显示流动进度条 + 已等待计时 */
+  _watchAnalyzeTask: function (taskId, title) {
+    var pid = 'ab_' + uid();
+    var setStage = function (stage, pct, flowing) {
+      var el = document.getElementById(pid + '_stage');
+      var bar = document.getElementById(pid + '_bar');
+      var pctEl = document.getElementById(pid + '_pct');
+      if (el) el.textContent = stage;
+      if (bar) {
+        bar.style.width = Math.max(2, pct || 0) + '%';
+        if (flowing) bar.classList.add('v2-progress-flow');
+        else bar.classList.remove('v2-progress-flow');
+      }
+      if (pctEl) pctEl.textContent = (pct || 0) + '%';
+    };
+    var closeAll = function () {
+      document.querySelectorAll('#modalRoot .modal-overlay').forEach(function (o) { o.remove(); });
+    };
+    UI.modal({
+      title: '🔍 拆书进行中 · ' + esc(title),
+      sub: 'AI 正在通读全书（全文，不截断），请耐心等待',
+      noOverlayClose: true,
+      body: '<div style="padding:4px 0 12px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<span id="' + pid + '_stage" style="font-size:13px;color:var(--text2)">准备中…</span>' +
+        '<span id="' + pid + '_pct" style="font-size:12px;font-weight:700;color:var(--accent);font-family:monospace">0%</span></div>' +
+        '<div style="height:8px;background:var(--panel3);border-radius:4px;overflow:hidden"><div id="' + pid + '_bar" style="height:100%;width:2%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width .3s ease; /* impeccable-disable-line layout-transition: 进度条状态动画 */"></div></div>' +
+        '<div id="' + pid + '_wait" style="font-size:11px;color:var(--muted);margin-top:8px">已等待 0:00</div>' +
+        '<div id="' + pid + '_blocks" style="font-size:11px;color:var(--faint);margin-top:2px"></div>' +
+        '</div>',
+      actions: []
+    });
+    var startT = Date.now();
+    var waitTimer = setInterval(function () {
+      var el = document.getElementById(pid + '_wait');
+      if (el) {
+        var s = Math.floor((Date.now() - startT) / 1000);
+        el.textContent = '已等待 ' + Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+      }
+    }, 1000);
+    var stopped = false;
+    var poll = function () {
+      if (stopped) return;
+      API.get('/api/library/analyze/task/' + taskId).then(function (t) {
+        if (!t) { setTimeout(poll, 1000); return; }
+        if (t.done) {
+          stopped = true;
+          clearInterval(waitTimer);
+          closeAll();
+          if (t.ok && t.result) {
+            UI.toast('✅ 拆书完成' + (t.model ? '（模型: ' + t.model + '）' : '') + ((t.saved || 0) > 0 ? '，已自动保存 ' + t.saved + ' 条素材到样本库' : ''), 'success', { duration: 6000 });
+            try {
+              StyleBankPage._showAnalyze(t.result, title, (t.saved || 0) > 0);
+            } catch (e) {
+              UI.toast('结果展示异常: ' + e.message, 'error');
+            }
+          } else {
+            UI.toast('拆书失败', 'error');
+            UI.modal({
+              title: '❌ 拆书失败 · ' + esc(title),
+              body: '<div style="font-size:12px;white-space:pre-wrap;line-height:1.7;background:var(--panel);border-radius:6px;padding:10px">' +
+                esc(t.error || '未知错误') + '</div>' +
+                '<div style="margin-top:12px;font-size:11.5px;color:var(--muted)">常见原因与处理：<br>' +
+                '· 免费模型限流（429）：等 1-2 分钟重试，或换用「默认（deepseek-v4-flash）」<br>' +
+                '· 模型服务繁忙（503）：稍后重试即可<br>' +
+                '· 已自动重试 3 次仍失败，说明模型暂不可用</div>',
+              actions: [{ id: 'ok', label: '知道了', cls: 'btn-primary' }]
+            });
+          }
+          return;
+        }
+        var flowing = /通读|分析|提炼|整理/.test(t.stage || '');
+        setStage(t.stage || '进行中…', t.percent || 0, flowing);
+        var bEl = document.getElementById(pid + '_blocks');
+        if (bEl && t.blocks) bEl.textContent = '全书 ' + (t.chars || '?') + ' 字 · 分 ' + t.blocks + ' 块通读';
+        setTimeout(poll, 1000);
+      }).catch(function (e) {
+        // 任务丢失（服务重启/清理）则停止；网络抖动继续重试
+        if (e && e.message && /不存在|404/.test(e.message)) {
+          stopped = true;
+          clearInterval(waitTimer);
+          closeAll();
+          UI.toast('拆书任务已失效，请重新发起', 'error');
+          return;
+        }
+        setTimeout(poll, 2000);
+      });
+    };
+    poll();
+  },
+  _showAnalyze: function (text, work, autoSaved) {
+    // 记录当前拆书的作品名（保存片段时作为书名归属；拆书从主界面触发时 _work 为空，必须用这里传入的书名）
+    StyleBankPage._analyzeWork = work || '';
+    // 后端已在任务完成时自动保存四类素材；autoSaved=true 时手动保存按钮提示已入库，防重复
+    StyleBankPage._analyzeAutoSaved = !!autoSaved;
+    var sec = function (key) {
+      var m = text.match(new RegExp('【' + key + '】([\\s\\S]*?)(?=【|$)', 'm'));
+      return (m ? m[1] : '').trim();
+    };
+    var frag = sec('标志性片段');
+    var chars = sec('主要角色');
+    var world = sec('世界观');
+    var foreshadow = sec('伏笔设计');
+    var html = '<div style="max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-right:4px">';
+    // 顶部引导：拆书结果不会自动入库，需保存（一键或逐条）
+    html += '<div style="font-size:11.5px;color:var(--muted);background:var(--panel);border-radius:6px;padding:8px 10px">💡 拆书结果不会自动保存到样本库——点弹窗底部「💾 一键保存全部」一键入库，或每条片段右下角按钮逐条保存。</div>';
+    // 标志性片段（可保存）
+    html += '<div><div class="ghead">🏆 标志性片段（覆盖不同场景类型，可保存为文风样本）</div>';
+    if (frag) {
+      var blocks = frag.split(/\n(?=\d+\.)/).filter(function (s) { return s.trim().length > 0; });
+      if (blocks.length) {
+        html += '<div style="display:flex;flex-direction:column;gap:8px">';
+        blocks.forEach(function (b, i) {
+          var title = (b.match(/^[\d]+\.\s*(.+)$/m) || [])[1] || ('片段 ' + (i + 1));
+          var body = b.replace(/^[\d]+\.\s*.+\n/, '').trim();
+          html += '<div style="border:1px solid var(--border2);border-radius:8px;padding:8px;background:var(--panel2)">' +
+            '<div style="font-weight:600;font-size:12.5px;margin-bottom:4px">' + esc(title) + '</div>' +
+            '<div style="font-size:11.5px;white-space:pre-wrap;line-height:1.6;background:var(--panel);border-radius:6px;padding:8px;max-height:180px;overflow-y:auto">' + esc(body) + '</div>' +
+            '<div style="margin-top:6px"><button class="btn btn-primary btn-sm" onclick="StyleBankPage.saveAnalyzedFragment(' + i + ')">💾 保存为文风样本</button></div>' +
+            '</div>';
+        });
+        StyleBankPage._analyzeFrags = blocks;
+        html += '</div>';
+      } else {
+        html += '<div style="font-size:11.5px;color:var(--muted)">' + esc(frag) + '</div>';
+      }
+    }
+    html += '</div>';
+    // 角色/世界观/伏笔
+    var renderSec = function (label, icon, content) {
+      if (!content) return '';
+      return '<div><div class="ghead">' + icon + ' ' + label + '</div>' +
+        '<div style="font-size:12px;line-height:1.7;white-space:pre-wrap;background:var(--panel);border-radius:6px;padding:8px">' + esc(content) + '</div></div>';
+    };
+    html += renderSec('主要角色·塑造手法', '👤', chars);
+    html += renderSec('世界观·构建手法', '🌍', world);
+    html += renderSec('伏笔设计', '🎯', foreshadow);
+    html += '</div>';
+    UI.modal({
+      title: '📖 拆书解析 · ' + esc(work),
+      wide: '720px',
+      body: html,
+      actions: [
+        { id: 'saveAll', label: '💾 一键保存全部' + ((StyleBankPage._analyzeFrags || []).length ? ' ' + StyleBankPage._analyzeFrags.length + ' 段' : '') + '为文风样本', cls: 'btn-primary', onClick: function () { StyleBankPage.saveAllAnalyzedFragments(); } },
+        { id: 'ok', label: '关闭', cls: 'btn-ghost' }
+      ]
+    });
+  },
+  saveAnalyzedFragment: function (idx) {
+    if (StyleBankPage._analyzeAutoSaved) { UI.toast('✅ 片段已自动保存入库，无需重复保存', 'success'); return; }
+    var b = (StyleBankPage._analyzeFrags || [])[idx];
+    if (!b) { UI.toast('片段不存在', 'warn'); return; }
+    var title = (b.match(/^[\d]+\.\s*(.+)$/m) || [])[1] || ('片段 ' + (idx + 1));
+    var body = b.replace(/^[\d]+\.\s*.+\n/, '').trim();
+    // 正文取【片段正文】之后的内容，去掉【来源】【风格要点】等标签行（兼容标签行前有缩进）
+    var m = body.match(/片段正文[：:]\s*([\s\S]*?)(?=\n\s*风格要点|$)/);
+    if (m && m[1].trim()) body = m[1].trim();
+    if (!body) { UI.toast('没有可保存的正文', 'warn'); return; }
+    var p = Store.state.currentProject;
+    var work = StyleBankPage._analyzeWork || StyleBankPage._work || '';
+    var first = (StyleBankPage._items || []).find(function (s) { return StyleBankPage.workOf(s) === work; });
+    UI.confirm('保存这段为文风样本', '保存：<b>' + esc(work) + ' · ' + esc(title) + '</b>', async function () {
+      try {
+        await API.createStyleSample({
+          title: (work ? work + ' · ' : '') + title,
+          author: first && first.author ? first.author : '',
+          category: first && first.category ? first.category : '其他',
+          content: body,
+          source_file: first && first.source_file ? first.source_file : 'book_analyze'
+        });
+        UI.toast('✅ 已保存为文风样本', 'success');
+        StyleBankPage.load(); // 刷新列表，新样本立即可见
+      } catch (e) { UI.toast('保存失败: ' + e.message, 'error'); }
+    });
+  },
+  /* 一键保存拆书解析出的全部标志性片段为文风样本 */
+  saveAllAnalyzedFragments: function () {
+    if (StyleBankPage._analyzeAutoSaved) { UI.toast('✅ 片段已自动保存入库，无需重复保存', 'success'); return; }
+    var blocks = StyleBankPage._analyzeFrags || [];
+    if (!blocks.length) { UI.toast('没有可保存的片段', 'warn'); return; }
+    var work = StyleBankPage._analyzeWork || StyleBankPage._work || '';
+    var first = (StyleBankPage._items || []).find(function (s) { return StyleBankPage.workOf(s) === work; });
+    UI.confirm('💾 一键保存', '将全部 <b>' + blocks.length + '</b> 段保存为文风样本（作品：<b>' + esc(work || '未分组') + '</b>）', async function () {
+      var okN = 0, failN = 0;
+      for (var i = 0; i < blocks.length; i++) {
+        var b = blocks[i];
+        var title = (b.match(/^[\d]+\.\s*(.+)$/m) || [])[1] || ('片段 ' + (i + 1));
+        var body = b.replace(/^[\d]+\.\s*.+\n/, '').trim();
+        var m = body.match(/片段正文[：:]\s*([\s\S]*?)(?=\n\s*风格要点|$)/);
+        if (m && m[1].trim()) body = m[1].trim();
+        if (!body) { failN++; continue; }
+        try {
+          await API.createStyleSample({
+            title: (work ? work + ' · ' : '') + title,
+            author: first && first.author ? first.author : '',
+            category: first && first.category ? first.category : '其他',
+            content: body,
+            source_file: first && first.source_file ? first.source_file : 'book_analyze'
+          });
+          okN++;
+        } catch (e) { failN++; }
+      }
+      if (okN) UI.toast('✅ 已保存 ' + okN + ' 段为文风样本' + (failN ? '，失败 ' + failN + ' 段' : ''), 'success');
+      else UI.toast('保存失败 ' + failN + ' 段，请重试', 'error');
+      StyleBankPage.load();
+    });
+  },
+  _workCount: function (items) {
+    var s = {};
+    items.forEach(function (m) { s[StyleBankPage.workOf(m)] = 1; });
+    return Object.keys(s).length;
   },
   toggleSelect: function (id) {
     var ids = this.selectedIds();

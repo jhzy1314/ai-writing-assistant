@@ -24,6 +24,9 @@ type ModelAdapter interface {
 type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
+	// CacheHitTokens 前缀缓存命中 token（DeepSeek 等返回 prompt_cache_hit_tokens）；
+	// 命中越多成本越低（官方命中/未命中差价可达百倍），用于统计各角色缓存命中率
+	CacheHitTokens int `json:"cache_hit_tokens"`
 }
 
 // Total 返回总 token

@@ -99,6 +99,7 @@ func main() {
 		{Version: 2, Name: "timeline表", SQL: "SELECT 1"},
 		{Version: 3, Name: "chapters扩展(tags/synopsis)", SQL: "SELECT 1"},
 		{Version: 4, Name: "chapters软删除(is_deleted/deleted_at)", SQL: "SELECT 1"},
+		{Version: 5, Name: "style_samples扩展拆书素材类型(kind)", SQL: "ALTER TABLE style_samples ADD COLUMN kind TEXT NOT NULL DEFAULT 'fragment'"},
 	}); err != nil {
 		log.Printf("警告: 数据库迁移失败: %v", err)
 	}
@@ -165,6 +166,7 @@ registry := llm.NewRegistry(store)
 	// （历史实现尝试以嵌套相对路径启动自身，导致每次启动报误导性 exec 错误）
 
 	server := api.NewServer(store, registry, dispatcher, limiter, appSvc)
+	server.SetLibraryDir(cfg.Server.LibraryDir)
 
 	go func() {
 		time.Sleep(3 * time.Second)

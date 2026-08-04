@@ -137,3 +137,19 @@ func (s *Server) HandleDeleteStyleSample(w http.ResponseWriter, r *http.Request)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// HandleDeleteStyleSamplesBySource DELETE /api/stylesamples/source/{source}
+// 删除整本书（source_file 匹配）的全部拆书素材，返回删除条数
+func (s *Server) HandleDeleteStyleSamplesBySource(w http.ResponseWriter, r *http.Request) {
+	src := chi.URLParam(r, "source")
+	if strings.TrimSpace(src) == "" {
+		writeError(w, http.StatusBadRequest, "缺少 source 参数")
+		return
+	}
+	n, err := s.store.DeleteStyleSamplesBySource(r.Context(), src)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeOK(w, map[string]interface{}{"deleted": n})
+}

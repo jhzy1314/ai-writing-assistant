@@ -16,6 +16,7 @@ type precheckRequest struct {
 	WorldSetting     string `json:"world_setting"`
 	CharacterSetting string `json:"character_setting"`
 	HistoryContent   string `json:"history_content"`
+	ProjectID        string `json:"project_id"` // 可选：有项目时按项目历史章节字数统计预估（更贴合作者习惯，稳定不随机）
 }
 
 // PrecheckResult 需求-字数预检返回体
@@ -43,6 +44,57 @@ func (s *Server) HandlePrecheck(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(req.UserDemand) == "" {
 		writeError(w, http.StatusBadRequest, "user_demand 不能为空")
 		return
+	}
+
+	// 项目历史字数统计预估（优先，不调 LLM）：读本项目已有章节的实际字数习惯，稳定且贴合作者
+	if req.ProjectID != "" {
+		if chs, err := s.store.ListChapters(r.Context(), req.ProjectID, ""); err == nil && len(chs) >= 3 {
+			var sizes []int
+			for _, c := range chs {
+				if c.WordCount > 0 {
+					sizes = append(sizes, c.WordCount)
+				}
+			}
+			if len(sizes) >= 3 {
+				recent := sizes
+				if len(recent) > 5 {
+					recent = sizes[len(sizes)-5:]
+				}
+				sum := 0
+				for _, n := range recent {
+					sum += n
+				}
+				avg := sum / len(recent)
+				// 单一推荐值：近5章平均 × 需求系数（稳定、有依据、不甩大区间）
+				lo := int(float64(avg)/100) * 100
+				if lo < 100 {
+					lo = 100
+				}
+				// 需求/大纲内容量修正：用户目标与需求规模不应被历史平均框死
+				demand := req.UserDemand + "\n" + req.HistoryContent
+				factor := 1.0
+				if strings.Contains(demand, "大战") || strings.Contains(demand, "对决") || strings.Contains(demand, "高潮") ||
+					strings.Contains(demand, "大场面") || strings.Contains(demand, "决战") || strings.Contains(demand, "转折") ||
+					strings.Contains(demand, "冲突") || strings.Contains(demand, "比赛") || strings.Contains(demand, "冒险") {
+					factor = 1.4 // 大场面/多事件章节：推荐值上浮
+				} else if strings.Contains(demand, "日常") || strings.Contains(demand, "过渡") || strings.Contains(demand, "平淡") {
+					factor = 0.8 // 日常过渡：推荐值下调
+				}
+				rec := int(float64(avg)*factor/100) * 100
+				if rec < 100 {
+					rec = 100
+				}
+				writeOK(w, PrecheckResult{
+					Analysis:       fmt.Sprintf("本项目 %d 章平均 %d 字/章（近 %d 章），按本章需求调整后推荐", len(sizes), avg, len(recent)),
+					SceneCount:     len(recent),
+					RecommendedMin: rec,
+					RecommendedMax: rec,
+					Mismatch:       false,
+					Model:          "project-stats+demand",
+				})
+				return
+			}
+		}
 	}
 
 	// 轻量校验：输入小于 30 字不触发预检（避免浪费 token）
@@ -108,10 +160,30 @@ func buildPrecheckPrompt(req precheckRequest) string {
 	}
 	b.WriteString(fmt.Sprintf("【设定目标字数】%d 字\n\n", req.TargetWord))
 	b.WriteString("请按以下格式逐行输出（纯文本，不要多余说明）：\n")
-	b.WriteString("场景数量：<数字>\n登场人物：<数字>\n推荐下限字数：<数字>\n推荐上限字数：<数字>\n匹配判断：合理/需求偏高需增加字数/需求偏低可缩减字数\n简短建议：<一句话>\n")
+	b.WriteString("场景数量：<数字>\n登场人物：<数字>\n推荐下限字数：<数字>\n推荐上限字数：<数字>\n匹配判断：合理/需求偏高需增加字数/需求偏低可缩减字数\n简短建议：<一句话>\n\n")
+	b.WriteString("【字数估算方法（必须按下述规则计算，不要自由发挥，同一需求每次结果必须一致）】\n")
+	b.WriteString("1. 先数需求与创作框架中明确列出的场景/事件节点个数 = 场景数量（重复的节点不重复计数）；\n")
+	b.WriteString("2. 基准字数：日常过渡场景 200-300 字/个；对话场景 300-400 字/个；冲突/高潮场景 500-700 字/个；\n")
+	b.WriteString("3. 推荐下限 = 各场景下限之和；推荐上限 = 各场景上限之和（按上述基准估算）；\n")
+	b.WriteString("4. 若需求没有明确场景（只是一句话），则推荐下限 = 目标字数的 60%，推荐上限 = 目标字数的 120%（取整到百位）；\n")
+	b.WriteString("5. 登场人物 = 需求与前文中明确提及且会出场的人物个数。\n")
 	return b.String()
 }
 
+
+// mismatchTypeOf 根据目标字数与推荐区间判断不匹配类型
+func mismatchTypeOf(target, lo, hi int) string {
+	if target <= 0 {
+		return ""
+	}
+	if target < lo {
+		return "too_low"
+	}
+	if target > hi {
+		return "too_high"
+	}
+	return ""
+}
 func parsePrecheck(text string, targetWord int) PrecheckResult {
 	r := PrecheckResult{Analysis: text}
 	// 解析结构化字段

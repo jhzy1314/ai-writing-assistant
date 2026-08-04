@@ -41,6 +41,8 @@ type GenerateRequest struct {
 	ChapterID         string  `json:"chapter_id"`
 	UserDemand        string  `json:"user_demand"`
 	SelectedText      string  `json:"selected_text"`
+	Outline           string  `json:"outline"`           // 用户手填的章节/全书大纲
+	RewriteOutline    bool    `json:"rewrite_outline"`   // 用户大纲是否让规划师完善（true=规划师读大纲补充细节；false=完全按用户大纲直接写）
 	WorldSetting      string  `json:"world_setting"`
 	CharacterSetting  string  `json:"character_setting"`
 	HistoryContent    string  `json:"history_content"`
@@ -129,6 +131,7 @@ type ProgressEvent struct {
 	WordCount  int       `json:"word_count,omitempty"`  // 终稿字数（done 时）
 	Tokens     int       `json:"tokens,omitempty"`      // 预估/实际 token
 	Degraded  bool      `json:"degraded,omitempty"`   // 是否发生降级
+	DurationMs int64     `json:"duration_ms,omitempty"` // 本 agent 调用耗时（毫秒），stage/done 事件携带
 	Reset       bool                `json:"reset,omitempty"`        // true=清空已渲染文本（微调重写前）
 	OutlineWords *OutlineWordEstimate `json:"outline_words,omitempty"` // 大纲字数校验结果
 }

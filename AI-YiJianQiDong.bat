@@ -45,6 +45,24 @@ if not errorlevel 1 (
 )
 echo   [OK] Port 8081 available
 
+:: --- Auto rebuild: keep server.exe in sync with source code ---
+:: (dev folder with source + Go toolchain => always build the latest version
+::  before starting; released zip without source => skip and use bundled exe)
+if exist "cmd\server\main.go" (
+    where go >nul 2>&1
+    if not errorlevel 1 (
+        echo   [OK] Source + Go toolchain detected, rebuilding latest...
+        call go build -o server.exe ./cmd/server
+        if errorlevel 1 (
+            echo   [!] Build failed, will start existing server.exe
+        ) else (
+            echo   [OK] Build finished, server.exe is up to date
+        )
+    ) else (
+        echo   [!] Go not found, starting existing server.exe (may be outdated)
+    )
+)
+
 :: ================================================================
 ::  Step 1: Check / Setup API Key
 :: ================================================================

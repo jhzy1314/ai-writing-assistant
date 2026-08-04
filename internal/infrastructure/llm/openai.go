@@ -171,10 +171,17 @@ func (a *OpenAICompatibleAdapter) Stream(ctx context.Context, systemPrompt, user
 			if msg.Content != "" {
 				out <- StreamChunk{Text: msg.Content}
 			}
-			// 部分模型在末尾分片携带 usage
+			// 部分模型在末尾分片携带 usage。
+			// 注：缓存命中依赖 SDK 解析 OpenAI 标准 prompt_tokens_details.cached_tokens；
+			// DeepSeek 实测返回该兼容字段，若换用仅返回顶层 prompt_cache_hit_tokens 的模型，
+			// 此字段将为 0（落入 ExtraFields 不解析），统计需另行适配。
 			if msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
 				u := msg.ResponseMeta.Usage
-				out <- StreamChunk{Usage: &Usage{PromptTokens: u.PromptTokens, CompletionTokens: u.CompletionTokens}}
+				out <- StreamChunk{Usage: &Usage{
+					PromptTokens:     u.PromptTokens,
+					CompletionTokens: u.CompletionTokens,
+					CacheHitTokens:   u.PromptTokenDetails.CachedTokens,
+				}}
 			}
 		}
 	}()
@@ -192,7 +199,7 @@ func extractUsage(resp *schema.Message, systemPrompt, userPrompt, output string)
 		if ct == 0 {
 			ct = EstimateTokens(output)
 		}
-		return Usage{PromptTokens: pt, CompletionTokens: ct}
+		return Usage{PromptTokens: pt, CompletionTokens: ct, CacheHitTokens: u.PromptTokenDetails.CachedTokens}
 	}
 	return Usage{
 		PromptTokens:     EstimateTokens(systemPrompt + userPrompt),

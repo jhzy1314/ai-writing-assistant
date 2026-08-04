@@ -1,0 +1,6 @@
+- Icon: document with pencil (purple/gray paper, orange pencil)
+- Text: “开始创作...” (Chinese: “Start creating...”)
+- Background: pale beige with faint vertical lines (notebook paper style)
+- No code, errors, stack traces, or UI elements beyond the icon and text.
+
+[Model: qwen3-vl-flash | Tokens: in=1461 out=66]

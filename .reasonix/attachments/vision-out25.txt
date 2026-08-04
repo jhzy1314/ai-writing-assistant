@@ -1,0 +1,6 @@
+- UI element: “章节大纲” (red icon, left)
+- Text content: “句、白描、动作先行、心理克制。“林云耳尖泛红”这类微表情只写现象，不写揣测。如果Worker在写作中再次出现解释性排比，视为文风偏离。”
+- Right side: “2200 字” (gray box, numeric counter), “预估” (button with robot icon)
+- Color: Red used for “章节大纲” icon; gray for counter and button.
+
+[Model: qwen3-vl-flash | Tokens: in=241 out=114]

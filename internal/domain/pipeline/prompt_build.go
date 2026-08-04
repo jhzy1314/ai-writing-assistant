@@ -32,17 +32,19 @@ func buildThinkerUserPrompt(req GenerateRequest, bundle ContextBundle, pl Pipeli
 	b.WriteString("【用户创作需求】\n")
 	b.WriteString(req.UserDemand)
 	b.WriteString("\n\n")
-	// 人设保持约束：规划剧情时人物行为必须基于人物卡设定
-	if strings.TrimSpace(bundle.CharacterSetting) != "" {
-		b.WriteString("【人设铁律】上方【人物卡】是角色设定基准。规划剧情/动机/对话时，所有角色的行为必须符合其人物卡设定（性格、背景、关系、说话方式）。人物可随剧情合理成长，但成长线要有铺垫。\n\n")
+	// 用户手填大纲：规划师必须忠实保留用户全部要点，仅在其基础上补充细节与结构（不得另起炉灶）
+	if strings.TrimSpace(req.Outline) != "" {
+		b.WriteString("【用户已提供的大纲（最高优先级，必须忠实保留）】\n")
+		b.WriteString("以下是用户亲手填写的大纲。你必须：\n")
+		b.WriteString("1. 完整保留用户大纲中的全部要点、剧情节点、人物与场景安排，不得删改、不得偏离；\n")
+		b.WriteString("2. 仅在其基础上补充可执行的细节：每个节点的场景描写要点、角色行为动机、对话节奏、伏笔埋设；\n")
+		b.WriteString("3. 若补充内容与用户大纲冲突，一律以用户大纲为准；\n")
+		b.WriteString("4. 输出为可直接指导创作的框架，用户大纲的节点必须全部出现在框架中。\n\n")
+		b.WriteString("【用户大纲】\n")
+		b.WriteString(req.Outline)
+		b.WriteString("\n\n")
 	}
-	// 世界观+大纲约束：规划剧情时世界规则与既有大纲是基准，演化需自洽
-	if strings.TrimSpace(bundle.WorldSetting) != "" {
-		b.WriteString("【世界观铁律】上方【世界观设定】是世界规则基准。规划剧情时不得违背世界规则/力量体系/势力格局；如需演化（新势力、规则变化），要在剧情中给出合理契机与铺垫。\n\n")
-	}
-	if strings.TrimSpace(req.UserDemand) != "" {
-		b.WriteString("【大纲约束】用户的需求/大纲见上方【用户创作需求】。规划创作框架时应遵循其主线方向，可细化补充但不得推翻骨架与结局方向。\n\n")
-	}
+	// 人设/世界观/大纲约束已上移至 ThinkerPrompt 系统提示词（固定前缀，命中提供商缓存）
 	if req.SelectedText != "" {
 		b.WriteString("【编辑器选中文字】\n")
 		b.WriteString(req.SelectedText)
@@ -60,6 +62,11 @@ func buildThinkerUserPrompt(req GenerateRequest, bundle ContextBundle, pl Pipeli
 		b.WriteString("【字数预估要求】请在每个剧情节点后以「预估字数：XXX字」标注该节点建议的字数范围。\n")
 		b.WriteString("在框架末尾以「全文建议字数汇总：XXX字」汇总所有节点建议字数的总和。\n")
 	}
+	// 剧情一致性硬性要求：规划师必须吃透前文，禁止重复/冲突
+	b.WriteString("【剧情一致性硬性要求】\n")
+	b.WriteString("1. 上方【历史前文】已交代过的人物关系、身份、事件、信息（谁认识谁、谁是什么关系、发生过什么），一律视为已知事实，严禁在框架中重复介绍、再次揭示或装作不知道；\n")
+	b.WriteString("2. 每个剧情节点先对照【历史前文】检查：是否与已发生的事实冲突？是否重复已交代的信息？发现冲突或重复必须规避或修正；\n")
+	b.WriteString("3. 本章的人物出场、事件推进必须建立在【历史前文】的既有进度之上，不得回退、重置或重新引入已解决的设定。\n\n")
 	// 流水线差异化要求
 	switch pl {
 	case PipelineStrict:
@@ -119,13 +126,38 @@ func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline st
 	} else if req.TargetWord > 0 {
 		b.WriteString(fmt.Sprintf("【字数要求】约 %d 字，完成后需经审稿校验，请尽量接近目标。\n\n", req.TargetWord))
 	}
+	b.WriteString("【叙事原则（硬性，对照本章逐条自检——标准是像本项目前文那样把一件事写透）】\n\n")
+
+	b.WriteString("1. 过程优先：每个场景必须展开成过程而不是结果——写人物怎么经历（动作、等待、身体感受、心理活动、视角移动），禁止事件列举、禁止快剪式跳接；本章宁可少写一件事，也要把写的那件事写到前文（如第12章社团文化节）那样的密度\n")
+
+	b.WriteString("2. 时间要有流动感：事件之间要让读者感到时间在流逝（过渡、天气、身体状态、天色），禁止三个孤立片段生硬拼接；时间必须承担叙事功能，读者要能复述本章先后顺序\n")
+
+	b.WriteString("3. 纸上/隔空对话要密集推进：多轮来回（写一句、推过去、等她回、再推过来），写每句之间的等待与紧张；禁止两三句就收\n")
+
+	b.WriteString("4. 限知视角：只用当前视角人物（惊鸿）能知道的信息——他不知道的事（如某人物某物品放在哪、家里发生了什么）不能写；禁止作者跳出来用全知补信息\n")
+
+	b.WriteString("5. 人物不可全知：对话要试探、不确定、小心（她看到了他，但不确认他是否看到自己、不确定他为何不过来）；禁止角色洞悉一切（知道他躲在哪根柱子、站了多久）\n")
+
+	b.WriteString("6. 新人物出场必须有交集：与主角产生直接互动（说话/对视/回应），禁止存在-看一眼-消失的路过式出场\n")
+
+	b.WriteString("7. 结尾收一条线：一章收一条线即可，禁止多条线叠着收尾；重要动作（如署名）必须前文有铺垫\n")
+
+	b.WriteString("8. 去掉作者解释：不写“不用递，两个人同桌”这类解释句，让动作和场景自己说话。\n\n")
+
+	b.WriteString("【上下文使用要求（硬性，逐条自检）】\n")
+
+	b.WriteString("1. 【参考素材】中的素材库融合内容：必须主动借鉴其中的表达方式、句式节奏、细节描写手法来消除AI腔，自然地融入本段文字，禁止忽略它们\n")
+
+	b.WriteString("2. 【历史前文】中的【未回收伏笔提醒】：本段若情节可自然承接，必须推进或回收其中至少一个伏笔（或为后续埋下新线索），禁止无视伏笔\n")
+
+	b.WriteString("3. 【RAG相关记忆】与人物卡/世界观设定：凡与本段相关者必须遵守并体现，不得与已建立设定冲突。\n\n")
+
 	b.WriteString("【输出要求】直接输出正文本身：不要任何开场白、标题、思考过程、解释或多余说明，从故事正文第一句开始写。\n")
 	writeWebRef(&b, req)
 	b.WriteString("请撰写正文：")
 	return b.String()
 }
 
-// buildReviseUserPrompt 构造微调（校验后回传）的用户提示词
 func buildReviseUserPrompt(req GenerateRequest, bundle ContextBundle, review, currentText string) string {
 	var b strings.Builder
 	if bundle.HasContext() {
@@ -150,7 +182,6 @@ func buildReviseUserPrompt(req GenerateRequest, bundle ContextBundle, review, cu
 	return b.String()
 }
 
-// buildVerifierUserPrompt 构造校验官的用户提示词
 func buildVerifierUserPrompt(req GenerateRequest, bundle ContextBundle, content string, pl PipelineName, outline string) string {
 	var b strings.Builder
 	if bundle.HasContext() {
@@ -169,6 +200,10 @@ func buildVerifierUserPrompt(req GenerateRequest, bundle ContextBundle, content 
 	// 文艺模式跳过：该模式不干涉文学表达与叙事节奏
 	if pl != PipelineArt && (strings.TrimSpace(bundle.MaterialText) != "" || strings.TrimSpace(bundle.HistoryContent) != "") {
 		b.WriteString("【文风审查】对照上方【参考素材】（若提供）与【历史前文】：核查正文的句式节奏、用词习惯、叙事视角、对话风格是否保持一致。区分「剧情需要的变化」与「真实文风漂移」：因场景/情绪/情节需要的合理变化不算缺陷；与参考素材明显偏离、或与前文出现断层（同一卷内文风突变）才列为缺陷（【次要文字优化建议】级别）。\n\n")
+	}
+	// 伏笔审查约束：有未回收伏笔提醒时核查推进/回收情况
+	if strings.Contains(bundle.HistoryContent, "未回收伏笔提醒") {
+		b.WriteString("【伏笔审查】上方【历史前文】含【未回收伏笔提醒】：核查本段是否推进或回收了其中至少一个伏笔。若本段情节明显涉及相关伏笔却完全无视，列为缺陷。\n\n")
 	}
 	if strings.TrimSpace(outline) != "" {
 		b.WriteString("【大纲审查】上方【创作框架】是大纲基准。核查正文是否偏离大纲骨架（结局方向/关键节点）；合理细化不算偏离，但砍掉关键节点或改结局须标为缺陷。\n\n")

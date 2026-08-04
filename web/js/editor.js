@@ -61,6 +61,14 @@ var Editor = {
         });
       }
     });
+    // 点击编辑器/工具栏之外的区域，直接隐藏选中工具栏（防止残留）
+    document.addEventListener('mousedown', function (e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('.editor-inner') || t.closest('#selToolbar') || t.closest('.sel-toolbar')) return;
+      var tb = document.getElementById('selToolbar');
+      if (tb) tb.style.display = 'none';
+    });
   },
   fallbackToMarkdown: function (msg) {
     this.mode = 'markdown';
@@ -182,25 +190,27 @@ var Editor = {
   },
   // 去AI味：检测 AI 痕迹 + 文字层润色（替换全文，支持撤销）
   deAIfy: async function () {
+    console.log('[deAIfy] clicked', new Date().toLocaleTimeString());
+    UI.toast('✨ 已点击「去AI味」，开始处理…', 'info', 3000);
     var text = this.getText();
     if (!text || text.trim().length < 50) { UI.toast('正文太短（<50字），请先写一段内容', 'warn'); return; }
     if (this._deAIing) return;
     this._deAIing = true;
     var btn = document.getElementById('deAIfyBtn');
-    if (btn) btn.disabled = true;
+    if (btn) { btn.disabled = true; btn.classList.add('busy'); btn.textContent = '⏳ 去AI味中…'; }
     try {
-      UI.toast('🔍 正在检测 AI 味…', '');
+      UI.toast('🔍 正在检测 AI 味…', '', 2000);
       var tells = null;
       try { tells = await API.aiTells({ content: text }); } catch (e) { /* 检测失败不阻塞润色 */ }
-      UI.toast('✨ 正在去 AI 味润色（约 10-60 秒）…', '');
+      UI.toast('✨ 正在去 AI 味润色（约 10-60 秒）…', '', 3000);
       var r;
-      try { r = await API.aiPolish({ content: text, language: 'zh' }); }
-      catch (e) { UI.toast('润色失败：' + e.message, 'error'); return; }
-      if (!r || !r.text || !r.text.trim()) { UI.toast('润色结果为空，请重试', 'error'); return; }
+      try { r = await API.aiPolish({ content: text, language: 'zh', project_id: (Store.state.currentProject || {}).id || '' }); }
+      catch (e) { UI.toast('润色失败：' + e.message, 'error', 6000); return; }
+      if (!r || !r.text || !r.text.trim()) { UI.toast('润色结果为空，请重试', 'error', 6000); return; }
       // 撤销快照 + 替换全文
       this.undoContent = text;
       this.setContent(r.text);
-      UI.toast('✅ 已去 AI 味润色（' + (r.model || '') + '）', 'success');
+      UI.toast('✅ 已去 AI 味润色（' + (r.model || '') + '）', 'success', 5000);
       // 展示检测报告（润色前检出问题才弹）
       if (tells && tells.issues && tells.issues.length) {
         var html = tells.issues.map(function (it) {
@@ -217,7 +227,7 @@ var Editor = {
       }
     } finally {
       this._deAIing = false;
-      if (btn) btn.disabled = false;
+      if (btn) { btn.disabled = false; btn.classList.remove('busy'); btn.textContent = '✨去AI味'; }
     }
   },
   adjustFontSize: function (delta) {
@@ -639,7 +649,7 @@ var Editor = {
     var sel = Store.state.editor.selectedText;
     var tb = document.getElementById('selToolbar');
     if (!tb) return;
-    if (sel && sel.length > 0) {
+    if (!sel || sel.length === 0) { tb.style.display = 'none'; return; }
       var rect;
       if (this.tiptap) {
         var _a = this.tiptap.state.selection;
@@ -661,7 +671,6 @@ var Editor = {
       tb.style.position = 'fixed';
       tb.style.top = Math.max(8, rect.top - 48) + 'px';
       tb.style.left = Math.max(8, rect.left) + 'px';
-    }
   },
   hideSelToolbar: function () {
     var tb = document.getElementById('selToolbar');

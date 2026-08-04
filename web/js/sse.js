@@ -46,6 +46,24 @@ var SSE = {
     upd();
     this._timerInt = setInterval(upd, 1000);
   },
+  _elapsedTxt: function () {
+    if (!this._startTs) return '';
+    var sec = Math.round((Date.now() - this._startTs) / 1000);
+    if (sec < 60) return sec + ' 秒';
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    return m + ' 分' + (s < 10 ? '0' : '') + s + ' 秒';
+  },
+  /* 生成完成汇总：每个 agent 的耗时 + 总耗时 */
+  _summaryTxt: function () {
+    var steps = (Store.state.pipeline && Store.state.pipeline.steps) || [];
+    var parts = [];
+    steps.forEach(function (s) {
+      if (s.durationMs) parts.push((ROLE_META[s.role] ? ROLE_META[s.role].label : (s.label || s.role)) + ' ' + fmtDur(s.durationMs));
+    });
+    var total = this._elapsedTxt();
+    return (parts.length ? parts.join(' · ') + ' · ' : '') + '总耗时 ' + total;
+  },
   _fmtTime: function (sec) {
     if (sec < 60) return sec + ' 秒';
     var m = Math.floor(sec / 60);
@@ -154,6 +172,7 @@ var SSE = {
     this.controller = new AbortController();
     Composer.setGenerating(true);
     PipelineUI.reset();
+    this._startTs = Date.now();
     this._setProgress('⏳ 准备中…', 3, 0, payload.target_word || 0);
     // 自动快照：每 90 秒保存一次当前进度（新章模式下跳过，避免污染当前章节）
     this._snapshotTimer = setInterval(function () {
@@ -370,7 +389,8 @@ var SSE = {
             document.getElementById('instructionInput').value = '';
             Store.state.pipeline.steps.forEach(function (s) { s.status = 'done'; });
             PipelineUI.setStage('生成完成', 'idle', 100);
-            PipelineUI.log('✓ 完成（新章节）');
+            PipelineUI.log('✓ 完成（新章节，总耗时 ' + SSE._elapsedTxt() + '）');
+            UI.toast('✅ 生成完成 · ' + SSE._summaryTxt(), 'success', 8000);
             PipelineUI.setActive(false, true);
             PipelineUI.render();
             var rb2 = document.getElementById('pipeRetry'); if (rb2) rb2.remove();
@@ -392,7 +412,8 @@ var SSE = {
     // 标记所有步骤完成
     Store.state.pipeline.steps.forEach(function (s) { s.status = 'done'; });
     PipelineUI.setStage('生成完成', 'idle', 100);
-    PipelineUI.log('✓ 完成');
+    PipelineUI.log('✓ 完成（总耗时 ' + SSE._elapsedTxt() + '）');
+    UI.toast('✅ 生成完成 · ' + SSE._summaryTxt(), 'success', 8000);
     PipelineUI.setActive(false, true);
     PipelineUI.render();
     var rb = document.getElementById('pipeRetry'); if (rb) rb.remove();
@@ -460,6 +481,24 @@ var SSE = {
     var actsEl = document.getElementById('genActions');
     var oldFill = actsEl.querySelector('.fillup-btn'); if (oldFill) oldFill.remove();
     var oldRetry = actsEl.querySelector('.retry-strategy-btn'); if (oldRetry) oldRetry.remove();
+    var oldRegen = actsEl.querySelector('.regen-btn'); if (oldRegen) oldRegen.remove();
+    // 不满意 → 一键重新生成（相同设置重跑）
+    var regenBtn = document.createElement('button');
+    regenBtn.className = 'tool-btn regen-btn';
+    regenBtn.textContent = '🔄 重新生成';
+    regenBtn.title = '对结果不满意？用相同设置重新生成一版（当前内容会被替换）';
+    regenBtn.onclick = function () {
+      var savedPayload = SSE._lastPayload;
+      if (!savedPayload) return;
+      UI.confirm('🔄 重新生成', '将用相同设置重新生成一版，当前生成的内容会被替换。确定继续？', function () {
+        if (Editor.undoContent != null) Editor.setContent(Editor.undoContent);
+        Store.state.composer.runMode = savedPayload.run_mode;
+        Composer.onModeChange(savedPayload.run_mode);
+        document.getElementById('instructionInput').value = savedPayload.user_demand || '';
+        setTimeout(function () { Composer.generate(); }, 300);
+      });
+    };
+    actsEl.appendChild(regenBtn);
     if (Store.state.composer.targetWord > 0 && finalLen < Store.state.composer.targetWord * 0.7) {
       var fillUpBtn = document.createElement('button');
       fillUpBtn.className = 'tool-btn fillup-btn';

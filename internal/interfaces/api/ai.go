@@ -64,8 +64,9 @@ func (s *Server) HandleAITells(w http.ResponseWriter, r *http.Request) {
 // 响应：{ "text": "润色后正文", "model": "..." }
 func (s *Server) HandleAIPolish(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Content  string `json:"content"`
-		Language string `json:"language"`
+		Content   string `json:"content"`
+		Language  string `json:"language"`
+		ProjectID string `json:"project_id"` // 可选：项目前文参考（读全文，保持文风/视角）
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -86,6 +87,24 @@ func (s *Server) HandleAIPolish(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Minute)
 	defer cancel()
 
+	// 项目前文：读全文作为文风/视角参考（用户要求 agent 读全文）
+	projectCtx := ""
+	if req.ProjectID != "" {
+		if chs, err := s.store.ListChapters(ctx, req.ProjectID, ""); err == nil && len(chs) > 0 {
+			var pb strings.Builder
+			for i := range chs {
+				if strings.TrimSpace(chs[i].Content) == "" {
+					continue
+				}
+				pb.WriteString(chs[i].Title + "\n")
+				pb.WriteString(chs[i].Content + "\n\n")
+			}
+			if pb.Len() > 0 {
+				projectCtx = pb.String()
+			}
+		}
+	}
+
 	adapters, err := s.registry.AdaptersForRole(ctx, llm.RoleWorker)
 	if err != nil {
 		writeError(w, http.StatusServiceUnavailable, "无可用的润色模型: "+err.Error())
@@ -94,7 +113,7 @@ func (s *Server) HandleAIPolish(w http.ResponseWriter, r *http.Request) {
 
 	var lastErr error
 	for _, ad := range adapters {
-		text, usage, gErr := ad.Generate(ctx, PolishSystemPrompt, buildPolishUserPrompt(req.Content, req.Language))
+		text, usage, gErr := ad.Generate(ctx, PolishSystemPrompt, buildPolishUserPrompt(req.Content, req.Language, projectCtx))
 		_ = s.store.IncrUsage(ctx, ad.Name(), 1, usage.Total())
 		if gErr == nil && strings.TrimSpace(text) != "" {
 			writeOK(w, map[string]interface{}{
@@ -129,9 +148,25 @@ func errText(err error) string {
 }
 
 // buildPolishUserPrompt 构造去 AI 味润色的用户提示词
-func buildPolishUserPrompt(content, language string) string {
-	if language == "en" {
-		return "Please polish the following text to remove AI-generated feel. Return ONLY the polished full text — no JSON, no headers, no commentary. Preserve the vast majority of sentences; only rewrite sentences that truly need it; total length change must stay within ±15%.\n\n## Text Under Polish\n" + content
+func buildPolishUserPrompt(content, language, projectCtx string) string {
+	if projectCtx != "" {
+		return "【项目前文（读全文参考：保持它的叙事视角、语言风格与用词习惯，润色结果必须像同一部作品）】\n\n" + projectCtx + "\n\n" + buildPolishUserPrompt(content, language, "")
 	}
-	return "请对以下正文做「去AI味」文字层润色，只返回润色后的完整正文——不要 JSON、不要标题、不要任何解释。保留原文绝大多数句子，只改真正有问题的句子，不要整段重写；修改后总长变化不超过 ±15%。\n\n## 待润色正文\n" + content
+	if language == "en" {
+		return "Please polish the following text to remove the AI-generated feel. Return ONLY the polished full text — no JSON, no headers, no commentary. AI tells to fix: (1) repeated subject at sentence starts (he/she...); (2) piled-up 'like...' similes after every action; (3) narrator explaining emotions instead of showing; (4) overly neat symmetrical endings; (5) adverb stuffing. Keep plot, characters, dialogue unchanged. You may merge sentences and cut redundancy — shortening to ~70% is fine. Make it natural, understated, with breathing room.\n\n## Text Under Polish\n" + content
+	}
+	return `请对以下正文做「去AI味」润色，消除 AI 生成痕迹。只返回润色后的完整正文——不要 JSON、不要标题、不要任何解释。
+
+AI 味的主要表现，务必逐条针对性处理：
+1. 主语爆炸：连续多句以「他/她」开头 → 适当省略主语、调整语序、用动作或景物开头换句式，让句子长短错落。
+2. 比喻堆砌：每个动作后都跟「像…」的解释（像打招呼、像反驳、像怕…）→ 删掉多余的，只保留最有力的一处，其余直接去掉。
+3. 解释性旁白：作者跳出来解说（「像是在解释」「好像是在给自己找一个新的位置」）→ 整句删掉，用动作、细节、留白让读者自己体会。
+4. 情绪说破：直接写「他觉得自己像…」「他像被…」把情绪点破 → 改成动作与细节暗示，情绪留给读者。
+5. 刻意对称：首尾呼应、物品呼应过于工整（猫/兔子/书签互cue）→ 打破对称，结尾自然松散，不强行收束。
+6. 修饰词堆砌：很轻/很自然/刻意地/忍不住 等高频副词与「下意识」类词 → 删减大半。
+
+硬性要求：情节、人物、对话原意一律不变；允许合并句子、删掉冗余（总长可减至原文 70% 左右，删冗余是去味的正路）；语言更口语、自然、克制，有留白和呼吸感。
+
+## 待润色正文
+` + content
 }

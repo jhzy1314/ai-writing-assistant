@@ -1,0 +1,31 @@
+- Top bar: `AI Novel Studio`, usage `38 / 500`, token `602,796 / 2,000,000`, icons: `API`, `🔔`, `📖 指南`, `✏️ 墨韵书斋`, volume slider `14`, `✨ 纯净`
+- Chapter info: `第13章`, `拟标题`, `Ctrl+F`, `第13章 • 0字 | 全书 26,672字 • 16人助 3世界观 0素材 • 13章节`
+- Model config panel (top-right):  
+  - `模型配置 ▲`  
+  - `构思大纲`: `deepseek-v4-flash`  
+  - `动笔写作`: `deepseek-v4-flash`  
+  - `品质审稿`: `deepseek-v4-flash`  
+  - `智能分层（推荐）`: dropdown  
+  - `?` help icon, `⚙️` settings
+- Toolbar: `B`, `/`, `U`, `H2`, `H3`, `💾 保存版本 Ctrl+S`, `✨ 从光标续写`, `🎨 多候选`, `◀ 上一章`, `▶ 下一章`, `... 更多`, `字数 0 字符 0`
+- Main editor: centered placeholder text `📝 开始创作...`
+- Left sidebar:  
+  - `+ 新建项目`  
+  - `🧰 编辑器`  
+  - `🌿 章节大纲`  
+  - `👥 人物卡`  
+  - `🌍 世界观`  
+  - `▸ 更多` (with badge `4`)  
+  - Chapter list (e.g., `第十三章 0字`, `第十二章 2,199字`, etc.)  
+  - Current project: `十七岁的雨季` (轻小说), folder `暗恋这件难过的小事 • 26,672字`
+- Bottom input area:  
+  - Prompt: `💡 输入创作需求或选中文字后使用快捷指令… (Ctrl+Enter 发送)`  
+  - Suggestion: `• 天一：慕言，行动大于语言，最早发现惊鸿“没睡觉”这一反常`  
+  - Buttons: `🔴 生成 Ctrl+Enter`, `⚙️ 选项`, `⚡ 专业模式`  
+  - Status: `全书 26,672 字 • 本章 0 字`  
+  - Footer note: `为每个角色手动指定模型，跑完整 Thinker→Worker→Verifier 流程`  
+  - Small controls: `Ctrl + Enter 发送`, `Ctrl + S 保存版本`, `Esc 终止生成`, `⚙️` settings
+
+Colors: Red used for primary action (`生成` button), orange for AI features (`✨`), dark brown/sepia UI theme. No error messages or stack traces visible.
+
+[Model: qwen3-vl-flash | Tokens: in=2569 out=646]

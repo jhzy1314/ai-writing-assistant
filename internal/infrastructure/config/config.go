@@ -24,6 +24,8 @@ type ServerConfig struct {
 	LogDir           string `mapstructure:"log_dir"`
 	AuthPassword     string `mapstructure:"auth_password"`
 	CookieEncryptKey string `mapstructure:"cookie_encrypt_key"`
+	// LibraryDir 本地文库目录：拆书解析从这里扫描书籍文件（txt/epub/docx/html）
+	LibraryDir string `mapstructure:"library_dir"`
 }
 
 // QuotasConfig 调用限制与成本控制参数（同时种子入库 configs 表）

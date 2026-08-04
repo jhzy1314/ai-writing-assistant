@@ -5,6 +5,60 @@ var CharacterPage = {
     if (!p) return;
     this.load();
   },
+  /* 去重合并：检测重复人物卡（同名/别名变体），弹窗列出，一键合并描述并删除重复项 */
+  dedup: function () {
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选中一个项目', 'warn'); return; }
+    API.get('/api/characters/duplicates?project_id=' + encodeURIComponent(p.id)).then(function (d) {
+      var groups = (d && d.groups) || [];
+      if (!groups.length) { UI.toast('未检测到重复人物卡', 'success'); return; }
+      var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">检测到 <b>' + groups.length + '</b> 组疑似重复。每组保留第一张（合并描述），其余删除：</div>';
+      groups.forEach(function (g, gi) {
+        var mergeIds = g.items.map(function (x) { return x.id; }).slice(1);
+        html += '<div class="dedup-group" style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px">' +
+          '<div style="font-size:12px;font-weight:600;margin-bottom:4px">组 ' + (gi + 1) + '：' +
+          g.items.map(function (it) { return '<span style="color:var(--accent)">' + esc(it.name) + '</span>'; }).join('  <->  ') + '</div>';
+        g.items.forEach(function (it, ii) {
+          var desc = (it.description || it.bio || '').replace(/\s+/g, ' ').slice(0, 50);
+          html += '<div style="font-size:11px;color:var(--muted);padding:2px 0 2px 10px">' +
+            (ii === 0 ? '保留：' : '删除：') + esc(it.name) + (desc ? ' - ' + esc(desc) + (desc.length >= 50 ? '...' : '') : '') + '</div>';
+        });
+        html += '<button class="btn btn-primary btn-sm dedup-merge" style="margin-top:6px" data-keep="' + esc(g.keep_id) + '" data-merges="' + mergeIds.join(',') + '">合并本组</button>' +
+          '<button class="btn btn-ghost btn-sm dedup-skip" style="margin-top:6px;margin-left:6px">跳过</button></div>';
+      });
+      html += '<div style="font-size:11px;color:var(--faint)">合并 = 把重复项的描述并入保留卡后删除（软删可恢复）。跳过 = 本次不动。</div>';
+      UI.modal({
+        title: '人物卡去重合并（' + groups.length + ' 组）',
+        body: html,
+        actions: [{ id: 'close', label: '关闭', cls: 'btn-primary' }]
+      });
+      setTimeout(function () {
+        document.querySelectorAll('.dedup-merge').forEach(function (b) {
+          b.onclick = function () { CharacterPage._doMerge(b); };
+        });
+        document.querySelectorAll('.dedup-skip').forEach(function (b) {
+          b.onclick = function () { var g = b.closest('.dedup-group'); if (g) g.remove(); };
+        });
+      }, 0);
+    }).catch(function (e) { UI.toast('检测失败: ' + e.message, 'error'); });
+  },
+  _doMerge: function (btn) {
+    var p = Store.state.currentProject;
+    if (!p || !btn) return;
+    var keepId = btn.getAttribute('data-keep') || '';
+    var mergeIds = (btn.getAttribute('data-merges') || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    if (!keepId || !mergeIds.length) { UI.toast('合并参数缺失', 'warn'); return; }
+    btn.disabled = true; btn.textContent = '合并中…';
+    API.post('/api/characters/merge', { project_id: p.id, keep_id: keepId, merge_ids: mergeIds }).then(function (r) {
+      UI.toast('已合并 ' + (r.merged || 0) + ' 张重复人物卡', 'success');
+      var g = btn.closest('.dedup-group'); if (g) g.remove();
+      CharacterPage.load();
+    }).catch(function (e) {
+      UI.toast('合并失败: ' + e.message, 'error');
+      btn.disabled = false; btn.textContent = '合并本组';
+    });
+  },
+
   load: async function () {
     var p = Store.state.currentProject;
     if (!p) { this.showEmpty('请先在左侧选中一个项目'); return; }

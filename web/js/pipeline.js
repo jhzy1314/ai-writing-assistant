@@ -50,8 +50,9 @@ var PipelineUI = {
         existing.status = existing.status === 'done' ? 'done' : 'active';
         existing.model = ev.model || existing.model || '';
         existing.stage = ev.stage || existing.stage || '';
+        if (ev.duration_ms) existing.durationMs = ev.duration_ms;
       } else {
-        steps.push({ role: roleKey, label: meta.label, status: 'active', model: ev.model || '', stage: ev.stage || meta.label, iteration: ev.iteration || 0, text: ev.text || '' });
+        steps.push({ role: roleKey, label: meta.label, status: 'active', model: ev.model || '', stage: ev.stage || meta.label, iteration: ev.iteration || 0, text: ev.text || '', durationMs: ev.duration_ms || 0 });
       }
       // 存储中间文本产出
       if (ev.text && roleKey === 'thinker') { p.outline = ev.text; }
@@ -108,7 +109,8 @@ var PipelineUI = {
           var icon = ss.status === 'done' ? '✅' : '⏳';
           var cls = ss.status === 'done' ? 'done' : 'active';
           var modelTag = ss.model ? ' <span class="step-model">(' + esc(ss.model) + ')</span>' : '';
-          return '<div class="pipe-step ' + cls + '"><span class="step-icon">' + icon + '</span><span>' + ss.label + modelTag + '</span></div>';
+          var durTag = ss.durationMs ? ' <span class="step-dur">⏱ ' + fmtDur(ss.durationMs) + '</span>' : '';
+          return '<div class="pipe-step ' + cls + '"><span class="step-icon">' + icon + '</span><span>' + ss.label + modelTag + durTag + '</span></div>';
         }).join('');
       }
     }
@@ -148,7 +150,9 @@ var PipelineUI = {
       var modelLines = [];
       Object.keys(p.models).forEach(function (r) {
         var rm = ROLE_META[r] || {};
-        modelLines.push('<span class="pipe-model-tag"><b>' + (rm.ico || '') + ' ' + (rm.label || r) + ':</b> ' + esc(p.models[r]) + '</span>');
+        var st = p.steps.find(function (s) { return s.role === r; });
+        var durTxt = st && st.durationMs ? ' ⏱' + fmtDur(st.durationMs) : '';
+        modelLines.push('<span class="pipe-model-tag"><b>' + (rm.ico || '') + ' ' + (rm.label || r) + ':</b> ' + esc(p.models[r]) + durTxt + '</span>');
       });
       modelsEl.innerHTML = modelLines.join(' ');
     } else if (modelsEl) {

@@ -13,6 +13,14 @@ var OutlinePage = {
     if (n < 5000) return 'wc-done';
     return 'wc-big';
   },
+  /* 章节摘要：synopsis 优先，否则取正文开头 60 字 */
+  chSummary: function (ch) {
+    var s = (ch && (ch.synopsis || '')).trim();
+    if (s) return s;
+    var c = (ch && ch.content || '').replace(/\s+/g, ' ').trim();
+    if (!c) return '（暂无内容）';
+    return c.slice(0, 60) + (c.length > 60 ? '…' : '');
+  },
   load: async function () {
     var p = Store.state.currentProject;
     if (!p) { this.showEmpty('请先在左侧选中一个项目'); return; }
@@ -57,6 +65,7 @@ var OutlinePage = {
       } else {
         volChs.forEach(function (ch, i) {
           html += '<div class="ot-ch-item ' + OutlinePage.wcClass(ch.word_count) + '" data-cid="' + ch.id + '" draggable="true" ondragstart="OutlinePage.dragStart(event,\'' + ch.id + '\')" ondragover="OutlinePage.dragOver(event)" ondrop="OutlinePage.dragDrop(event,\'' + vol.id + '\',\'' + ch.id + '\')">';
+          html += '<div class="ot-ch-top">';
           html += '<span class="ot-ch-num">' + (i + 1) + '</span>';
           html += '<span class="ot-ch-status"></span>';
           html += '<span class="ot-ch-icon">📄</span>';
@@ -70,6 +79,8 @@ var OutlinePage = {
           html += '<span class="link-btn" onclick="event.stopPropagation();OutlinePage.delChapter(\'' + ch.id + '\')" title="删除">✕</span>';
           html += '</span>';
           html += '</div>';
+          html += '<div class="ot-ch-sum">' + esc(OutlinePage.chSummary(ch)) + '</div>';
+          html += '</div>';
         });
       }
       html += '</div>';
@@ -82,6 +93,7 @@ var OutlinePage = {
       html += '<div class="ot-vol-body">';
       orphans.forEach(function (ch, i) {
         html += '<div class="ot-ch-item ' + OutlinePage.wcClass(ch.word_count) + '" data-cid="' + ch.id + '" draggable="true" ondragstart="OutlinePage.dragStart(event,\'' + ch.id + '\')" ondragover="OutlinePage.dragOver(event)" ondrop="OutlinePage.dragDrop(event,null,\'' + ch.id + '\')">';
+        html += '<div class="ot-ch-top">';
         html += '<span class="ot-ch-num">' + (i + 1) + '</span><span class="ot-ch-status"></span><span class="ot-ch-icon">📄</span>';
         html += '<span class="ot-ch-name">' + esc(ch.title || '未命名章节') + '</span>';
         html += '<span class="ot-ch-wc">' + (ch.word_count || 0) + ' 字</span>';
@@ -90,6 +102,8 @@ var OutlinePage = {
         html += '<span class="link-btn" onclick="event.stopPropagation();OutlinePage.renameChapter(\'' + ch.id + '\')">✏</span>';
         html += '<span class="link-btn" onclick="event.stopPropagation();OutlinePage.delChapter(\'' + ch.id + '\')">✕</span>';
         html += '</span></div>';
+        html += '<div class="ot-ch-sum">' + esc(OutlinePage.chSummary(ch)) + '</div>';
+        html += '</div>';
       });
       html += '</div></div>';
     }

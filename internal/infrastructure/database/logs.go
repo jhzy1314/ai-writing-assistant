@@ -18,6 +18,7 @@ type GenerationLog struct {
 	ModelName        string `json:"model_name"`
 	PromptTokens     int    `json:"prompt_tokens"`
 	CompletionTokens int    `json:"completion_tokens"`
+	CacheHitTokens   int    `json:"cache_hit_tokens"` // 前缀缓存命中 token
 	DurationMs       int    `json:"duration_ms"`
 	Status           string `json:"status"`
 	ErrorMsg         string `json:"error_msg"`
@@ -33,10 +34,10 @@ func (s *Store) InsertLog(ctx context.Context, log GenerationLog) error {
 		log.Status = "ok"
 	}
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO generation_logs(id, project_id, role, model_name, prompt_tokens, completion_tokens, duration_ms, status, error_msg, created_at)
-		 VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO generation_logs(id, project_id, role, model_name, prompt_tokens, completion_tokens, cache_hit_tokens, duration_ms, status, error_msg, created_at)
+		 VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
 		log.ID, log.ProjectID, log.Role, log.ModelName, log.PromptTokens,
-		log.CompletionTokens, log.DurationMs, log.Status, log.ErrorMsg, now())
+		log.CompletionTokens, log.CacheHitTokens, log.DurationMs, log.Status, log.ErrorMsg, now())
 	return err
 }
 
@@ -45,7 +46,7 @@ func (s *Store) ListLogs(ctx context.Context, projectID string, limit, offset in
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	q := `SELECT id, project_id, role, model_name, prompt_tokens, completion_tokens, duration_ms, status, error_msg, created_at FROM generation_logs`
+	q := `SELECT id, project_id, role, model_name, prompt_tokens, completion_tokens, COALESCE(cache_hit_tokens,0), duration_ms, status, error_msg, created_at FROM generation_logs`
 	args := []interface{}{}
 	if projectID != "" {
 		q += ` WHERE project_id=?`
@@ -62,7 +63,7 @@ func (s *Store) ListLogs(ctx context.Context, projectID string, limit, offset in
 	for rows.Next() {
 		var l GenerationLog
 		if err := rows.Scan(&l.ID, &l.ProjectID, &l.Role, &l.ModelName, &l.PromptTokens,
-			&l.CompletionTokens, &l.DurationMs, &l.Status, &l.ErrorMsg, &l.CreatedAt); err != nil {
+			&l.CompletionTokens, &l.CacheHitTokens, &l.DurationMs, &l.Status, &l.ErrorMsg, &l.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, l)

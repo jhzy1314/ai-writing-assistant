@@ -165,6 +165,7 @@ window.initTiptap = async function () {
       <span class="tool-divider"></span>
       <div class="grp">
         <select id="contextScope" style="font-size:11px;padding:4px 6px" onchange="Composer.onScopeChange()" title="上下文范围">
+          <option value="full" selected>📖 全部章节全文（读全文）</option>
           <option value="smart">智能分层（推荐）</option>
           <option value="current">仅当前章节</option>
           <option value="recent">最近2章全文</option>
@@ -178,9 +179,6 @@ window.initTiptap = async function () {
             </label>
             <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="关闭需求字数双层校验（重新开启需刷新页面或重新选中项目）">
               <input type="checkbox" id="skipWordCheck" onchange="Composer.onSkipWordCheck(this.checked)"> <span>跳过字数校验</span>
-            </label>
-            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="一键全开/全关思考。默认推荐：仅规划师开（快）；全开=所有角色都思考（更慢但更稳）">
-              <input type="checkbox" id="thinkingToggle" onchange="Composer.onThinkingChange(this.checked)"> <span>🧠 思考·全开</span>
             </label>
           </div>
         </span>
@@ -322,22 +320,49 @@ window.initTiptap = async function () {
         </div>
         <button class="gen-stop" onclick="SSE.stop()">■ 终止</button>
       </div>
+      <div class="outline-row" id="outlineRow">
+        <span class="outline-label">📝 章节大纲</span>
+        <textarea id="genOutline" class="outline-input" rows="2" placeholder="选填：手动填写本章或全书大纲（留空则由 AI 自动规划；填了则按你的大纲续写）" oninput="Composer.onOutlineChange()"></textarea>
+        <span class="outline-target" title="限制本章目标字数">🎯<input id="targetWordMini" type="number" value="1000" min="100" max="20000" step="100">字</span>
+        <button class="tool-btn outline-est" onclick="Composer.onEstimate()" title="AI 根据大纲与需求预估本章合理字数">🤖 预估</button>
+      </div>
       <div class="composer-inner" id="composerInner">
         <textarea id="instructionInput" placeholder="💡 输入创作需求或选中文字后使用快捷指令…（Ctrl+Enter 发送）" oninput="Editor.syncInstructionHeight(this)" onkeydown="if(event.ctrlKey&amp;&amp;event.key==='Enter'){event.preventDefault();Composer.generate()}"></textarea>
-        <textarea id="genOutline" class="outline-input" rows="2" placeholder="📝 手动填写本章或全书大纲（选填），留空则由 AI 生成" oninput="Composer.onOutlineChange()"></textarea>
         <div class="gen-main-row">
           <button class="btn btn-primary btn-gen" id="btnGenerate" onclick="Composer.generate()" data-shortcut="Ctrl+Enter">✨ 生成</button>
+          <button class="tool-btn think-toggle" id="thinkBtn" onclick="Composer.toggleThinkingPanel(event)" title="每个 agent 是否开深度思考：规划师/写作/审稿/轻活">🧠 思考</button>
           <button class="tool-btn gen-opt-toggle" onclick="Composer.toggleGenOptions(event)" title="更多生成选项">⚙️ 选项</button>
           <button class="tool-btn pro-mode-toggle" id="proModeBtn" onclick="Composer.toggleProMode(event)" title="专业模式：详细填写大纲，AI 辅助完善设定">⚡ 专业模式</button>
+        </div>
+        <div class="gen-opts" id="thinkingPanel" style="display:none">
+          <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="一键全开/全关所有角色思考。默认推荐：仅规划师开（快）；全开=所有角色都思考（更慢但更稳）">
+            <input type="checkbox" id="thinkingToggle" onchange="Composer.onThinkingChange(this.checked)"> 🧠 思考·全开
+          </span>
+          <span class="gen-opts-sep"></span>
+          <span style="font-size:10px;color:var(--muted)" title="推荐配置：仅规划师开思考（大纲质量最关键）；写作/审稿/轻活关（实测审稿思考开销极大）。可单独调整">角色思考</span>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="规划师：构思大纲与剧情节点（动脑收益最大）">
+            <input type="checkbox" id="thinkThinker" checked onchange="Composer.onRoleThinkingChange('thinker', this.checked)"> 规划
+          </label>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="写作：正文创作（推荐关闭--写作是执行任务，思考收益小且更慢）">
+            <input type="checkbox" id="thinkWorker" onchange="Composer.onRoleThinkingChange('worker', this.checked)"> 写作
+          </label>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="审稿：质量校验（推荐关闭--实测审稿思考开销极大：审 700 字要 2.5 分钟，性价比低）">
+            <input type="checkbox" id="thinkVerifier" onchange="Composer.onRoleThinkingChange('verifier', this.checked)"> 审稿
+          </label>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="轻活：缩写/摘要/改写等小任务（推荐关闭--简单执行不需要思考）">
+            <input type="checkbox" id="thinkHelper" onchange="Composer.onRoleThinkingChange('helper', this.checked)"> 轻活
+          </label>
+          <span style="font-size:10px;color:var(--accent)">推荐：仅规划开</span>
         </div>
         <div class="gen-opts" id="genOpts" style="display:none">
           <button class="tool-btn" style="font-size:10px;margin-right:4px" onclick="ChapterUI.batchFromOutline()" title="根据大纲批量创建空白章节">📋 批量建章</button>
           <button class="tool-btn" onclick="TemplateUI.quickOpen()" title="模板库">📚 模板</button>
           <button class="tool-btn" onclick="Composer.previewRAG(event)" title="预览 AI 将参考的书中相关记忆（长篇小说连贯性）">🧠 相关记忆</button>
-          <span style="font-size:10px;color:var(--muted)" title="目标字数">目标字数</span>
-          <input class="mini-input" type="number" id="targetWordMini" value="1000" min="100" max="20000" step="100" title="目标字数">
           <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="开启后，AI 会联网检索相关资料辅助创作（构思/写作/审稿/轻活都会参考）">
             <input type="checkbox" id="webSearchToggle" onchange="Composer.onWebSearchChange()"> 🌐 联网
+          </label>
+          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="勾选：规划师读完你的大纲后补充细节再写；取消：完全按你填的大纲直接写（规划师不干预）">
+            <input type="checkbox" id="rewriteOutlineChk" checked onchange="Composer.onRewriteOutlineChange()"> 🖊️ 完善大纲
           </label>
         </div>
       </div>
@@ -366,21 +391,6 @@ window.initTiptap = async function () {
           <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="续写/生成的新内容写入新建的下一章节（当前章节保持不动）">
             <input type="checkbox" id="newChapterToggle" onchange="Composer.onNewChapterChange()"> 新章
           </label>
-          <span class="tool-divider"></span>
-          <span style="font-size:10px;color:var(--muted)" title="推荐配置：仅规划师开思考（大纲质量最关键）；写作/审稿/轻活关（实测审稿思考开销极大，不划算）。可单独调整">🧠角色思考</span>
-          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="规划师：构思大纲与剧情节点（动脑收益最大）">
-            <input type="checkbox" id="thinkThinker" checked onchange="Composer.onRoleThinkingChange('thinker', this.checked)"> 规划
-          </label>
-          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="写作：正文创作（推荐关闭--写作是执行任务，思考收益小且更慢）">
-            <input type="checkbox" id="thinkWorker" onchange="Composer.onRoleThinkingChange('worker', this.checked)"> 写作
-          </label>
-          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="审稿：质量校验（推荐关闭--实测审稿思考开销极大：审 700 字要 2.5 分钟，性价比低）">
-            <input type="checkbox" id="thinkVerifier" onchange="Composer.onRoleThinkingChange('verifier', this.checked)"> 审稿
-          </label>
-          <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="轻活：缩写/摘要/改写等小任务（推荐关闭--简单执行不需要思考）">
-            <input type="checkbox" id="thinkHelper" onchange="Composer.onRoleThinkingChange('helper', this.checked)"> 轻活
-          </label>
-          <span style="font-size:10px;color:var(--accent);margin-left:2px">推荐：仅规划开</span>
         </span>
         <span id="modeHint" style="margin-left:auto;color:var(--accent);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%;flex-shrink:1"></span>
       </div>
@@ -427,6 +437,7 @@ window.initTiptap = async function () {
           <h2>👤 人物卡管理</h2>
           <div class="page-head-acts">
             <button class="btn btn-ghost btn-sm" onclick="RelationGraph.show()" title="AI 分析正文，绘制人物关系图谱">🕸 关系图谱</button>
+            <button class="btn btn-ghost btn-sm" onclick="CharacterPage.dedup()" title="检测重复人物卡（同名/别名变体），可一键合并">🔍 去重合并</button>
             <button class="btn btn-primary btn-sm" onclick="CharacterPage.showCreate()">＋ 新建人物</button>
             <button class="btn btn-ghost btn-sm" onclick="ResourceUI.autoImportSettings()" title="AI 通读本项目全部章节，自动提取并保存人物卡/世界观（重复自动跳过）">🤖 自动导入</button>
             <span class="spacer" style="flex:1"></span>
@@ -452,6 +463,7 @@ window.initTiptap = async function () {
           <div class="page-head-acts">
             <button class="btn btn-primary btn-sm" onclick="WorldPage.showCreate()">＋ 新建设定</button>
             <button class="btn btn-ghost btn-sm" onclick="ResourceUI.autoImportSettings()" title="AI 通读本项目全部章节，自动提取并保存人物卡/世界观（重复自动跳过）">🤖 自动导入</button>
+            <button class="btn btn-ghost btn-sm" onclick="WorldPage.suggest()" title="AI 分析现有世界观，建议可丰富方向，预览后可一键保存">✨ 丰富建议</button>
             <span class="spacer" style="flex:1"></span>
             <input type="text" class="page-search" id="worldSearch" placeholder="🔍 搜索设定" oninput="WorldPage.render()">
           </div>
@@ -529,7 +541,8 @@ window.initTiptap = async function () {
         <div class="page-head">
           <h2>🎨 文风样本库</h2>
           <div class="page-head-acts">
-            <button class="btn btn-primary btn-sm" onclick="StyleBankPage.create()">＋ 手动添加</button>
+            <button class="btn btn-primary btn-sm" onclick="StyleBankPage.analyzeFile()" title="AI 通读本地书籍，提取标志性片段/角色塑造/世界观/伏笔设计">🔍 拆书解析</button>
+            <button class="btn btn-ghost btn-sm" onclick="StyleBankPage.create()">＋ 手动添加</button>
             <select class="page-search" id="sbCatFilter" style="width:130px" onchange="StyleBankPage.load()">
               <option value="">全部风格</option>
               <option>热血燃向</option>
@@ -1330,32 +1343,36 @@ window.initTiptap = async function () {
           <div class="pro-form-grid">
             <div class="form-group">
               <label>📕 书名 <span class="pro-opt">（选填）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'bookname')" title="AI 生成书名建议（严格限定只输出书名）">✨AI</button></label>
-              <input class="pro-input" id="proBookName" placeholder="例如：风起西陵" oninput="Composer.onProOutline()">
+              <input class="pro-input" id="proBookName" placeholder="例如：书名（2-12 字，有记忆点）" oninput="Composer.onProOutline()">
             </div>
             <div class="form-group">
               <label>📂 题材 <span class="pro-opt">（选填）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'genre')" title="AI 生成题材建议（严格限定只输出题材）">✨AI</button></label>
-              <input class="pro-input" id="proGenre" placeholder="例如：都市异能 / 玄幻修仙 / 科幻末世" oninput="Composer.onProOutline()">
+              <input class="pro-input" id="proGenre" placeholder="例如：校园青春 / 都市生活 / 玄幻修仙 / 科幻末世 / 悬疑推理…" oninput="Composer.onProOutline()">
             </div>
             <div class="form-group">
               <label>🎯 核心卖点 <span class="pro-opt">（选填）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'selling')" title="AI 生成卖点建议（严格限定只输出卖点）">✨AI</button></label>
-              <input class="pro-input" id="proSelling" placeholder="例如：废柴逆袭打脸爽文 / 悬疑烧脑反转" oninput="Composer.onProOutline()">
+              <input class="pro-input" id="proSelling" placeholder="例如：最吸引人的 1-3 个点（成长/逆袭/悬疑/爽点…）" oninput="Composer.onProOutline()">
             </div>
             <div class="form-group">
               <label>🎭 主角设定 <span class="pro-opt">（选填）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'hero')" title="AI 生成主角设定建议（严格限定只输出主角设定）">✨AI</button></label>
-              <input class="pro-input" id="proHero" placeholder="例如：林夜，外卖员，实为上古灵脉传人，性格隐忍腹黑" oninput="Composer.onProOutline()">
+              <input class="pro-input" id="proHero" placeholder="例如：主角姓名、身份、核心特质、性格" oninput="Composer.onProOutline()">
             </div>
             <div class="form-group">
-              <label>🌍 世界观/环境设定 <span class="pro-opt">（选填）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'world')" title="AI 生成世界观建议（严格限定只输出世界观）">✨AI</button></label>
-              <input class="pro-input" id="proWorld" placeholder="例如：灵气复苏的现代都市，五大势力暗中博弈" oninput="Composer.onProOutline()">
+              <label>🌍 世界观/环境设定 <span class="pro-opt">（选填，可多行）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'world')" title="AI 生成世界观建议（严格限定只输出世界观）">✨AI</button></label>
+              <textarea id="proWorld" class="pro-outline" rows="2" placeholder="例如：时代背景、核心规则/设定、主要势力或格局" oninput="Composer.onProOutline()"></textarea>
             </div>
             <div class="form-group">
-              <label>⚔️ 力量/等级体系 <span class="pro-opt">（选填）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'power')" title="AI 生成力量体系建议（严格限定只输出体系内容）">✨AI</button></label>
-              <input class="pro-input" id="proPower" placeholder="例如：觉醒者九阶：E→D→C→B→A→S→SS→SSS→神阶" oninput="Composer.onProOutline()">
+              <label>⚔️ 力量/等级体系 <span class="pro-opt">（选填，可多行）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'power')" title="AI 生成力量体系建议（严格限定只输出体系内容）">✨AI</button></label>
+              <textarea id="proPower" class="pro-outline" rows="2" placeholder="例如：无超自然体系可留空；有力量/特长/等级设定则写下等级与获取方式" oninput="Composer.onProOutline()"></textarea>
             </div>
           </div>
           <div class="form-group">
             <label>📝 主线剧情概述 <span class="pro-opt">（选填，可多行）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'plot')" title="AI 生成主线剧情建议（严格限定只输出主线）">✨AI</button></label>
-            <textarea id="proPlot" class="pro-outline" rows="3" placeholder="例如：\n开局：主角意外觉醒，卷入城市灵异事件\n发展：逐步揭开家族秘辛，卷入五大势力争斗\n高潮：决战幕后黑手，守护城市\n结局：完成传承，开启新篇章" oninput="Composer.onProOutline()"></textarea>
+            <textarea id="proPlot" class="pro-outline" rows="3" placeholder="例如：
+开局：故事从哪里开始，主角的处境
+发展：冲突与成长如何推进
+高潮：最大的转折或对决
+结局：阶段性收束，开启下一段" oninput="Composer.onProOutline()"></textarea>
           </div>
           <div class="form-group">
             <label>📑 分卷规划 <span class="pro-opt">（选填，每卷一行）</span><button class="pro-ai-btn" onclick="Composer.aiField(event,'volumes')" title="AI 生成分卷规划建议（严格限定只输出分卷）">✨AI</button></label>

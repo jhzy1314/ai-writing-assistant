@@ -1,0 +1,6 @@
+Red error banner: “保存失败: project_id 与 title 必填”  
+Top bar: “墨韵书斋” (left), slider with value “15” (center), “纯净” (right, with pink/purple icon)  
+Bottom: “未命名” (light beige background)  
+Color note: Red = error message.
+
+[Model: qwen3-vl-flash | Tokens: in=211 out=74]

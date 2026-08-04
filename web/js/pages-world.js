@@ -21,9 +21,9 @@ var WorldPage = {
     var items = Store.state.worldSettings || [];
     if (search) {
       items = items.filter(function (w) {
-        var n = (w.name || '').toLowerCase();
-        var d = (w.description || w.content || '').toLowerCase();
-        var cat = (w.category || '').toLowerCase();
+        var n = (w.title || w.name || '').toLowerCase();
+        var d = (w.content || w.description || '').toLowerCase();
+        var cat = (WorldPage.catOf(w) || '').toLowerCase();
         return n.indexOf(search) >= 0 || d.indexOf(search) >= 0 || cat.indexOf(search) >= 0;
       });
     }
@@ -36,9 +36,10 @@ var WorldPage = {
       html += '<div class="world-card" onclick="WorldPage.edit(\'' + w.id + '\')">';
       html += '<div class="world-card-icon">' + WorldPage.iconFor(w.category) + '</div>';
       html += '<div class="world-card-body">';
-      html += '<div class="world-card-name">' + esc(w.name || '未命名') + '</div>';
-      if (w.category) html += '<span class="world-tag">' + esc(w.category) + '</span>';
-      var desc = w.description || w.content || '';
+      html += '<div class="world-card-name">' + esc(w.title || w.name || '未命名') + '</div>';
+      var wcat = WorldPage.catOf(w);
+      if (wcat) html += '<span class="world-tag">' + esc(wcat) + '</span>';
+      var desc = w.content || w.description || '';
       if (desc.length > 100) desc = desc.substring(0, 100) + '...';
       html += '<div class="world-card-desc">' + esc(desc) + '</div>';
       html += '</div>';
@@ -64,14 +65,14 @@ var WorldPage = {
       for (var i = 0; i < items.length; i++) { if (items[i].id === id) { w = items[i]; break; } }
     }
     var isNew = !w;
-    var cats = ['地理', '历史', '政治', '经济', '文化', '种族', '魔法/力量体系', '科技', '宗教', '法律', '其他'];
-    var html = '<div class="form-group"><label>设定名称 *</label><input id="worldName" value="' + escAttr(w ? w.name || '' : '') + '"></div>';
+    var cats = ['地理环境', '历史背景', '社会文化', '校园/职场', '政治势力', '经济体系', '力量/能力体系', '科技', '宗教/信仰', '法律', '其他'];
+    var html = '<div class="form-group"><label>设定名称 *</label><input id="worldName" value="' + escAttr(w ? w.title || w.name || '' : '') + '"></div>';
     html += '<div class="form-group"><label>分类</label><select id="worldCategory">';
     cats.forEach(function (cat) {
-      html += '<option value="' + cat + '"' + (w && w.category === cat ? ' selected' : '') + '>' + cat + '</option>';
+      html += '<option value="' + cat + '"' + (w && WorldPage.catOf(w) === cat ? ' selected' : '') + '>' + cat + '</option>';
     });
     html += '</select></div>';
-    html += '<div class="form-group"><label>设定内容 *</label><textarea id="worldContent" rows="6" placeholder="详细描述世界观设定...">' + esc(w ? w.description || w.content || '' : '') + '</textarea></div>';
+    html += '<div class="form-group"><label>设定内容 *</label><textarea id="worldContent" rows="6" placeholder="详细描述世界观设定...">' + esc(w ? w.content || w.description || '' : '') + '</textarea></div>';
     html += '<div class="form-group"><label>备注</label><textarea id="worldNotes" rows="2">' + esc(w ? w.notes || '' : '') + '</textarea></div>';
 
     var self = this;
@@ -98,13 +99,22 @@ var WorldPage = {
   save: async function (id, data) {
     var p = Store.state.currentProject;
     if (!p) { UI.toast('请先在左侧选择项目', 'warn'); return; }
-    data.project_id = p.id;
+    var content = (data.category ? '【分类】' + data.category + '\n' : '') + (data.description || '') + (data.notes ? '\n备注：' + data.notes : '');
+    var payload = { project_id: p.id, title: data.name, content: content };
     try {
-      if (id) { await API.updateWorldSetting(id, data); }
-      else { await API.createWorldSetting(data); }
+      if (id) { await API.updateWorldSetting(id, payload); }
+      else { await API.createWorldSetting(payload); }
       UI.toast(id ? '已保存' : '已创建', 'success');
       this.load();
     } catch (e) { UI.toast('保存失败: ' + e.message, 'error'); }
+  },
+  /* 从 content 首行解析分类（兼容老数据用 category 字段） */
+  catOf: function (w) {
+    if (!w) return '';
+    if (w.category) return w.category;
+    var c = w.content || '';
+    var m = c.match(/【分类】(.+)/);
+    return m ? m[1].trim() : '';
   },
   del: function (id) {
     var self = this;
@@ -114,6 +124,83 @@ var WorldPage = {
         self.load();
       }).catch(function (e) { UI.toast('删除失败: ' + e.message, 'error'); });
     });
+  },
+  /* ---- AI 丰富建议：分析现有世界观 → 建议可丰富方向 → 预览 → 一键保存 ---- */
+  _suggestBlocks: [],
+  suggest: async function () {
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择项目', 'warn'); return; }
+    var worlds = Store.state.worldSettings || [];
+    if (!worlds.length) { UI.toast('还没有世界观设定，先创建一条或使用「🤖 自动导入」', 'warn'); return; }
+    var existing = worlds.map(function (w) {
+      return '《' + (w.name || '未命名') + '》' + (w.category ? '（' + w.category + '）' : '') + '\n' + (w.description || w.content || '');
+    }).join('\n\n');
+    // 风格参考：当前选中的文风样本（最多 2 条，各取前 200 字）
+    var styleRef = '';
+    try {
+      var sel = Store.state.selection && Store.state.selection.styleSamples;
+      var samples = Store.state.styleSamples || [];
+      if (sel && samples.length) {
+        styleRef = samples.filter(function (s) { return sel.has(s.id); }).slice(0, 2)
+          .map(function (s) { return s.title + '：' + (s.content || '').slice(0, 200); }).join('\n');
+      }
+    } catch (e) {}
+    if (!styleRef) styleRef = '（未选择文风样本，请根据已有世界观与作品基调推断风格）';
+    UI.toast('AI 正在分析世界观并给出丰富建议…', '');
+    try {
+      var r = await API.post('/api/tools/execute', { tool: 'world_enhance', content: existing, params: { instruction: styleRef } });
+      var text = (r && (r.result || r.text)) || '';
+      WorldPage._showSuggestions(text);
+    } catch (e) { UI.toast('建议生成失败: ' + e.message, 'error'); }
+  },
+  _showSuggestions: function (text) {
+    var blocks = text.split(/【方向\s*\d+】/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
+    if (!blocks.length) { UI.toast('AI 未返回有效建议，请重试', 'warn'); return; }
+    WorldPage._suggestBlocks = blocks;
+    var html = '<div style="max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px">';
+    blocks.forEach(function (b, i) {
+      var title = b.split('\n')[0] || ('方向 ' + (i + 1));
+      var reason = (b.match(/【理由】\s*([\s\S]*?)(?=【预览样本】|$)/) || [])[1] || '';
+      var sample = (b.match(/【预览样本】\s*([\s\S]*)$/) || [])[1] || '';
+      if (!sample) sample = b.split('\n').slice(1).join('\n');
+      html += '<div class="world-suggest-card" id="wsCard' + i + '" style="border:1px solid var(--border2);border-radius:8px;padding:10px;background:var(--panel2)">';
+      html += '<div style="font-weight:600;font-size:13px;margin-bottom:4px">✨ ' + esc(title) + '</div>';
+      if (reason) html += '<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">💡 ' + esc(reason) + '</div>';
+      html += '<div style="font-size:12px;line-height:1.7;white-space:pre-wrap;background:var(--panel);border-radius:6px;padding:8px;margin-bottom:8px">' + esc(sample) + '</div>';
+      html += '<button class="btn btn-primary btn-sm" onclick="WorldPage.saveSuggestion(' + i + ')">💾 保存这条</button> ';
+      html += '<button class="btn btn-ghost btn-sm" onclick="WorldPage.discardSuggestion(' + i + ')">忽略</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+    UI.modal({
+      title: '✨ 世界观丰富建议（点击「保存这条」直接入库）',
+      wide: '640px',
+      body: html,
+      actions: [{ id: 'ok', label: '关闭', cls: 'btn-primary' }]
+    });
+  },
+  saveSuggestion: function (idx) {
+    var b = WorldPage._suggestBlocks[idx];
+    if (!b) { UI.toast('建议不存在', 'warn'); return; }
+    var title = (b.split('\n')[0] || '').trim() || ('世界观设定 ' + (idx + 1));
+    var sample = (b.match(/【预览样本】\s*([\s\S]*)$/) || [])[1] || b.split('\n').slice(1).join('\n');
+    sample = sample.trim();
+    if (!sample) { UI.toast('该建议没有可保存的内容', 'warn'); return; }
+    var p = Store.state.currentProject;
+    if (!p) { UI.toast('请先选择项目', 'warn'); return; }
+    UI.confirm('保存这条设定', '将保存为世界观条目：<br><b>' + esc(title) + '</b>', async function () {
+      try {
+        await API.createWorldSetting({ project_id: p.id, title: title, content: sample });
+        UI.toast('✅ 已保存', 'success');
+        var card = document.getElementById('wsCard' + idx);
+        if (card) card.style.display = 'none';
+        WorldPage.load();
+      } catch (e) { UI.toast('保存失败: ' + e.message, 'error'); }
+    });
+  },
+  discardSuggestion: function (idx) {
+    var card = document.getElementById('wsCard' + idx);
+    if (card) card.style.display = 'none';
   },
   importFromText: function () {
     var self = this;

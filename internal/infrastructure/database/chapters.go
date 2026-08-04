@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -59,6 +60,8 @@ type SplitChaptersRequest struct {
 	ProjectID string `json:"project_id"`
 	Content   string `json:"content"`
 	SplitBy   string `json:"split_by"` // "## " / "第.*章" / "auto"
+	Replace   bool   `json:"replace"`  // true=替换(软删旧章节后写入)；false(默认)=追加，绝不动已有章节
+	Preview   bool   `json:"preview"`  // true=只计算分割结果不写库（预览按钮用）
 }
 
 // ===== Volume CRUD =====
@@ -492,7 +495,7 @@ func (s *Store) ImportChapters(ctx context.Context, projectID string, data *Expo
 }
 
 // SplitChapters 将正文按标题/标记分割为章节并写入
-// 导入前清空该项目所有现有章节（事务保护），确保 sort_order 从1开始递增
+// SplitChapters 按标记切分章节；默认追加（Replace=false 不动已有章节），Replace=true 才软删旧章节
 func (s *Store) SplitChapters(ctx context.Context, req *SplitChaptersRequest) ([]Chapter, error) {
 	if strings.TrimSpace(req.Content) == "" {
 		return nil, fmt.Errorf("content 不能为空")
@@ -503,6 +506,11 @@ func (s *Store) SplitChapters(ctx context.Context, req *SplitChaptersRequest) ([
 	if len(segments) == 0 {
 		return nil, fmt.Errorf("error:未能识别出章节，请检查正文是否包含标题标记")
 	}
+	// 预览模式：只计算分割结果不写库（前端「预览结果」按钮用，防止误写入）
+	if req.Preview {
+		return buildPreviewChapters(segments), nil
+	}
+
 	// 仅识别到1段：不覆盖现有章节，追加
 	if len(segments) == 1 {
 		var result []Chapter
@@ -514,16 +522,26 @@ func (s *Store) SplitChapters(ctx context.Context, req *SplitChaptersRequest) ([
 		return result, nil
 	}
 
-	// 多章分割：在事务中先软删除现有章节再写入，避免编号冲突
+	// 多章分割：仅在 replace=true 时软删旧章节；默认追加（保护已有内容，防止误删）
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// 软删除旧章节
-	if _, err := tx.ExecContext(ctx, `UPDATE chapters SET is_deleted=1, deleted_at=? WHERE project_id=?`, now(), req.ProjectID); err != nil {
-		return nil, err
+	if req.Replace {
+		// 软删除旧章节
+		if _, err := tx.ExecContext(ctx, `UPDATE chapters SET is_deleted=1, deleted_at=? WHERE project_id=?`, now(), req.ProjectID); err != nil {
+			return nil, err
+		}
+	}
+
+	// 追加模式：新章节 sort_order 从现有最大序号之后开始，避免与已有章节重叠
+	baseOrder := 0
+	if !req.Replace {
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(sort_order),0) FROM chapters WHERE project_id=? AND is_deleted=0`, req.ProjectID).Scan(&baseOrder); err != nil {
+			return nil, err
+		}
 	}
 
 	var result []Chapter
@@ -533,7 +551,7 @@ func (s *Store) SplitChapters(ctx context.Context, req *SplitChaptersRequest) ([
 			title = fmt.Sprintf("第%d章", i+1)
 		}
 		wc := wordCount(seg.content)
-		ord := i + 1
+		ord := baseOrder + i + 1
 		newID := newID()
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at, is_deleted, deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'')`,
@@ -574,15 +592,12 @@ func (s *Store) SplitByTitles(ctx context.Context, req *SplitChaptersRequest, ti
 
 	// 为每个标题匹配其后的正文段落
 	for i, title := range titles {
-		idx := strings.Index(content[prevEnd:], title)
-		if idx < 0 {
-			idx = strings.Index(content[prevEnd:], strings.TrimSpace(title))
-		}
-		if idx < 0 {
+		start, titleEnd := findTitleIndex(content[prevEnd:], title)
+		if start < 0 {
 			continue
 		}
-		start := prevEnd + idx
-		titleEnd := start + len(title)
+		start += prevEnd
+		titleEnd += prevEnd
 
 		if i > 0 {
 			segContent := strings.TrimSpace(content[prevEnd:start])
@@ -596,12 +611,9 @@ func (s *Store) SplitByTitles(ctx context.Context, req *SplitChaptersRequest, ti
 		if i < len(titles)-1 {
 			nextTitle := titles[i+1]
 			rest := content[titleEnd:]
-			nextIdx := strings.Index(rest, nextTitle)
-			if nextIdx < 0 {
-				nextIdx = strings.Index(rest, strings.TrimSpace(nextTitle))
-			}
-			if nextIdx >= 0 {
-				end = titleEnd + nextIdx
+			nextStart, _ := findTitleIndex(rest, nextTitle)
+			if nextStart >= 0 {
+				end = titleEnd + nextStart
 			}
 		}
 
@@ -616,19 +628,50 @@ func (s *Store) SplitByTitles(ctx context.Context, req *SplitChaptersRequest, ti
 		return nil, fmt.Errorf("未能从标题列表中分割出足够章节")
 	}
 
-	return s.commitSegments(ctx, req.ProjectID, segments)
+	// 预览模式：只计算分割结果不写库
+	if req.Preview {
+		return buildPreviewChapters(segments), nil
+	}
+
+	return s.commitSegments(ctx, req.ProjectID, segments, req.Replace)
+}
+
+// buildPreviewChapters 仅组装分割结果（不落库），供预览接口使用
+func buildPreviewChapters(segments []chapterSeg) []Chapter {
+	result := make([]Chapter, 0, len(segments))
+	for i, seg := range segments {
+		title := seg.title
+		if title == "" {
+			title = fmt.Sprintf("第%d章", i+1)
+		}
+		result = append(result, Chapter{
+			Title: title, Content: seg.content, WordCount: wordCount(seg.content), SortOrder: i + 1,
+		})
+	}
+	return result
 }
 
 // commitSegments 将分割后的段落在事务中写入数据库
-func (s *Store) commitSegments(ctx context.Context, projectID string, segments []chapterSeg) ([]Chapter, error) {
+func (s *Store) commitSegments(ctx context.Context, projectID string, segments []chapterSeg, replace bool) ([]Chapter, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, `UPDATE chapters SET is_deleted=1, deleted_at=? WHERE project_id=?`, now(), projectID); err != nil {
-		return nil, err
+	if replace {
+		// 仅替换模式软删旧章节；默认追加不动已有内容（防止误删用户章节）
+		if _, err := tx.ExecContext(ctx, `UPDATE chapters SET is_deleted=1, deleted_at=? WHERE project_id=?`, now(), projectID); err != nil {
+			return nil, err
+		}
+	}
+
+	// 追加模式：新章节 sort_order 从现有最大序号之后开始
+	baseOrder := 0
+	if !replace {
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(sort_order),0) FROM chapters WHERE project_id=? AND is_deleted=0`, projectID).Scan(&baseOrder); err != nil {
+			return nil, err
+		}
 	}
 
 	var result []Chapter
@@ -639,18 +682,19 @@ func (s *Store) commitSegments(ctx context.Context, projectID string, segments [
 		}
 		wc := wordCount(seg.content)
 		cid := newID()
+		ord := baseOrder + i + 1
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO chapters(id, project_id, volume_id, title, content, word_count, sort_order, tags, synopsis, created_at, updated_at, is_deleted, deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,'')`,
-			cid, projectID, "", title, seg.content, wc, i+1, "", "", now(), now()); err != nil {
-			return result, fmt.Errorf("写入第%d章失败: %w", i+1, err)
+			cid, projectID, "", title, seg.content, wc, ord, "", "", now(), now()); err != nil {
+			return result, fmt.Errorf("写入第%d章失败: %w", ord, err)
 		}
 		vid := uuid.NewString()
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO chapter_versions(id, chapter_id, title, content, version, created_at) VALUES(?,?,?,?,1,?)`,
 			vid, cid, title, seg.content, now()); err != nil {
-			return result, fmt.Errorf("写入第%d章版本记录失败: %w", i+1, err)
+			return result, fmt.Errorf("写入第%d章版本记录失败: %w", ord, err)
 		}
-		ch := Chapter{ID: cid, ProjectID: projectID, Title: title, Content: seg.content, WordCount: wc, SortOrder: i + 1}
+		ch := Chapter{ID: cid, ProjectID: projectID, Title: title, Content: seg.content, WordCount: wc, SortOrder: ord}
 		result = append(result, ch)
 	}
 
@@ -776,6 +820,23 @@ func splitByPattern(lines []string) []chapterSeg {
 			continue
 		}
 		prevWasHeading = false
+
+		// 行尾章节标题识别：docx 导出常见「正文……。第十章」标题与正文同段。
+		// 仅当行尾为「句末标点 + 第X章」（可带 ** 与空白）时拆分，降低正文误判。
+		if title, body, ok := matchTrailingChapter(trimmed); ok {
+			if buf.Len() > 0 {
+				buf.WriteString("\n")
+			}
+			buf.WriteString(body)
+			if curTitle != "" || buf.Len() > 0 {
+				parts = append(parts, chapterSeg{title: curTitle, content: strings.TrimSpace(buf.String())})
+				buf.Reset()
+			}
+			curTitle = title
+			prevWasHeading = true
+			continue
+		}
+
 		if buf.Len() > 0 {
 			buf.WriteString("\n")
 		}
@@ -785,6 +846,75 @@ func splitByPattern(lines []string) []chapterSeg {
 		parts = append(parts, chapterSeg{title: curTitle, content: strings.TrimSpace(buf.String())})
 	}
 	return parts
+}
+
+// trailingChapterRe 行尾章节标题：句末标点 + 空白(可选) + 第X章(可带 **)，仅定位用
+var trailingChapterRe = regexp.MustCompile(`[。！？…!?][\s\x{3000}\t]*(\*\*)?第[0-9一二三四五六七八九十百]+章(\*\*)?$`)
+
+// findTitleIndex 定位标题在正文中的位置：
+// 1) 优先「独立行标题」（可带 ** 与空白）；2) 其次「段尾标题」（句末标点后，可带 **）；
+// 3) 兜底裸查找。避免正文中「详见第十章」式引用被误判为章节边界。
+// 返回 (标题文本实际起点, 终点)（不含前导标点/空白/**），未找到返回 (-1,-1)。
+func findTitleIndex(haystack, title string) (int, int) {
+	clean := strings.TrimSpace(title)
+	if clean == "" || haystack == "" {
+		return -1, -1
+	}
+	q := regexp.QuoteMeta(clean)
+	// 1. 独立行标题：行首空白(可选) + 可选 ** + 标题 + 可选 ** + 行尾空白
+	lineRe := regexp.MustCompile(`(?m)^[\s\x{3000}\t]*(\*\*)?` + q + `(\*\*)?[\s\x{3000}\t]*$`)
+	if loc := lineRe.FindStringIndex(haystack); loc != nil {
+		if s, e := cleanSpan(haystack[loc[0]:loc[1]], clean); s >= 0 {
+			return loc[0] + s, loc[0] + e
+		}
+	}
+	// 2. 段尾标题：句末标点 + 空白(可选) + 可选 ** + 标题 + 可选 **，锚定行尾（(?m) 使 $ 匹配行尾）
+	tailRe := regexp.MustCompile(`(?m)[。！？…!?][\s\x{3000}\t]*(\*\*)?` + q + `(\*\*)?[\s\x{3000}\t]*$`)
+	if loc := tailRe.FindStringIndex(haystack); loc != nil {
+		if s, e := cleanSpan(haystack[loc[0]:loc[1]], clean); s >= 0 {
+			return loc[0] + s, loc[0] + e
+		}
+	}
+	// 3. 兜底：裸查找（兼容无标点独立标题等异常格式）
+	if idx := strings.Index(haystack, clean); idx >= 0 {
+		return idx, idx + len(clean)
+	}
+	return -1, -1
+}
+
+// cleanSpan 在匹配串内定位标题文本的实际起止（跳过 ** 与空白）
+func cleanSpan(matched, clean string) (int, int) {
+	i := strings.Index(matched, clean)
+	if i < 0 {
+		return -1, -1
+	}
+	return i, i + len(clean)
+}
+
+// matchTrailingChapter 识别段尾嵌入的章节标题，返回 (标题, 正文(含句末标点), 是否命中)
+func matchTrailingChapter(line string) (string, string, bool) {
+	trimmed := strings.TrimRight(line, " \t\u3000")
+	loc := trailingChapterRe.FindStringIndex(trimmed)
+	if loc == nil {
+		return "", "", false
+	}
+	matched := trimmed[loc[0]:]
+	// 拆出前导句末标点（保留给正文）与标题文本
+	rs := []rune(matched)
+	i := 0
+	for i < len(rs) && strings.ContainsRune("。！？…!?", rs[i]) {
+		i++
+	}
+	punct := string(rs[:i])
+	title := strings.TrimSpace(string(rs[i:]))
+	title = strings.TrimPrefix(title, "**")
+	title = strings.TrimSuffix(title, "**")
+	title = strings.TrimSpace(title)
+	if title == "" || len([]rune(title)) > 30 {
+		return "", "", false
+	}
+	body := strings.TrimRight(trimmed[:loc[0]], " \t\u3000") + punct
+	return title, body, true
 }
 
 func splitByHeading(lines []string, prefix string) []chapterSeg {

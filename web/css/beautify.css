@@ -1412,49 +1412,49 @@ body {
 .ot-vol-acts .link-btn:hover { background: var(--accent-soft); color: var(--accent); }
 
 .ot-vol-body { padding: 6px 0; }
+.ot-vol-body { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 6px; padding: 6px 8px; }
 .ot-ch-item {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  margin: 0 8px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
   transition: all .2s;
   position: relative;
-}
-.ot-ch-item::before {
-  content: '';
-  position: absolute;
-  left: -16px; top: 50%;
-  width: 14px; height: 1px;
-  background: var(--border);
+  border: 1px solid transparent;
 }
 .ot-ch-item:hover {
   background: var(--accent-soft);
-  transform: translateX(3px);
+  border-color: var(--border2);
 }
-.ot-ch-item:hover::before { background: var(--accent); }
+.ot-ch-top { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
 .ot-ch-num {
-  width: 24px; height: 24px;
+  width: 22px; height: 22px;
   border-radius: 6px;
   background: var(--panel2);
   color: var(--muted);
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   flex-shrink: 0;
 }
-.ot-ch-icon { font-size: 13px; color: var(--accent); }
-.ot-ch-name { flex: 1; font-size: 13px; color: var(--text); font-weight: 500; }
+.ot-ch-icon { font-size: 12px; color: var(--accent); }
+.ot-ch-name { flex: 1; font-size: 12.5px; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ot-ch-sum {
+  font-size: 11px; color: var(--muted); line-height: 1.45;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding-left: 30px;
+}
 .ot-ch-wc {
   background: var(--panel2);
   color: var(--muted);
-  padding: 2px 9px;
+  padding: 1px 8px;
   border-radius: 10px;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
   font-family: 'SF Mono', monospace;
+  flex-shrink: 0;
 }
 .ot-ch-acts { display: flex; gap: 2px; opacity: 0; transition: opacity .2s; }
 .ot-ch-item:hover .ot-ch-acts { opacity: 1; }
@@ -1496,7 +1496,8 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: var(--shadow-xl), 0 0 60px var(--accent-soft);
-  overflow: hidden;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 .modal-head {
   padding: 18px 22px;

@@ -434,10 +434,10 @@ var ChapterUI = {
     ChapterUI._splitContent = content;
 
     UI.toast('AI 正在分析章节结构…', '');
-    API.splitChapters(p.id, content, 'auto').then(function (r) {
+    API.splitChapters(p.id, content, 'auto').then(async function (r) {
       var chs = r.items || [];
-      Store.state.chapters = chs;
-      UI.toast('已分为 ' + chs.length + ' 章', 'success');
+      await ChapterUI.loadAll();
+      UI.toast(r.replaced ? ('已替换为 ' + chs.length + ' 章') : ('已追加 ' + chs.length + ' 章，原有章节未改动'), 'success');
       ChapterUI.renderTree();
       ProjectUI.renderList();
       Sidebar.renderResources();
@@ -459,6 +459,7 @@ var ChapterUI = {
           '</select></div>' +
           '<div class="form-group" id="' + idn + '_custom" style="display:none"><label>自定义分隔标记</label><input id="' + idn + '_sep" placeholder="例如：--- 或 ##"></div>' +
           '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:7px;padding:8px;font-size:11px;background:var(--panel2)" id="' + idn + '_preview"><span class="res-check-empty">点击预览查看分割结果</span></div>' +
+          '<div style="margin-top:4px;font-size:11px;color:var(--faint)">分割结果将<b>追加</b>到当前项目，原有章节保持不变</div>' +
           '<div style="margin-top:4px"><button class="tool-btn" onclick="ChapterUI.manualPreview(\'' + idn + '\')">🔍 预览结果</button></div>',
         actions: [
           { id: 'cancel', label: '取消' },
@@ -470,12 +471,12 @@ var ChapterUI = {
             try {
               var r2 = await API.splitChapters(p.id, ChapterUI._splitContent, splitBy);
               var chs = r2.items || [];
-              Store.state.chapters = chs;
+              await ChapterUI.loadAll();
               ChapterUI.renderTree();
               ProjectUI.renderList();
               Sidebar.renderResources();
               if (chs.length > 0) { ChapterUI.selectChapter(chs[0]); }
-              UI.toast('已分为 ' + chs.length + ' 章', 'success');
+              UI.toast(r2.replaced ? ('已替换为 ' + chs.length + ' 章') : ('已追加 ' + chs.length + ' 章，原有章节未改动'), 'success');
             } catch (e2) { UI.toast('分割失败：' + e2.message, 'error'); }
           }}
         ]
@@ -490,7 +491,7 @@ var ChapterUI = {
     if (!pp) return;
     var content = ChapterUI._splitContent;
     if (!content) { UI.toast('内容为空', 'warn'); return; }
-    API.splitChapters(pp.id, content, sb).then(function (r) {
+    API.splitChapters(pp.id, content, sb, true).then(function (r) {
       document.getElementById(idn + '_preview').innerHTML = (r.items || []).map(function (c, i) {
         return '<div style="padding:4px 0;border-bottom:1px solid var(--border)"><b>#' + (i + 1) + '</b> ' + esc(c.title || '') + ' <span style="color:var(--faint)">' + (c.word_count || 0) + '字</span></div>';
       }).join('') || '<span class="res-check-empty">未识别到章节</span>';

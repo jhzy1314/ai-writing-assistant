@@ -43,6 +43,7 @@ type Server struct {
 	router     *chi.Mux
 	appearance *appearance.Service
 	rag        *rag.Service
+	libraryDir string // 本地文库目录（config.server.library_dir）
 }
 
 // NewServer 构造 API 服务
@@ -59,6 +60,9 @@ func NewServer(store *database.Store, registry *llm.Registry, dispatcher *pipeli
 	s.routes()
 	return s
 }
+
+// SetLibraryDir 设置本地文库目录（拆书解析用，来自 config.server.library_dir）
+func (s *Server) SetLibraryDir(dir string) { s.libraryDir = dir }
 
 // routes 注册全部路由（对应规格第四章 API 接口定义）
 func (s *Server) routes() {
@@ -111,6 +115,11 @@ func (s *Server) routes() {
 
 	// 8. Helper 工具辅助接口
 	s.router.Post("/api/tools/execute", s.HandleToolExecute)
+	s.router.Post("/api/tools/analyze-file", s.HandleAnalyzeFile)
+	s.router.Get("/api/library", s.HandleListLibrary)
+	s.router.Post("/api/library/analyze", s.HandleAnalyzeLibrary)
+	s.router.Post("/api/library/analyze-project", s.HandleAnalyzeProject)
+	s.router.Get("/api/library/analyze/task/{id}", s.HandleAnalyzeTask)
 
 	// 8.5 创作增强：伏笔 / 素材库 / 场景节拍 / 构思Agent / 角色关系
 	s.router.Get("/api/foreshadows", s.HandleListForeshadows)
@@ -145,6 +154,7 @@ func (s *Server) routes() {
 	s.router.Post("/api/stylesamples", s.HandleCreateStyleSample)
 	s.router.Put("/api/stylesamples/{id}", s.HandleUpdateStyleSample)
 	s.router.Delete("/api/stylesamples/{id}", s.HandleDeleteStyleSample)
+	s.router.Delete("/api/stylesamples/source/{source}", s.HandleDeleteStyleSamplesBySource)
 	s.router.Post("/api/stylesamples/import", s.HandleImportStyleSamples)
 
 	// 2. 项目管理
@@ -165,6 +175,8 @@ func (s *Server) routes() {
 	// 4. 设定资源
 	s.router.Get("/api/characters", s.HandleListCharacters)
 	s.router.Post("/api/characters", s.HandleCreateCharacter)
+	s.router.Get("/api/characters/duplicates", s.HandleCharDuplicates)
+	s.router.Post("/api/characters/merge", s.HandleCharMerge)
 	s.router.Put("/api/characters/{id}", s.HandleUpdateCharacter)
 	s.router.Delete("/api/characters/{id}", s.HandleDeleteCharacter)
 

@@ -1,0 +1,3 @@
+Error toast: “合并参数缺失” (Chinese for “Merge parameters missing”) on a brown rounded rectangle, with a thin white progress bar beneath the text. Background is dark gray; top UI elements partially visible but blurred. No code, stack trace, or file names visible.
+
+[Model: qwen3-vl-flash | Tokens: in=180 out=57]

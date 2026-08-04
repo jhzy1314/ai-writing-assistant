@@ -10,6 +10,15 @@ function fmtTime(s) {
   if (isNaN(d)) return s;
   return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
+function fmtDur(ms) {
+  ms = Number(ms) || 0;
+  if (ms < 1000) return ms + 'ms';
+  var s = ms / 1000;
+  if (s < 60) return s.toFixed(1) + 's';
+  var m = Math.floor(s / 60);
+  var rem = Math.round(s % 60);
+  return m + 'm' + (rem > 0 ? rem + 's' : '');
+}
 function wordCount(text) {
   // 与后端 wordCount 口径一致：统计非空白字符数（含标点，排除空格/换行）
   return Array.from(text || '').filter(function (c) { return !/\s/.test(c); }).length;

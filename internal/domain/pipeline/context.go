@@ -23,13 +23,42 @@ func (d *Dispatcher) buildContext(ctx context.Context, req GenerateRequest) Cont
 	if req.ProjectID == "" {
 		return bundle
 	}
-	// ChapterID 优先：加载对应章节内容作为前文
+	// 历史前文：加载项目全部章节正文（agent 读全文，避免遗漏早期章节已交代的信息）
+	var allChs []database.ChapterWithVolume
+	if chs, err := d.store.ListChapters(ctx, req.ProjectID, ""); err == nil && len(chs) > 0 {
+		allChs = chs
+		var hb strings.Builder
+		for i := range chs {
+			if strings.TrimSpace(chs[i].Content) == "" {
+				continue
+			}
+			hb.WriteString(chs[i].Title + "\n")
+			hb.WriteString(chs[i].Content + "\n\n")
+		}
+		if hb.Len() > 0 {
+			bundle.HistoryContent = hb.String()
+		}
+	}
+	// 叙事视角识别：统计第一人称叙述者标记（"后来惊鸿跟我说"这类框架句），识别项目主导视角
+	if len(allChs) > 0 {
+		firstPersonChs := 0
+		firstPersonHits := 0
+		for i := range allChs {
+			c := allChs[i].Content
+			if strings.Contains(c, "跟我说") || strings.Contains(c, "跟我") ||
+				strings.Contains(c, "我后来") || strings.Contains(c, "我说你") ||
+				strings.Contains(c, "我们") || strings.Contains(c, "我心想") {
+				firstPersonChs++
+			}
+			firstPersonHits += strings.Count(c, "跟我说") + strings.Count(c, "我后来")
+		}
+		if firstPersonChs >= 2 && float64(firstPersonChs)/float64(len(allChs)) >= 0.25 {
+			bundle.MaterialText = "【叙事风格参考】本项目前几章带有第一人称叙述者“我”（惊鸿的同学/朋友）讲述故事的框架（如“后来惊鸿跟我说”），后半部分转为第三人称。续写时自然延续这种风格即可：该用“我”的叙述框架时就用，该纯第三人称场景时就第三人称，不必刻意、不要生硬，像前文一样灵活切换。\n" + bundle.MaterialText
+		}
+	}
+	// ChapterID 对应章节的 tags/synopsis 作为补充上下文
 	if req.ChapterID != "" {
 		if ch, err := d.store.GetChapter(ctx, req.ChapterID); err == nil && ch != nil {
-			if strings.TrimSpace(bundle.HistoryContent) == "" {
-				bundle.HistoryContent = ch.Content
-			}
-			// 加载章节关联的 tags/synopsis 作为补充上下文
 			if ch.Tags != "" {
 				bundle.WorldSetting = "【章节标签】" + ch.Tags + "\n" + bundle.WorldSetting
 			}
@@ -39,40 +68,8 @@ func (d *Dispatcher) buildContext(ctx context.Context, req GenerateRequest) Cont
 	if req.ContextScope == "withSummary" && strings.TrimSpace(req.PreviousSummaries) != "" {
 		bundle.HistoryContent = "【前面章节摘要】\n" + req.PreviousSummaries + "\n\n" + bundle.HistoryContent
 	}
-	// ContextScope=smart 时自动分层
-	if req.ContextScope == "smart" {
-		if chs, err := d.store.ListChapters(ctx, req.ProjectID, ""); err == nil && len(chs) > 0 {
-			var builder strings.Builder
-			total := len(chs)
-			for i := total - 1; i >= 0 && i >= total-2; i-- {
-				if chs[i].Content != "" {
-					builder.WriteString("【" + chs[i].Title + "（全文）】\n" + chs[i].Content + "\n\n")
-				}
-			}
-			for i := total - 3; i >= 0 && i >= total-7; i-- {
-				// 优先使用章节 Synopsis（人工/AI 维护的摘要），无则退化取前 3 句
-				summary := strings.TrimSpace(chs[i].Synopsis)
-				if summary == "" && chs[i].Content != "" {
-					summary = strings.Join(strings.Split(chs[i].Content, "。")[:3], "。") + "。"
-				}
-				if summary != "" {
-					builder.WriteString("【" + chs[i].Title + "（摘要）】" + summary + "\n\n")
-				}
-			}
-			for i := 0; i < total && i < total-7; i++ {
-				if chs[i].Title != "" {
-					builder.WriteString("· " + chs[i].Title)
-					if chs[i].Synopsis != "" {
-						builder.WriteString("：" + chs[i].Synopsis)
-					}
-					builder.WriteString("\n")
-				}
-			}
-			bundle.HistoryContent = builder.String()
-		}
-	}
 	// ========== RAG 按需注入：向量语义检索（懒建索引） ==========
-	if req.ContextScope == "smart" || req.ContextScope == "" {
+	if req.ContextScope == "smart" || req.ContextScope == "" || req.ContextScope == "full" {
 		if d.rag != nil {
 			// 懒建索引：项目尚无向量块时全量建一次
 			n, _ := d.store.CountRAGChunks(ctx, req.ProjectID)
@@ -106,11 +103,6 @@ func (d *Dispatcher) buildContext(ctx context.Context, req GenerateRequest) Cont
 	if strings.TrimSpace(bundle.CharacterSetting) == "" {
 		if t, err := d.store.CharactersText(ctx, req.ProjectID); err == nil && t != "" {
 			bundle.CharacterSetting = t
-		}
-	}
-	if strings.TrimSpace(bundle.HistoryContent) == "" {
-		if v, err := d.store.LatestVersion(ctx, req.ProjectID); err == nil && v != nil && v.Content != "" {
-			bundle.HistoryContent = v.Content
 		}
 	}
 	// ========== 素材库融合：按需求语义检索写作素材注入（去AI味） ==========
@@ -150,23 +142,73 @@ func (d *Dispatcher) buildContext(ctx context.Context, req GenerateRequest) Cont
 			}
 		}
 	}
-	// ========== 文风样本库注入：用户自选样本作为风格参考（本地知识库） ==========
+	// ========== 文风样本库注入：用户自选样本作为参考（本地知识库） ==========
+	// 拆书素材按类型分组注入：关键片段/人物卡/世界观/伏笔设计，全部原文读取（不截断）。
+	// 这些来自用户拆解的其他书籍——只作创作手法参考，严禁挪用其人物/设定/剧情。
 	if len(req.StyleSampleIDs) > 0 {
 		if samples, err := d.store.GetStyleSamplesByIDs(ctx, req.StyleSampleIDs); err == nil && len(samples) > 0 {
-			var b strings.Builder
-			b.WriteString("\n\n【文风参考样本（来自本地知识库，仅借鉴表达方式与叙事节奏，不得整段照抄）】\n")
+			var frags, chars, worlds, fores []database.StyleSample
 			for _, sm := range samples {
-				header := sm.Title
-				if sm.Author != "" {
-					header += "（" + sm.Author + "）"
+				switch sm.Kind {
+				case database.KindCharacter:
+					chars = append(chars, sm)
+				case database.KindWorld:
+					worlds = append(worlds, sm)
+				case database.KindForeshadow:
+					fores = append(fores, sm)
+				default:
+					frags = append(frags, sm)
 				}
-				if sm.Category != "" {
-					header += "【" + sm.Category + "】"
-				}
-				b.WriteString("《" + header + "》\n")
-				b.WriteString(truncateRunes(strings.TrimSpace(sm.Content), 600) + "\n\n")
 			}
-			bundle.MaterialText = bundle.MaterialText + b.String()
+			bundle.MaterialText = bundle.MaterialText +
+				"\n\n【外部书籍拆书参考（重要：以下素材来自用户拆解的其他小说，仅供你借鉴创作手法——学习它们如何塑造人物、如何构建世界观、如何埋设伏笔、如何组织文字节奏。你的作品人物、世界观、剧情必须全部来自用户自己的设定，严禁挪用参考书中的任何人物、地名、设定、伏笔或剧情；若参考书内容与用户自己设定冲突，一律以用户自己的设定为准）】"
+			writeGroup := func(label string, list []database.StyleSample) {
+				if len(list) == 0 {
+					return
+				}
+				var b strings.Builder
+				b.WriteString("\n\n【" + label + "】\n")
+				for _, sm := range list {
+					b.WriteString("《" + sm.Title + "》\n")
+					b.WriteString(strings.TrimSpace(sm.Content) + "\n\n")
+				}
+				bundle.MaterialText = bundle.MaterialText + b.String()
+			}
+			writeGroup("文风参考样本（关键片段，仅学表达方式与叙事节奏，不得整段照抄）", frags)
+			writeGroup("拆书参考·人物卡（仅学人物塑造手法，参考书人物一律不得出现在你的作品中）", chars)
+			writeGroup("拆书参考·世界观（仅学世界观构建手法，你的世界观必须用用户自己的设定）", worlds)
+			writeGroup("拆书参考·伏笔设计（仅学伏笔埋设与回收手法，不得挪用参考书的具体伏笔）", fores)
+		}
+	}
+
+	// ========== 自动文风参考：用户未选拆书素材/文风章节时，采样项目已有正文作为文风参考 ==========
+	// 项目正文本身就是最好的文风样本——续写必须像前文，而不是像一篇新文章。
+	if len(req.StyleSampleIDs) == 0 && strings.TrimSpace(req.MaterialText) == "" && req.ProjectID != "" {
+		if chs, err := d.store.ListChapters(ctx, req.ProjectID, ""); err == nil && len(chs) > 0 {
+			const headRunes = 1500
+			var b strings.Builder
+			// 第一章开头（作品定调处，最能体现整体文风）
+			if strings.TrimSpace(chs[0].Content) != "" {
+				b.WriteString("\n【文风参考·作品开篇】\n")
+				b.WriteString(truncateRunes(strings.TrimSpace(chs[0].Content), headRunes))
+				b.WriteString("\n")
+			}
+			// 最近一章开头（当前叙事语感；若当前章就是最后一章则跳过，避免与正文冲突）
+			last := chs[len(chs)-1]
+			if last.ID != req.ChapterID && strings.TrimSpace(last.Content) != "" {
+				b.WriteString("\n【文风参考·最近章节】\n")
+				b.WriteString(truncateRunes(strings.TrimSpace(last.Content), headRunes))
+				b.WriteString("\n")
+			}
+			if b.Len() > 0 {
+				bundle.MaterialText = "【项目正文·文风参考（硬性要求）】以下是你正在创作的这部小说的既有正文片段。续写必须严格模仿它的文风，逐条对照自检：\n" +
+					"1. 事件密集：用具体的事、动作、对话推进剧情，禁止停留在心理独白和内心戏里出不来；\n" +
+					"2. 白描克制：少用「像…」比喻，每 1000 字最多 1 处；禁止「动作很自然，甚至有点刻意地自然」这类作者跳出来解说的句子；\n" +
+					"3. 对话自然：对话简短、生活化、带具体信息（谁做了什么事、说了什么话），用对话交代剧情；\n" +
+					"4. 直接进入事件：禁止用环境氛围渲染开场（如「风从缝隙挤进来，先冻脚踝」式抒情开头），第一句就写发生了什么事；\n" +
+					"5. 情绪用动作表达：不写「他屏住呼吸」「他心跳先快了一下」这类直接心理标注，用他做了什么来暗示。\n" +
+					"新内容必须读起来像同一部作品的自然延续，而不是一篇新文章。" + b.String() + bundle.MaterialText
+			}
 		}
 	}
 

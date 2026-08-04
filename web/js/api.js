@@ -118,7 +118,7 @@ var API = {
   // 章节导入导出
   exportChapters: function (pid) { return this.get('/api/chapters/export?project_id=' + pid).then(function (d) { return d.item; }); },
   importChapters: function (data) { return this.post('/api/chapters/import', data); },
-  splitChapters: function (pid, content, splitBy) { return this.post('/api/chapters/split', { project_id: pid, content: content, split_by: splitBy || 'auto' }); },
+  splitChapters: function (pid, content, splitBy, preview) { return this.post('/api/chapters/split', { project_id: pid, content: content, split_by: splitBy || 'auto', preview: !!preview }); },
   mergeChapters: function (ids, title) { return this.post('/api/chapters/merge', { chapter_ids: ids, title: title }).then(function (d) { return d.item; }); },
   splitChapterAtCursor: function (id, cursorPos) { return this.post('/api/chapters/' + id + '/split', { cursor_pos: cursorPos }).then(function (d) { return d.items; }); },
   getProjectStats: function (pid) { return this.get('/api/projects/' + pid + '/stats').then(function (d) { return d.item; }); },
@@ -168,7 +168,7 @@ var API = {
   // 角色关系图谱
   characterRelations: function (pid, content, force) { return this.post('/api/characters/relations', { project_id: pid, content: content || '', force: !!force }); },
   // 文风样本库（本地知识库）
-  listStyleSamples: function (cat) { return this.get('/api/stylesamples' + (cat ? '?category=' + encodeURIComponent(cat) : '')).then(function (d) { return d.items || []; }); },
+  listStyleSamples: function (cat) { return this.get('/api/stylesamples?full=1' + (cat ? '&category=' + encodeURIComponent(cat) : '')).then(function (d) { return d.items || []; }); },
   getStyleSample: function (id) { return this.get('/api/stylesamples/' + id).then(function (d) { return d.item; }); },
   createStyleSample: function (m) { return this.post('/api/stylesamples', m).then(function (d) { return d.item; }); },
   updateStyleSample: function (id, m) { return this.put('/api/stylesamples/' + id, m).then(function (d) { return d.item; }); },

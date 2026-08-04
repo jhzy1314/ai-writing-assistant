@@ -120,16 +120,30 @@ var ResourceUI = {
           .replace(/[\s"'"'“”‘’（）()《》【】\[\]：:，,。.！!？?]/g, '')
           .replace(/(.+)\1$/, '$1'); // 去掉尾部重复段（天一天一 -> 天一）
       };
+      // 别名变体判定：精确相等 / 字符重排相同（叙述者我 vs 我叙述者）/ 短名（≥2字）被长名包含（小龙女 vs 小龙女外号；马老头 vs 物理马老师马老头）
+      var isDupName = function (a, b) {
+        if (!a || !b) return false;
+        if (a === b) return true;
+        if (Array.from(a).sort().join('') === Array.from(b).sort().join('')) return true;
+        var short = a.length <= b.length ? a : b;
+        var long = a.length <= b.length ? b : a;
+        if (short.length >= 2 && long.indexOf(short) >= 0) return true;
+        return false;
+      };
+      var dupOfList = function (name, list) {
+        for (var i = 0; i < list.length; i++) if (isDupName(name, list[i])) return true;
+        return false;
+      };
       var existingCharsNorm = (Store.state.characters || []).map(function (c) { return norm(c.name); });
       var existingWorldsNorm = (Store.state.worldSettings || []).map(function (w) { return norm(w.title); });
-      var newChars = parsed.characters.filter(function (c) { return existingCharsNorm.indexOf(norm(c.name)) < 0; });
-      var newWorlds = parsed.worlds.filter(function (w) { return existingWorldsNorm.indexOf(norm(w.title)) < 0; });
+      var newChars = parsed.characters.filter(function (c) { return !dupOfList(norm(c.name), existingCharsNorm); });
+      var newWorlds = parsed.worlds.filter(function (w) { return !dupOfList(norm(w.title), existingWorldsNorm); });
       // 新提取的彼此之间也去重（保留第一个）
-      var seenNew = {};
+      var seenNew = [];
       newChars = newChars.filter(function (c) {
         var k = norm(c.name);
-        if (!k || seenNew[k]) return false;
-        seenNew[k] = true;
+        if (!k || dupOfList(k, seenNew)) return false;
+        seenNew.push(k);
         return true;
       });
       var saved = 0, failed = 0, skipped = parsed.characters.length + parsed.worlds.length - newChars.length - newWorlds.length;
@@ -215,10 +229,10 @@ var ResourceUI = {
     worldBlocks.forEach(function (block) {
       block = block.trim();
       if (!block) return;
-      var f = { title: '', era: '', tags: '', rules: '', forces: '', geography: '', powers: '' };
-      var map = { '标题': 'title', '时代背景': 'era', '标签': 'tags', '世界规则': 'rules', '势力分布': 'forces', '地理设定': 'geography', '力量体系': 'powers' };
+      var f = { title: '', era: '', location: '', core: '', society: '', rules: '', forces: '', geography: '', powers: '', evolution: '', tags: '' };
+      var map = { '标题': 'title', '时代背景': 'era', '主要地点': 'location', '核心设定': 'core', '社会环境': 'society', '世界规则': 'rules', '势力分布': 'forces', '地理设定': 'geography', '力量体系': 'powers', '演化标注': 'evolution', '标签': 'tags' };
       block.split('\n').forEach(function (line) {
-        var m = line.match(/^(标题|时代背景|标签|世界规则|势力分布|地理设定|力量体系)[：:]\s*(.*)/);
+        var m = line.match(/^(标题|时代背景|主要地点|核心设定|社会环境|世界规则|势力分布|地理设定|力量体系|演化标注|标签)[：:]\s*(.*)/);
         if (m && map[m[1]]) f[map[m[1]]] = m[2].trim();
       });
       if (f.title && f.title !== '未知') worlds.push(f);
@@ -258,7 +272,7 @@ var ResourceUI = {
     if (parsed.worlds.length) {
       worldsHTML = '<div style="margin-bottom:8px"><div class="ghead">世界观（' + parsed.worlds.length + ' 项）</div>';
       parsed.worlds.forEach(function (w, i) {
-        var desc = [w.era, w.tags, w.rules].filter(function (x) { return x && x !== '未知'; }).map(function (s) { return s.slice(0, 40); }).join(' · ');
+        var desc = [w.era, w.location, w.core, w.evolution].filter(function (x) { return x && x !== '未知'; }).map(function (s) { return s.slice(0, 40); }).join(' · ');
         worldsHTML += '<div class="summary-check-item" onclick="event.currentTarget.classList.toggle(\'unchecked\');var cb=event.currentTarget.querySelector(\'input\');cb.checked=!cb.checked;if(cb.checked){checkedWorlds[\'' + esc(w.title) + '\']=true}else{checkedWorlds[\'' + esc(w.title) + '\']=false}"">' +
           '<input type="checkbox" checked onchange="if(this.checked){checkedWorlds[\'' + esc(w.title) + '\']=true}else{checkedWorlds[\'' + esc(w.title) + '\']=false}" onclick="event.stopPropagation()">' +
           '<span class="n">' + esc(w.title) + '</span><span class="d">' + esc(desc) + '</span></div>';
@@ -496,19 +510,23 @@ var ResourceUI = {
   /* ---- 世界观 ---- */
   editWorld: function (id) {
     var w = id ? Store.state.worldSettings.find(function (x) { return x.id === id; }) : null;
-    var f = w ? this.unpackWorld(w.content) : { era: '', tags: '', rules: '', forces: '', geography: '', powers: '' };
+    var f = w ? this.unpackWorld(w.content) : { era: '', location: '', core: '', society: '', tags: '', rules: '', forces: '', geography: '', powers: '', evolution: '' };
     var ids = 'w_' + uid();
     UI.modal({
-      title: w ? '编辑世界观' : '新建世界观', wide: '560px',
+      title: w ? '编辑世界观' : '新建世界观', wide: '620px',
       body: '<div class="form-row" style="display:flex;gap:8px">' +
         '<div class="form-group" style="flex:2"><label>标题 *</label><input id="' + ids + '_title" value="' + esc(w ? w.title : '') + '"></div>' +
         '<div class="form-group" style="flex:1"><label>时代背景</label><input id="' + ids + '_era" value="' + esc(f.era) + '" placeholder="古代/现代/未来"></div>' +
-        '<div class="form-group" style="flex:1"><label>标签</label><input id="' + ids + '_tags" value="' + esc(f.tags) + '" placeholder="玄幻,修仙,东方"></div>' +
+        '<div class="form-group" style="flex:1"><label>标签</label><input id="' + ids + '_tags" value="' + esc(f.tags) + '" placeholder="青春,校园"></div>' +
         '</div>' +
+        '<div class="form-group"><label>主要地点</label><textarea id="' + ids + '_location" rows="2" placeholder="学校/城市/场景">' + esc(f.location) + '</textarea></div>' +
+        '<div class="form-group"><label>核心设定（标志性物品/叙事结构/独特规则）</label><textarea id="' + ids + '_core" rows="2">' + esc(f.core) + '</textarea></div>' +
+        '<div class="form-group"><label>社会环境</label><textarea id="' + ids + '_society" rows="2">' + esc(f.society) + '</textarea></div>' +
         '<div class="form-group"><label>世界规则</label><textarea id="' + ids + '_rules" rows="2">' + esc(f.rules) + '</textarea></div>' +
         '<div class="form-group"><label>势力分布</label><textarea id="' + ids + '_forces" rows="2">' + esc(f.forces) + '</textarea></div>' +
         '<div class="form-group"><label>地理设定</label><textarea id="' + ids + '_geography" rows="2">' + esc(f.geography) + '</textarea></div>' +
-        '<div class="form-group"><label>力量体系</label><textarea id="' + ids + '_powers" rows="2">' + esc(f.powers) + '</textarea></div>',
+        '<div class="form-group"><label>力量体系</label><textarea id="' + ids + '_powers" rows="2">' + esc(f.powers) + '</textarea></div>' +
+        '<div class="form-group"><label>演化标注（随剧情变化的时间线）</label><textarea id="' + ids + '_evolution" rows="2" placeholder="现为…；曾为…">' + esc(f.evolution) + '</textarea></div>',
       actions: [
         { id: 'cancel', label: '取消' }
       ].concat(w ? [{ id: 'del', label: '删除', cls: 'btn-danger', onClick: function (m, ov) { ov.remove(); ResourceUI.delWorld(id); } }] : []).concat([
@@ -529,10 +547,14 @@ var ResourceUI = {
             var fields = {
               era: document.getElementById(ids + '_era').value,
               tags: document.getElementById(ids + '_tags').value,
+              location: document.getElementById(ids + '_location').value,
+              core: document.getElementById(ids + '_core').value,
+              society: document.getElementById(ids + '_society').value,
               rules: document.getElementById(ids + '_rules').value,
               forces: document.getElementById(ids + '_forces').value,
               geography: document.getElementById(ids + '_geography').value,
-              powers: document.getElementById(ids + '_powers').value
+              powers: document.getElementById(ids + '_powers').value,
+              evolution: document.getElementById(ids + '_evolution').value
             };
             ov.remove();
             ResourceUI.saveWorld(id, title, fields);
@@ -544,18 +566,22 @@ var ResourceUI = {
   packWorld: function (f) {
     var parts = [];
     if (f.era) parts.push('时代背景：' + f.era);
+    if (f.location) parts.push('主要地点：' + f.location);
+    if (f.core) parts.push('核心设定：' + f.core);
+    if (f.society) parts.push('社会环境：' + f.society);
     if (f.tags) parts.push('标签：' + f.tags);
     if (f.rules) parts.push('世界规则：' + f.rules);
     if (f.forces) parts.push('势力分布：' + f.forces);
     if (f.geography) parts.push('地理设定：' + f.geography);
     if (f.powers) parts.push('力量体系：' + f.powers);
+    if (f.evolution) parts.push('演化标注：' + f.evolution);
     return parts.join('\n');
   },
   unpackWorld: function (content) {
-    var f = { era: '', tags: '', rules: '', forces: '', geography: '', powers: '' };
-    var map = { '时代背景': 'era', '标签': 'tags', '世界规则': 'rules', '势力分布': 'forces', '地理设定': 'geography', '力量体系': 'powers' };
+    var f = { era: '', location: '', core: '', society: '', tags: '', rules: '', forces: '', geography: '', powers: '', evolution: '' };
+    var map = { '时代背景': 'era', '主要地点': 'location', '核心设定': 'core', '社会环境': 'society', '标签': 'tags', '世界规则': 'rules', '势力分布': 'forces', '地理设定': 'geography', '力量体系': 'powers', '演化标注': 'evolution' };
     (content || '').split('\n').forEach(function (line) {
-      var m = line.match(/^(时代背景|标签|世界规则|势力分布|地理设定|力量体系)：(.*)$/);
+      var m = line.match(/^(时代背景|主要地点|核心设定|社会环境|标签|世界规则|势力分布|地理设定|力量体系|演化标注)：(.*)$/);
       if (m) f[map[m[1]]] = m[2];
     });
     return f;
@@ -583,16 +609,20 @@ var ResourceUI = {
   editWorldWithFields: function (title, fields) {
     var ids = 'w_' + uid();
     UI.modal({
-      title: 'AI生成世界观 · ' + title, wide: '560px',
+      title: 'AI生成世界观 · ' + title, wide: '620px',
       body: '<div class="form-row" style="display:flex;gap:8px">' +
         '<div class="form-group" style="flex:2"><label>标题 *</label><input id="' + ids + '_title" value="' + esc(title) + '"></div>' +
         '<div class="form-group" style="flex:1"><label>时代背景</label><input id="' + ids + '_era" value="' + esc(fields.era || '') + '"></div>' +
         '<div class="form-group" style="flex:1"><label>标签</label><input id="' + ids + '_tags" value="' + esc(fields.tags || '') + '"></div>' +
         '</div>' +
+        '<div class="form-group"><label>主要地点</label><textarea id="' + ids + '_location" rows="2">' + esc(fields.location || '') + '</textarea></div>' +
+        '<div class="form-group"><label>核心设定（标志性物品/叙事结构/独特规则）</label><textarea id="' + ids + '_core" rows="2">' + esc(fields.core || '') + '</textarea></div>' +
+        '<div class="form-group"><label>社会环境</label><textarea id="' + ids + '_society" rows="2">' + esc(fields.society || '') + '</textarea></div>' +
         '<div class="form-group"><label>世界规则</label><textarea id="' + ids + '_rules" rows="2">' + esc(fields.rules || '') + '</textarea></div>' +
         '<div class="form-group"><label>势力分布</label><textarea id="' + ids + '_forces" rows="2">' + esc(fields.forces || '') + '</textarea></div>' +
         '<div class="form-group"><label>地理设定</label><textarea id="' + ids + '_geography" rows="2">' + esc(fields.geography || '') + '</textarea></div>' +
-        '<div class="form-group"><label>力量体系</label><textarea id="' + ids + '_powers" rows="2">' + esc(fields.powers || '') + '</textarea></div>',
+        '<div class="form-group"><label>力量体系</label><textarea id="' + ids + '_powers" rows="2">' + esc(fields.powers || '') + '</textarea></div>' +
+        '<div class="form-group"><label>演化标注（随剧情变化的时间线）</label><textarea id="' + ids + '_evolution" rows="2">' + esc(fields.evolution || '') + '</textarea></div>',
       actions: [
         { id: 'cancel', label: '取消' },
         {
@@ -602,10 +632,14 @@ var ResourceUI = {
             var ff = {
               era: document.getElementById(ids + '_era').value,
               tags: document.getElementById(ids + '_tags').value,
+              location: document.getElementById(ids + '_location').value,
+              core: document.getElementById(ids + '_core').value,
+              society: document.getElementById(ids + '_society').value,
               rules: document.getElementById(ids + '_rules').value,
               forces: document.getElementById(ids + '_forces').value,
               geography: document.getElementById(ids + '_geography').value,
-              powers: document.getElementById(ids + '_powers').value
+              powers: document.getElementById(ids + '_powers').value,
+              evolution: document.getElementById(ids + '_evolution').value
             };
             ov.remove();
             ResourceUI.saveWorld(null, t, ff);
@@ -615,14 +649,18 @@ var ResourceUI = {
     });
   },
   saveWorld: async function (id, title, fields) {
+    var p = Store.state.currentProject;
+    if (!p || !p.id) { UI.toast('请先在左侧选中一个项目，再保存世界观', 'warn'); return; }
+    var t = (title || '').trim();
+    if (!t) { UI.toast('请输入世界观标题', 'warn'); return; }
     var content = this.packWorld(fields);
-    var pid = Store.state.currentProject.id;
+    var pid = p.id;
     try {
       if (id) {
-        var w = await API.updateWorldSetting(id, { title: title, content: content });
+        var w = await API.updateWorldSetting(id, { title: t, content: content });
         Object.assign(Store.state.worldSettings.find(function (x) { return x.id === id; }) || {}, w);
       } else {
-        var nw = await API.createWorldSetting({ project_id: pid, title: title, content: content });
+        var nw = await API.createWorldSetting({ project_id: pid, title: t, content: content });
         Store.state.worldSettings.push(nw);
       }
       Sidebar.renderResources(); RightPanel.renderContext(); ProjectUI.updateMeta();

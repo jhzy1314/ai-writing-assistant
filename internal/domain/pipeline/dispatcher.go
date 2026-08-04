@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 	"unicode"
@@ -234,10 +235,11 @@ func thinkingEnabled(role llm.Role, roleThinking map[string]bool) bool {
 }
 
 // callRole 非流式调用某角色（含备用模型降级 + 调用日志 + 用量记录 + 超时保护）
-func (d *Dispatcher) callRole(ctx context.Context, role llm.Role, pl PipelineName, projectID, userPrompt string, roleThinking map[string]bool) (string, llm.Usage, string, bool, error) {
+// 返回 (文本, 用量, 模型名, 是否降级, 耗时ms, 错误)
+func (d *Dispatcher) callRole(ctx context.Context, role llm.Role, pl PipelineName, projectID, userPrompt string, roleThinking map[string]bool) (string, llm.Usage, string, bool, int64, error) {
 	adapters, err := d.registry.AdaptersForRole(ctx, role)
 	if err != nil {
-		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」无可用模型：%w", roleLabel(role), err)
+		return "", llm.Usage{}, "", false, 0, fmt.Errorf("「%s」无可用模型：%w", roleLabel(role), err)
 	}
 	agent := roles.NewRoleAgent(role, string(pl))
 	var lastErr error
@@ -248,9 +250,10 @@ func (d *Dispatcher) callRole(ctx context.Context, role llm.Role, pl PipelineNam
 	if role == llm.RoleVerifier && thinkingEnabled(role, roleThinking) {
 		timeout = 10 * time.Minute
 	}
+	totalStart := time.Now()
 	for _, ad := range adapters {
 		if ctx.Err() != nil {
-			return "", llm.Usage{}, "", degraded, ctx.Err()
+			return "", llm.Usage{}, "", degraded, time.Since(totalStart).Milliseconds(), ctx.Err()
 		}
 		ad.SetThinking(thinkingEnabled(role, roleThinking))
 		roleCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -261,14 +264,14 @@ func (d *Dispatcher) callRole(ctx context.Context, role llm.Role, pl PipelineNam
 		if gErr == nil {
 			d.logCall(ctx, projectID, role, ad.Name(), usage, dur.Milliseconds(), "ok", "")
 			_ = d.store.IncrUsage(ctx, ad.Name(), 1, usage.Total())
-			return text, usage, ad.Name(), degraded, nil
+			return text, usage, ad.Name(), degraded, time.Since(totalStart).Milliseconds(), nil
 		}
 		d.logCall(ctx, projectID, role, ad.Name(), usage, dur.Milliseconds(), "error", gErr.Error())
 		lastErr = gErr
 		degraded = true
 		if d.isRateLimit(gErr) { d.registry.Mark429(ad.Name()) }
 	}
-	return "", llm.Usage{}, "", degraded, friendlyErr(role, lastErr)
+	return "", llm.Usage{}, "", degraded, time.Since(totalStart).Milliseconds(), friendlyErr(role, lastErr)
 }
 
 func (d *Dispatcher) isRateLimit(err error) bool {
@@ -278,19 +281,21 @@ func (d *Dispatcher) isRateLimit(err error) bool {
 
 // callRoleStream 流式调用某角色（备用模型降级仅在流启动前生效 + 超时保护）
 // textCB 接收每个增量分片（用于实时推送给前端与累积终稿）
-func (d *Dispatcher) callRoleStream(ctx context.Context, role llm.Role, pl PipelineName, projectID, userPrompt string, textCB func(string), roleThinking map[string]bool) (string, llm.Usage, string, bool, error) {
+// 返回 (文本, 用量, 模型名, 是否降级, 耗时ms, 错误)
+func (d *Dispatcher) callRoleStream(ctx context.Context, role llm.Role, pl PipelineName, projectID, userPrompt string, textCB func(string), roleThinking map[string]bool) (string, llm.Usage, string, bool, int64, error) {
 	adapters, err := d.registry.AdaptersForRole(ctx, role)
 	if err != nil {
-		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」无可用模型：%w", roleLabel(role), err)
+		return "", llm.Usage{}, "", false, 0, fmt.Errorf("「%s」无可用模型：%w", roleLabel(role), err)
 	}
 	agent := roles.NewRoleAgent(role, string(pl))
 	var lastErr error
 	degraded := false
 	// 流式超时较长（Worker 可能输出长篇内容）
 	timeout := 15 * time.Minute
+	totalStart := time.Now()
 	for _, ad := range adapters {
 		if ctx.Err() != nil {
-			return "", llm.Usage{}, "", degraded, ctx.Err()
+			return "", llm.Usage{}, "", degraded, time.Since(totalStart).Milliseconds(), ctx.Err()
 		}
 		ad.SetThinking(thinkingEnabled(role, roleThinking))
 		roleCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -361,9 +366,9 @@ func (d *Dispatcher) callRoleStream(ctx context.Context, role llm.Role, pl Pipel
 		}
 		d.logCall(ctx, projectID, role, ad.Name(), u, dur.Milliseconds(), status, errStr(streamErr))
 		_ = d.store.IncrUsage(ctx, ad.Name(), 1, u.Total())
-		return text, u, ad.Name(), degraded, nil
+		return text, u, ad.Name(), degraded, time.Since(totalStart).Milliseconds(), nil
 	}
-	return "", llm.Usage{}, "", degraded, friendlyErr(role, lastErr)
+	return "", llm.Usage{}, "", degraded, time.Since(totalStart).Milliseconds(), friendlyErr(role, lastErr)
 }
 
 // logCall 记录一次模型调用日志
@@ -374,10 +379,22 @@ func (d *Dispatcher) logCall(ctx context.Context, projectID string, role llm.Rol
 		ModelName:        modelName,
 		PromptTokens:     usage.PromptTokens,
 		CompletionTokens: usage.CompletionTokens,
+		CacheHitTokens:   usage.CacheHitTokens,
 		DurationMs:       int(durMs),
 		Status:           status,
 		ErrorMsg:         errMsg,
 	})
+	// 缓存命中观测（DeepSeek 前缀缓存：命中 token 越多成本越低）
+	// 只在高命中率异常偏低时记录，避免每次成功调用刷日志
+	if status == "ok" && usage.PromptTokens > 0 {
+		hit := usage.CacheHitTokens
+		if hit > 0 {
+			rate := float64(hit) / float64(usage.PromptTokens) * 100
+			if rate < 90 {
+				log.Printf("[cache] 命中率偏低 role=%s model=%s hit=%d/%d (%.0f%%)", roleLabel(role), modelName, hit, usage.PromptTokens, rate)
+			}
+		}
+	}
 }
 
 func errStr(e error) string {
@@ -388,10 +405,11 @@ func errStr(e error) string {
 }
 
 // callRoleWithModel 使用指定模型名调用某角色（orchestrated 模式用，不走 registry 多级备用）
-func (d *Dispatcher) callRoleWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string, roleThinking map[string]bool) (string, llm.Usage, string, bool, error) {
+// 返回 (文本, 用量, 模型名, 是否降级, 耗时ms, 错误)
+func (d *Dispatcher) callRoleWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string, roleThinking map[string]bool) (string, llm.Usage, string, bool, int64, error) {
 	ad, err := d.registry.AdapterByName(ctx, modelName)
 	if err != nil {
-		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」模型 %s 不可用：%w", roleLabel(role), modelName, err)
+		return "", llm.Usage{}, "", false, 0, fmt.Errorf("「%s」模型 %s 不可用：%w", roleLabel(role), modelName, err)
 	}
 	ad.SetThinking(thinkingEnabled(role, roleThinking))
 	agent := roles.NewRoleAgent(role, string(pl))
@@ -405,17 +423,18 @@ func (d *Dispatcher) callRoleWithModel(ctx context.Context, role llm.Role, pl Pi
 	if gErr == nil {
 		d.logCall(ctx, projectID, role, modelName, usage, dur.Milliseconds(), "ok", "")
 		_ = d.store.IncrUsage(ctx, modelName, 1, usage.Total())
-		return text, usage, modelName, false, nil
+		return text, usage, modelName, false, dur.Milliseconds(), nil
 	}
 	d.logCall(ctx, projectID, role, modelName, usage, dur.Milliseconds(), "error", gErr.Error())
-	return "", llm.Usage{}, modelName, true, friendlyErr(role, gErr)
+	return "", llm.Usage{}, modelName, true, dur.Milliseconds(), friendlyErr(role, gErr)
 }
 
 // callRoleStreamWithModel 使用指定模型名流式调用某角色
-func (d *Dispatcher) callRoleStreamWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string, textCB func(string), roleThinking map[string]bool) (string, llm.Usage, string, bool, error) {
+// 返回 (文本, 用量, 模型名, 是否降级, 耗时ms, 错误)
+func (d *Dispatcher) callRoleStreamWithModel(ctx context.Context, role llm.Role, pl PipelineName, projectID, modelName, userPrompt string, textCB func(string), roleThinking map[string]bool) (string, llm.Usage, string, bool, int64, error) {
 	ad, err := d.registry.AdapterByName(ctx, modelName)
 	if err != nil {
-		return "", llm.Usage{}, "", false, fmt.Errorf("「%s」模型 %s 不可用：%w", roleLabel(role), modelName, err)
+		return "", llm.Usage{}, "", false, 0, fmt.Errorf("「%s」模型 %s 不可用：%w", roleLabel(role), modelName, err)
 	}
 	ad.SetThinking(thinkingEnabled(role, roleThinking))
 	agent := roles.NewRoleAgent(role, string(pl))
@@ -425,7 +444,7 @@ func (d *Dispatcher) callRoleStreamWithModel(ctx context.Context, role llm.Role,
 	ch, sErr := agent.Stream(roleCtx, ad, userPrompt)
 	if sErr != nil {
 		d.logCall(ctx, projectID, role, modelName, llm.Usage{}, 0, "error", sErr.Error())
-		return "", llm.Usage{}, modelName, true, fmt.Errorf("流式启动失败: %w", sErr)
+		return "", llm.Usage{}, modelName, true, 0, fmt.Errorf("流式启动失败: %w", sErr)
 	}
 	var buf []byte
 	var gotUsage *llm.Usage
@@ -445,7 +464,7 @@ func (d *Dispatcher) callRoleStreamWithModel(ctx context.Context, role llm.Role,
 	if u.PromptTokens == 0 { u.PromptTokens = llm.EstimateTokens(agent.SystemPrompt + userPrompt) }
 	d.logCall(ctx, projectID, role, modelName, u, dur.Milliseconds(), "ok", "")
 	_ = d.store.IncrUsage(ctx, modelName, 1, u.Total())
-	return text, u, modelName, false, nil
+	return text, u, modelName, false, dur.Milliseconds(), nil
 }
 
 func countWords(s string) int {

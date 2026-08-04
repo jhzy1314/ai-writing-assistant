@@ -70,7 +70,39 @@ func (db *DB) migrate(ctx context.Context) error {
 	if err := db.migrateProjectsOutline(ctx); err != nil {
 		return fmt.Errorf("项目大纲列迁移失败: %w", err)
 	}
+	if err := db.migrateLogsCacheColumn(ctx); err != nil {
+		return fmt.Errorf("日志表缓存列迁移失败: %w", err)
+	}
 	return nil
+}
+
+// migrateLogsCacheColumn 为 generation_logs 补充 cache_hit_tokens 列（缓存命中统计）
+func (db *DB) migrateLogsCacheColumn(ctx context.Context) error {
+	has := false
+	rows, err := db.QueryContext(ctx, "PRAGMA table_info(generation_logs)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == "cache_hit_tokens" {
+			has = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if !has {
+		_, err = db.ExecContext(ctx, `ALTER TABLE generation_logs ADD COLUMN cache_hit_tokens INTEGER NOT NULL DEFAULT 0`)
+	}
+	return err
 }
 
 // migrateModelsColumns 为 models 表补充新增列（SQLite 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS，通过 PRAGMA 检测后添加）
@@ -344,6 +376,7 @@ CREATE TABLE IF NOT EXISTS generation_logs (
     model_name         TEXT NOT NULL DEFAULT '',
     prompt_tokens      INTEGER NOT NULL DEFAULT 0,
     completion_tokens  INTEGER NOT NULL DEFAULT 0,
+    cache_hit_tokens   INTEGER NOT NULL DEFAULT 0,
     duration_ms        INTEGER NOT NULL DEFAULT 0,
     status             TEXT NOT NULL DEFAULT 'ok',
     error_msg          TEXT NOT NULL DEFAULT '',
@@ -410,6 +443,7 @@ CREATE TABLE IF NOT EXISTS style_samples (
     author      TEXT NOT NULL DEFAULT '',
     category    TEXT NOT NULL DEFAULT '',
     source_file TEXT NOT NULL DEFAULT '',
+    kind        TEXT NOT NULL DEFAULT 'fragment',
     content     TEXT NOT NULL DEFAULT '',
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -517,7 +551,7 @@ func (db *DB) Seed(ctx context.Context, cfg *config.Config) error {
 				 VALUES(?,?,?,?,?,?,?,1,65536,1,0,'',0.7,0.9)
 				 ON CONFLICT(name) DO UPDATE SET vendor=excluded.vendor, api_endpoint=excluded.api_endpoint,
 				 status=excluded.status, daily_limit=excluded.daily_limit,
-				 context_limit=excluded.context_limit`,
+				 api_key=models.api_key`,
 				m.Name, m.Name, m.Vendor, m.APIEndpoint, apiKey, status, m.DailyLimit); err != nil {
 				return fmt.Errorf("seed model %s: %w", m.Name, err)
 			}
@@ -526,8 +560,7 @@ func (db *DB) Seed(ctx context.Context, cfg *config.Config) error {
 				`INSERT INTO models(id, name, vendor, api_endpoint, api_key, status, daily_limit, is_custom, context_limit, support_stream, is_default, description, temperature, top_p)
 				 VALUES(?,?,?,?,?,?,?,1,65536,1,0,'',0.7,0.9)
 				 ON CONFLICT(name) DO UPDATE SET vendor=excluded.vendor, api_endpoint=excluded.api_endpoint,
-				 api_key=excluded.api_key, status=excluded.status, daily_limit=excluded.daily_limit,
-				 context_limit=excluded.context_limit`,
+				 api_key=excluded.api_key, status=excluded.status, daily_limit=excluded.daily_limit`,
 				m.Name, m.Name, m.Vendor, m.APIEndpoint, apiKey, status, m.DailyLimit); err != nil {
 				return fmt.Errorf("seed model %s: %w", m.Name, err)
 			}

@@ -1,0 +1,20 @@
+- Top-left: `26,672 字` (black), `本章 1,394 字` (red)  
+- Main panel (beige rounded rectangle):  
+  - Right side:  
+    - 🌟 `输入创作需求或选`  
+    - `中文后使用快捷指`  
+    - `二、关键剧情节点`  
+    - `【节点一】开学换座`  
+  - Bottom row of buttons:  
+    - Red button: `✨ 生成` + `Ctrl+Enter` (white text on red)  
+    - Gray button: `⚙️ 选项`  
+    - Gray button: `⚡ 专业模式`  
+- Bottom toolbar (left-aligned):  
+  - `Ctrl + Enter 发送`  
+  - `Ctrl + S 保存版本`  
+  - `Esc 终止生成`  
+  - ⚙️ (gear icon)  
+- Bottom-right (red text):  
+  - `为每个角色手动指定模型，跑完整 Thinker→Worker→Verifier 流程`
+
+[Model: qwen3-vl-flash | Tokens: in=769 out=228]
