@@ -64,8 +64,12 @@ func (d *Dispatcher) buildContext(ctx context.Context, req GenerateRequest) Cont
 			}
 		}
 	}
-	// ContextScope=withSummary 时拼接前面章节摘要
-	if req.ContextScope == "withSummary" && strings.TrimSpace(req.PreviousSummaries) != "" {
+	// 章节摘要（synopsis）注入：自动收集各章 synopsis 作为前情提要（用户前端填入或未来 AI 自动提炼）；
+	// 无 synopsis 时回退到前端 withSummary 传入的 PreviousSummaries
+	autoSummaries := collectSynopses(allChs)
+	if strings.TrimSpace(autoSummaries) != "" {
+		bundle.HistoryContent = "【前面章节摘要】\n" + autoSummaries + "\n\n" + bundle.HistoryContent
+	} else if req.ContextScope == "withSummary" && strings.TrimSpace(req.PreviousSummaries) != "" {
 		bundle.HistoryContent = "【前面章节摘要】\n" + req.PreviousSummaries + "\n\n" + bundle.HistoryContent
 	}
 	// ========== RAG 按需注入：向量语义检索（懒建索引） ==========
@@ -295,6 +299,22 @@ func containsAny(s string, subs ...string) bool {
 }
 
 func runeLen(s string) int { return len([]rune(s)) }
+
+// collectSynopses 收集项目各章节的 synopsis（章节摘要），拼接为前情提要（仅收录非空摘要）
+func collectSynopses(chs []database.ChapterWithVolume) string {
+	var b strings.Builder
+	for i := range chs {
+		s := strings.TrimSpace(chs[i].Synopsis)
+		if s == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(chs[i].Title + "：" + s)
+	}
+	return b.String()
+}
 
 // truncateRunes 截断到 n 个 rune（中文安全）
 func truncateRunes(s string, n int) string {

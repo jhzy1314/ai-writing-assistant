@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -190,6 +191,9 @@ func (d *Dispatcher) runStandard(ctx context.Context, req GenerateRequest, bundl
 		emit(ProgressEvent{Type: EventWarning, Text: oe.Advice, OutlineWords: oe})
 	}
 
+	// 写前大纲一致性检查：大纲与前文冲突先修订再动笔（有前文时）
+	outline = d.checkOutlineAgainstHistory(ctx, req, bundle, outline, PipelineStandard, emit)
+
 	// 2. 创作者撰写正文（支持分段）
 	finalText, err := d.workerWrite(ctx, req, bundle, outline, PipelineStandard, emit)
 	if err != nil {
@@ -217,6 +221,9 @@ func (d *Dispatcher) runStrict(ctx context.Context, req GenerateRequest, bundle 
 		emit(ProgressEvent{Type: EventWarning, Text: oe.Advice, OutlineWords: oe})
 	}
 
+	// 写前大纲一致性检查
+	outline = d.checkOutlineAgainstHistory(ctx, req, bundle, outline, PipelineStrict, emit)
+
 	// Worker 仅轻度润色（严禁改动逻辑/框架/核心观点）
 	emit(ProgressEvent{Type: EventStage, Stage: "创作者 Worker 正在轻度润色", Role: string(llm.RoleWorker)})
 	finalText, err := d.workerWrite(ctx, req, bundle, outline, PipelineStrict, emit)
@@ -241,6 +248,9 @@ func (d *Dispatcher) runArt(ctx context.Context, req GenerateRequest, bundle Con
 		emit(ProgressEvent{Type: EventWarning, Text: oe.Advice, OutlineWords: oe})
 	}
 
+	// 写前大纲一致性检查
+	outline = d.checkOutlineAgainstHistory(ctx, req, bundle, outline, PipelineArt, emit)
+
 	emit(ProgressEvent{Type: EventStage, Stage: "创作者 Worker 高度自由创作中", Role: string(llm.RoleWorker)})
 	finalText, err := d.workerWrite(ctx, req, bundle, outline, PipelineArt, emit)
 	if err != nil {
@@ -259,6 +269,9 @@ func (d *Dispatcher) runCollab(ctx context.Context, req GenerateRequest, bundle 
 	if err != nil {
 		return "", err
 	}
+
+	// 写前大纲一致性检查
+	outline = d.checkOutlineAgainstHistory(ctx, req, bundle, outline, PipelineCollab, emit)
 
 	// 2. Worker 首次撰写
 	finalText, err := d.workerWrite(ctx, req, bundle, outline, PipelineCollab, emit)
@@ -328,6 +341,87 @@ func buildCollaborativeRevisePrompt(req GenerateRequest, bundle ContextBundle, c
 	b.WriteString(review)
 	b.WriteString("\n\n请根据审稿意见重新调整创作框架，输出修正后的完整大纲。仅调整问题涉及的部分，保留原框架中未受影响的规划内容。")
 	return b.String()
+}
+
+// checkOutlineAgainstHistory 写前大纲一致性检查（对标 show-me-the-story checkOutlineConsistency, writing.go:150-163）：
+// 动笔前把本章大纲与前文已发生事实对照，发现冲突（如大纲安排"初次见面"但前文两人已认识）
+// 则让规划师最小化修订大纲后再动笔，避免按过时大纲写出矛盾内容。
+// 仅在有历史前文时触发；检查/解析失败一律降级为原大纲，不阻塞创作。
+func (d *Dispatcher) checkOutlineAgainstHistory(ctx context.Context, req GenerateRequest, bundle ContextBundle, outline string, pl PipelineName, emit func(ProgressEvent)) string {
+	if strings.TrimSpace(outline) == "" {
+		return outline
+	}
+	if strings.TrimSpace(bundle.HistoryContent) == "" && strings.TrimSpace(bundle.PreviousSummaries) == "" {
+		return outline
+	}
+	// 检查环节用浓缩前文（尾部关键信息）；写作环节仍全量注入，互不影响
+	const historyTail = 2500
+	h := strings.TrimSpace(bundle.PreviousSummaries)
+	if h == "" {
+		r := []rune(bundle.HistoryContent)
+		if len(r) > historyTail {
+			h = string(r[len(r)-historyTail:])
+		} else {
+			h = bundle.HistoryContent
+		}
+	}
+	emit(ProgressEvent{Type: EventStage, Stage: "✏️ 写前检查：大纲与前文一致性…", Role: string(llm.RoleThinker)})
+	out, _, _, degraded, _, err := d.callRole(ctx, llm.RoleThinker, pl, req.ProjectID, buildOutlineConsistencyPrompt(h, outline), req.RoleThinking)
+	if err != nil || degraded {
+		emit(ProgressEvent{Type: EventWarning, Text: "写前大纲检查未执行（继续使用原大纲）", Degraded: true})
+		return outline
+	}
+	conflict, revised := parseOutlineConsistencyResult(out)
+	if conflict && strings.TrimSpace(revised) != "" {
+		emit(ProgressEvent{Type: EventStage, Stage: "✏️ 大纲与前文冲突，已自动修订后继续", Role: string(llm.RoleThinker), Text: revised})
+		return revised
+	}
+	if conflict {
+		emit(ProgressEvent{Type: EventWarning, Text: "写前检查提示大纲与前文可能冲突（未能自动修订），写作时请注意"})
+	}
+	return outline
+}
+
+// buildOutlineConsistencyPrompt 构造写前大纲一致性检查的用户提示词（结构化 JSON 输出）
+func buildOutlineConsistencyPrompt(historyTail, outline string) string {
+	return fmt.Sprintf(`你是资深小说编辑。动笔前检查本章大纲是否与已写前文冲突。
+
+【已写前文（节选）】
+%s
+
+【本章大纲】
+%s
+
+请逐项对照检查，只报告客观矛盾：
+1. 一次性事件重复安排（如大纲安排"初次见面/身份揭示/关系确立"，但前文已经发生过）；
+2. 人物关系、身份、称呼与前文矛盾；
+3. 时间线、地点、事件结果与前文矛盾；
+4. 大纲引用的前文事实不存在或与正文不符。
+
+【判定原则】拿不准的问题一律视为无冲突；主观风格问题不算冲突。
+
+【输出要求】严格输出 JSON（不要其他任何文字）：
+{"conflict": true或false, "issues": ["问题1", "问题2"], "revised_outline": "有冲突时给出最小化修订后的完整大纲（只改冲突部分，保留其余内容）；无冲突时为null"}`, historyTail, outline)
+}
+
+// parseOutlineConsistencyResult 解析大纲一致性检查结果（宽容解析：提取首尾大括号间的 JSON）
+func parseOutlineConsistencyResult(raw string) (conflict bool, revised string) {
+	start := strings.Index(raw, "{")
+	end := strings.LastIndex(raw, "}")
+	if start < 0 || end <= start {
+		return false, ""
+	}
+	var v struct {
+		Conflict      bool    `json:"conflict"`
+		RevisedOutline *string `json:"revised_outline"`
+	}
+	if err := json.Unmarshal([]byte(raw[start:end+1]), &v); err != nil {
+		return false, ""
+	}
+	if v.RevisedOutline != nil {
+		return v.Conflict, *v.RevisedOutline
+	}
+	return v.Conflict, ""
 }
 
 // extractIssues 从 Verifier 输出中提取问题列表

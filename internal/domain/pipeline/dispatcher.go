@@ -122,6 +122,12 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 			return
 		}
 
+		// 6.4 Scrub 清洗：删除章节元信息残留行（"（第X章）""本章完""以下是修订后的正文"等）
+		// 保证交付终稿为"印刷版"（对标 show-me-the-story stripChapterMetaProse）
+		if finalText != "" {
+			finalText = scrubChapterMeta(finalText)
+		}
+
 		// 6.5 零成本 AI 味检测（确定性规则，不调模型；命中仅提示，不阻塞输出）
 		// 把 Worker 去AI味规约/Verifier AI味清单代码化，生成完成即检查
 		if a := quality.Analyze(finalText); len(a.Issues) > 0 {
