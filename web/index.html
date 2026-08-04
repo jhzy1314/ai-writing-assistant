@@ -368,7 +368,9 @@ window.initTiptap = async function () {
           <span class="gen-opts-div" style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;border-top:1px dashed var(--border);padding-top:4px;margin-top:2px">
             <span style="font-size:10px;color:var(--muted)">本次写作参考：</span>
             <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="只拼本章出场人物卡（自由写作模式）"><input type="checkbox" id="freeRefCharacter" checked> 人物卡</label>
+            <button class="tool-btn" style="font-size:10px;padding:1px 6px" onclick="Composer.pickFreeCharacters(event)" title="勾选本章出场人物（不勾则自动匹配人名）">👥 选人</button>
             <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="文风参考章节+素材库（few-shot，自由写作模式）"><input type="checkbox" id="freeRefStyle" checked> 文风样本</label>
+            <button class="tool-btn" style="font-size:10px;padding:1px 6px" onclick="Composer.pickStyleChapters(event)" title="勾选你最满意的章节当文风基准（比规则管用）">📖 选章</button>
             <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="上一章尾部+最近摘要（自由写作模式）"><input type="checkbox" id="freeRefSummary" checked> 前情摘要</label>
             <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="世界观设定（自由写作模式）"><input type="checkbox" id="freeRefWorld"> 世界观</label>
             <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="未回收伏笔提醒（自由写作模式）"><input type="checkbox" id="freeRefForeshadow"> 伏笔</label>

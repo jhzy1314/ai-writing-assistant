@@ -138,9 +138,9 @@ func buildWorkerUserPrompt(req GenerateRequest, bundle ContextBundle, outline st
 }
 
 // buildFreeUserPrompt 自由写作模式用户提示词（2026-08-05 落地）：
-// 正面引导 + 分层拼装（文风样本 few-shot → 出场人物 → 最近前情 → 本章核心事件 → 字数）。
+// 正面引导 + 分层拼装（文风样本 few-shot → 出场人物 → 世界观 → 最近前情 → 伏笔 → 素材 → 核心事件 → 字数）。
 // 不写任何"禁止"类规则——自由写作要的是毛边感，禁令会把它压成安全范文。
-func buildFreeUserPrompt(req GenerateRequest, bundle ContextBundle, styleText, charactersText, recentText string) string {
+func buildFreeUserPrompt(req GenerateRequest, bundle ContextBundle, styleText, charactersText, recentText, worldText, foreshadowText, materialText string) string {
 	var b strings.Builder
 	// 1. 写作基调（叙事特征卡动态生成，不写死）+ 正面引导
 	if strings.TrimSpace(bundle.NarrativeHint) != "" {
@@ -159,13 +159,31 @@ func buildFreeUserPrompt(req GenerateRequest, bundle ContextBundle, styleText, c
 		b.WriteString(charactersText)
 		b.WriteString("\n\n")
 	}
-	// 4. 最近前情
+	// 4. 世界观
+	if strings.TrimSpace(worldText) != "" {
+		b.WriteString("【世界观设定】\n")
+		b.WriteString(worldText)
+		b.WriteString("\n\n")
+	}
+	// 5. 最近前情
 	if strings.TrimSpace(recentText) != "" {
 		b.WriteString("【最近发生的事】\n")
 		b.WriteString(recentText)
 		b.WriteString("\n\n")
 	}
-	// 5. 本章核心事件（优先手填大纲，否则需求）
+	// 6. 伏笔
+	if strings.TrimSpace(foreshadowText) != "" {
+		b.WriteString("【未回收伏笔（可自然承接，不必刻意）】\n")
+		b.WriteString(foreshadowText)
+		b.WriteString("\n\n")
+	}
+	// 7. 素材库片段
+	if strings.TrimSpace(materialText) != "" {
+		b.WriteString("【素材参考】\n")
+		b.WriteString(materialText)
+		b.WriteString("\n\n")
+	}
+	// 8. 本章核心事件（优先手填大纲，否则需求）
 	events := strings.TrimSpace(req.Outline)
 	if events == "" {
 		events = strings.TrimSpace(req.UserDemand)

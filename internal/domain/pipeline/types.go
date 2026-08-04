@@ -65,6 +65,7 @@ type GenerateRequest struct {
 	StyleSampleIDs    []string          `json:"style_sample_ids"`    // 文风样本库样本 ID（本地知识库风格参考）
 	StyleChapterIDs   []string          `json:"style_chapter_ids"`   // 手动选定的文风参考章节 ID（few-shot：自己写的章节）
 	FreeRefs          []string          `json:"free_refs"`           // 自由写作模式：本次写作参考勾选项（character/style/summary/world/foreshadow/material）
+	FreeCharIDs       []string          `json:"free_char_ids"`       // 自由写作模式：手动勾选的本章出场人物 ID（为空则自动匹配人名）
 }
 
 // ContextBundle 注入到所有子任务的共享上下文（世界观/人物卡/前文/素材）

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ai-novel/studio/internal/domain/roles"
+	"github.com/ai-novel/studio/internal/infrastructure/database"
 	"github.com/ai-novel/studio/internal/infrastructure/llm"
 )
 
@@ -518,7 +519,10 @@ func (d *Dispatcher) runFree(ctx context.Context, req GenerateRequest, bundle Co
 	styleText := d.freeStyleText(ctx, req)
 	charsText := d.freeCharactersText(ctx, req, bundle)
 	recentText := d.freeRecentText(ctx, req)
-	userPrompt := buildFreeUserPrompt(req, bundle, styleText, charsText, recentText)
+	worldText := d.freeWorldText(req, bundle)
+	foreshadowText := d.freeForeshadowText(ctx, req)
+	materialText := d.freeMaterialText(req, bundle)
+	userPrompt := buildFreeUserPrompt(req, bundle, styleText, charsText, recentText, worldText, foreshadowText, materialText)
 	text, _, wModel, wDegraded, durMs, err := d.callRoleStream(ctx, llm.RoleWorker, PipelineFree, req.ProjectID, userPrompt, emitToken(emit, string(llm.RoleWorker)), req.RoleThinking)
 	if err != nil {
 		return "", err
@@ -563,12 +567,28 @@ func (d *Dispatcher) freeStyleText(ctx context.Context, req GenerateRequest) str
 	return b.String()
 }
 
-// freeCharactersText 出场人物卡：从需求/大纲/最近前情中匹配人名，每人压缩为 ~100 字核心标签
-// （FreeRefs 勾选 character 才拼；不勾则跳过）
+// freeCharactersText 出场人物卡：优先用前端手动勾选的 FreeCharIDs；为空时从需求/大纲/最近前情自动匹配人名。
+// 每人压缩为 ~100 字核心标签（FreeRefs 勾选 character 才拼）
 func (d *Dispatcher) freeCharactersText(ctx context.Context, req GenerateRequest, bundle ContextBundle) string {
 	if len(req.FreeRefs) > 0 && !containsStr(req.FreeRefs, "character") {
 		return ""
 	}
+	// 手动勾选优先（评审：自动匹配十有八九会错）
+	if len(req.FreeCharIDs) > 0 {
+		var b strings.Builder
+		for _, id := range req.FreeCharIDs {
+			c, err := d.store.GetCharacter(ctx, id)
+			if err != nil || c == nil || strings.TrimSpace(c.Name) == "" {
+				continue
+			}
+			if b.Len() > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString("- " + c.Name + "：" + truncateRunes(strings.TrimSpace(c.Description), 100))
+		}
+		return b.String()
+	}
+	// 兜底：自动匹配
 	chars, err := d.store.ListCharacters(ctx, req.ProjectID)
 	if err != nil || len(chars) == 0 {
 		return ""
@@ -601,6 +621,43 @@ func (d *Dispatcher) freeCharactersText(ctx context.Context, req GenerateRequest
 		}
 	}
 	return b.String()
+}
+
+// freeWorldText 世界观设定（FreeRefs 勾选 world 才拼）
+func (d *Dispatcher) freeWorldText(req GenerateRequest, bundle ContextBundle) string {
+	if len(req.FreeRefs) > 0 && !containsStr(req.FreeRefs, "world") {
+		return ""
+	}
+	return strings.TrimSpace(bundle.WorldSetting)
+}
+
+// freeForeshadowText 未回收伏笔列表（FreeRefs 勾选 foreshadow 才拼）
+func (d *Dispatcher) freeForeshadowText(ctx context.Context, req GenerateRequest) string {
+	if len(req.FreeRefs) > 0 && !containsStr(req.FreeRefs, "foreshadow") {
+		return ""
+	}
+	fs, err := d.store.ListForeshadows(ctx, req.ProjectID)
+	if err != nil || len(fs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, f := range fs {
+		if f.Status == database.ForeshadowPending && strings.TrimSpace(f.Title) != "" {
+			if b.Len() > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString("· " + f.Title + "：" + strings.TrimSpace(f.Description))
+		}
+	}
+	return b.String()
+}
+
+// freeMaterialText 素材库/参考素材（FreeRefs 勾选 material 才拼）
+func (d *Dispatcher) freeMaterialText(req GenerateRequest, bundle ContextBundle) string {
+	if len(req.FreeRefs) > 0 && !containsStr(req.FreeRefs, "material") {
+		return ""
+	}
+	return strings.TrimSpace(bundle.MaterialText)
 }
 
 // freeRecentText 最近前情：上一章尾部原文（承接语感）+ 最近章节摘要（FreeRefs 勾选 summary 才拼）

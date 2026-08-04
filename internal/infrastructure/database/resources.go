@@ -87,6 +87,11 @@ func (s *Store) getCharacter(ctx context.Context, id string) (*Character, error)
 	return &c, nil
 }
 
+// GetCharacter 按 ID 查询角色（自由写作模式手动勾选出场人物用）
+func (s *Store) GetCharacter(ctx context.Context, id string) (*Character, error) {
+	return s.getCharacter(ctx, id)
+}
+
 func (s *Store) DeleteCharacter(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM characters WHERE id=?`, id)
 	return err

@@ -351,8 +351,9 @@ var Composer = {
       skip_word_check: Store.state.composer.skipWordCheck,
       role_thinking: Store.state.composer.roleThinking || { thinker: true, worker: true, verifier: false, helper: false },
       web_search: !!Store.state.composer.webSearch,
-      style_chapter_ids: Store.state.composer.styleChapterId ? [Store.state.composer.styleChapterId] : [],
-      free_refs: Composer.collectFreeRefs()
+      style_chapter_ids: (Store.state.composer.styleChapterIDs && Store.state.composer.styleChapterIDs.length) ? Store.state.composer.styleChapterIDs : (Store.state.composer.styleChapterId ? [Store.state.composer.styleChapterId] : []),
+      free_refs: Composer.collectFreeRefs(),
+      free_char_ids: Store.state.composer.freeCharIDs || []
     };
   },
   // 收集"本次写作参考"勾选（自由写作模式）
@@ -364,6 +365,60 @@ var Composer = {
       if (el && el.checked) refs.push(map[id]);
     });
     return refs;
+  },
+  // 手动勾选本章出场人物（自由写作模式；不勾则后端自动匹配人名）
+  pickFreeCharacters: function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var pid = (Store.state.currentProject || {}).id;
+    if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
+    API.listCharacters(pid).then(function (items) {
+      if (!items || !items.length) { UI.toast('还没有人物卡，先去人物卡页创建', 'warn'); return; }
+      var chosen = Store.state.composer.freeCharIDs || [];
+      var rows = items.map(function (c) {
+        var on = chosen.indexOf(c.id) >= 0;
+        return '<label style="display:flex;align-items:center;gap:4px;padding:3px 0;cursor:pointer">' +
+          '<input type="checkbox" data-cid="' + c.id + '"' + (on ? ' checked' : '') + '> ' +
+          '<b>' + esc(c.name) + '</b><span style="color:var(--text2);font-size:11px;margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px">' + esc(c.description || '') + '</span></label>';
+      }).join('');
+      UI.modal({ title: '👥 选择本章出场人物（自由写作模式）', body: '<div style="max-height:60vh;overflow:auto">' + rows + '</div><div style="color:var(--text2);font-size:11px;margin-top:6px">勾选的人物卡会拼进 Prompt；不勾则自动匹配</div>',
+        actions: [
+          { id: 'clear', label: '清空', onClick: function () { Store.state.composer.freeCharIDs = []; } },
+          { id: 'ok', label: '确定', cls: 'btn-primary', onClick: function (m, ov) {
+              var ids = [];
+              m.querySelectorAll('input[data-cid]:checked').forEach(function (el) { ids.push(el.getAttribute('data-cid')); });
+              Store.state.composer.freeCharIDs = ids;
+              ov.remove();
+              UI.toast('已选 ' + ids.length + ' 个出场人物', 'success');
+            } }
+        ] });
+    }).catch(function (e) { UI.toast('加载人物失败：' + (e && e.message || e), 'error'); });
+  },
+  // 手动勾选文风参考章节（自由写作模式 few-shot）
+  pickStyleChapters: function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var pid = (Store.state.currentProject || {}).id;
+    if (!pid) { UI.toast('请先选择项目', 'warn'); return; }
+    API.listChapters(pid).then(function (items) {
+      if (!items || !items.length) { UI.toast('还没有章节', 'warn'); return; }
+      var chosen = Store.state.composer.styleChapterIDs || [];
+      var rows = items.map(function (c) {
+        var on = chosen.indexOf(c.id) >= 0;
+        return '<label style="display:flex;align-items:center;gap:4px;padding:3px 0;cursor:pointer">' +
+          '<input type="checkbox" data-cid="' + c.id + '"' + (on ? ' checked' : '') + '> ' +
+          esc(c.title || c.id) + '<span style="color:var(--text2);font-size:11px;margin-left:6px">' + (c.word_count || 0) + ' 字</span></label>';
+      }).join('');
+      UI.modal({ title: '📖 选择文风参考章节（自由写作模式）', body: '<div style="max-height:60vh;overflow:auto">' + rows + '</div><div style="color:var(--text2);font-size:11px;margin-top:6px">勾选你最满意的章节，原文会拼进 Prompt 最前当写作基准（最多 3 章）</div>',
+        actions: [
+          { id: 'clear', label: '清空', onClick: function () { Store.state.composer.styleChapterIDs = []; } },
+          { id: 'ok', label: '确定', cls: 'btn-primary', onClick: function (m, ov) {
+              var ids = [];
+              m.querySelectorAll('input[data-cid]:checked').forEach(function (el) { ids.push(el.getAttribute('data-cid')); });
+              Store.state.composer.styleChapterIDs = ids.slice(0, 3);
+              ov.remove();
+              UI.toast('已选 ' + ids.length + ' 个文风参考章节', 'success');
+            } }
+        ] });
+    }).catch(function (e) { UI.toast('加载章节失败：' + (e && e.message || e), 'error'); });
   },
   validate: function (payload) {
     if (!Store.state.currentProject) { UI.toast('请先选择或创建项目', 'warn'); return false; }
