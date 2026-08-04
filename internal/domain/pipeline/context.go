@@ -300,9 +300,14 @@ func containsAny(s string, subs ...string) bool {
 
 func runeLen(s string) int { return len([]rune(s)) }
 
-// collectSynopses 收集项目各章节的 synopsis（章节摘要），拼接为前情提要（仅收录非空摘要）
+// oneTimeEventRe 从六段式摘要中提取【一次性事件】段内容（防止后续章节重复发生）
+var oneTimeEventRe = regexp.MustCompile(`【一次性事件】([^【\n]+)`)
+
+// collectSynopses 收集项目各章节的 synopsis（章节摘要），拼接为前情提要（仅收录非空摘要）。
+// 摘要中标注的"一次性事件"（初次见面/身份揭示/关系确立等）会被单独提取为反向约束块，
+// 明确要求后续章节不得重复发生（对标 show-me-the-story 的单向一致性护栏）。
 func collectSynopses(chs []database.ChapterWithVolume) string {
-	var b strings.Builder
+	var b, once strings.Builder
 	for i := range chs {
 		s := strings.TrimSpace(chs[i].Synopsis)
 		if s == "" {
@@ -312,6 +317,18 @@ func collectSynopses(chs []database.ChapterWithVolume) string {
 			b.WriteString("\n")
 		}
 		b.WriteString(chs[i].Title + "：" + s)
+		if m := oneTimeEventRe.FindStringSubmatch(s); len(m) > 1 {
+			ev := strings.TrimSpace(m[1])
+			if ev != "" && ev != "无" {
+				if once.Len() > 0 {
+					once.WriteString("；")
+				}
+				once.WriteString(ev)
+			}
+		}
+	}
+	if once.Len() > 0 {
+		return "【前文已发生的一次性事件（严禁在本章重新发生，只能作为既成事实延续）】" + once.String() + "\n" + b.String()
 	}
 	return b.String()
 }

@@ -424,6 +424,40 @@ func parseOutlineConsistencyResult(raw string) (conflict bool, revised string) {
 	return v.Conflict, ""
 }
 
+// summarizeAndStore 对定稿正文提炼六段式摘要并写入当前章节 synopsis（对标 show-me-the-story ChapterSummary）。
+// 摘要自动注入后续章节生成（见 collectSynopses），形成滚动前情提要；失败静默降级，不阻塞创作。
+func (d *Dispatcher) summarizeAndStore(ctx context.Context, req GenerateRequest, finalText string, emit func(ProgressEvent)) {
+	if req.ChapterID == "" || strings.TrimSpace(finalText) == "" {
+		return
+	}
+	userPrompt := buildSummaryPrompt(finalText)
+	sum, _, _, _, _, err := d.callRole(ctx, llm.RoleHelper, PipelineStandard, req.ProjectID, userPrompt, req.RoleThinking)
+	if err != nil || strings.TrimSpace(sum) == "" {
+		return
+	}
+	if err := d.store.UpdateChapterSynopsis(ctx, req.ChapterID, strings.TrimSpace(sum)); err != nil {
+		emit(ProgressEvent{Type: EventWarning, Text: "章节摘要自动提炼已生成但保存失败（不影响正文）", Degraded: true})
+	}
+}
+
+// buildSummaryPrompt 六段式章节摘要提示词（人物动态/心理轨迹/一次性事件等，供后续章节做前情提要）
+func buildSummaryPrompt(content string) string {
+	return fmt.Sprintf(`请为以下章节内容提炼一份结构化摘要（约200-300字），作为后续章节创作的前情提要。
+
+【章节内容】
+%s
+
+【输出格式】
+【本章核心】发生了什么（2-3句）
+【人物动态】各主要人物在本章的状态变化（位置/关系/情绪/实力等）
+【心理轨迹】主角的心理变化线索
+【状态变化】剧情关键状态（契约/承诺/秘密/危险/势力变化等）的建立或改变
+【一次性事件】本章发生的"一次性事件"（初次见面/身份揭示/关系确立/重要承诺/生死事件等，若有；无则写"无"）
+【关键细节】后续可能用到的具体信息（物件/地点/时间/对话要点等）
+
+直接按以上格式输出，不要其他任何说明。`, content)
+}
+
 // extractIssues 从 Verifier 输出中提取问题列表
 func (d *Dispatcher) workerWrite(ctx context.Context, req GenerateRequest, bundle ContextBundle, outline string, pl PipelineName, emit func(ProgressEvent)) (string, error) {
 	if needsSegmentation(req) {

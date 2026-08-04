@@ -3,6 +3,8 @@ package pipeline
 import (
 	"strings"
 	"testing"
+
+	"github.com/ai-novel/studio/internal/infrastructure/database"
 )
 
 // Scrub：删除章节元信息行，保留正文
@@ -78,5 +80,38 @@ func TestParseOutlineConsistencyResult_Bad(t *testing.T) {
 		if conflict || revised != "" {
 			t.Fatalf("坏输入 %q 应降级为无冲突, got %v %q", raw, conflict, revised)
 		}
+	}
+}
+
+// collectSynopses：一次性事件提取为反向约束块
+func TestCollectSynopses_OneTimeEvents(t *testing.T) {
+	chs := []database.ChapterWithVolume{
+		{Chapter: database.Chapter{Title: "第1章", Synopsis: "【本章核心】两人初见\n【一次性事件】林云与惊鸿初次相识"}},
+		{Chapter: database.Chapter{Title: "第2章", Synopsis: "【本章核心】课堂冲突\n【一次性事件】无"}},
+		{Chapter: database.Chapter{Title: "第3章", Synopsis: ""}}, // 空摘要跳过
+	}
+	out := collectSynopses(chs)
+	if !strings.Contains(out, "严禁在本章重新发生") {
+		t.Fatalf("缺少一次性事件约束块:\n%s", out)
+	}
+	if !strings.Contains(out, "初次相识") {
+		t.Fatalf("一次性事件内容未提取:\n%s", out)
+	}
+	if strings.Contains(out, "第3章") {
+		t.Fatalf("空摘要章节不应出现:\n%s", out)
+	}
+}
+
+// collectSynopses：无一次性事件时不生成约束块
+func TestCollectSynopses_NoEvents(t *testing.T) {
+	chs := []database.ChapterWithVolume{
+		{Chapter: database.Chapter{Title: "第1章", Synopsis: "【本章核心】日常\n【一次性事件】无"}},
+	}
+	out := collectSynopses(chs)
+	if strings.Contains(out, "严禁在本章重新发生") {
+		t.Fatalf("无一次性事件不应生成约束块:\n%s", out)
+	}
+	if !strings.Contains(out, "第1章") {
+		t.Fatalf("摘要内容丢失:\n%s", out)
 	}
 }

@@ -223,6 +223,16 @@ func (s *Store) GetChapter(ctx context.Context, id string) (*Chapter, error) {
 	return &c, nil
 }
 
+// UpdateChapterSynopsis 更新章节摘要（synopsis）：AI 自动提炼的六段式摘要或用户前端填入。
+// 摘要随章节一同入库，后续章节生成时自动注入作为前情提要（见 pipeline collectSynopses）。
+func (s *Store) UpdateChapterSynopsis(ctx context.Context, id, synopsis string) error {
+	if id == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE chapters SET synopsis=?, updated_at=? WHERE id=?`, synopsis, now(), id)
+	return err
+}
+
 func (s *Store) UpdateChapter(ctx context.Context, id string, title, content, volumeID, ifUpdatedAt *string) (*Chapter, error) {
 	if title == nil && content == nil && volumeID == nil {
 		return s.GetChapter(ctx, id)

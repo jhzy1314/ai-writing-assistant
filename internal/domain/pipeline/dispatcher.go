@@ -122,6 +122,12 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 			return
 		}
 
+		// 6.3 章节摘要自动提炼（六段式 + 一次性事件标注，写入 synopsis，失败静默）
+		// 摘要后续自动注入下一章生成（collectSynopses），形成滚动前情提要
+		if finalText != "" {
+			d.summarizeAndStore(ctx, req, finalText, emit)
+		}
+
 		// 6.4 Scrub 清洗：删除章节元信息残留行（"（第X章）""本章完""以下是修订后的正文"等）
 		// 保证交付终稿为"印刷版"（对标 show-me-the-story stripChapterMetaProse）
 		if finalText != "" {
