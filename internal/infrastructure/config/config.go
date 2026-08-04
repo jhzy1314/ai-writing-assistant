@@ -60,8 +60,9 @@ func LoadConfig(configPath string) (*Config, error) {
 	v.SetDefault("server.port", 8081)
 	v.SetDefault("server.listen_addr", "127.0.0.1")
 	v.SetDefault("server.sqlite_path", "data/ai-novel.db")
-	v.SetDefault("quotas.daily_call_limit", 500)
-	v.SetDefault("quotas.daily_token_limit", 2000000)
+	// 单机本地工具：默认不做每日额度限制（0=不限制）；仅限流/并发保留防打爆
+	v.SetDefault("quotas.daily_call_limit", 0)
+	v.SetDefault("quotas.daily_token_limit", 0)
 	v.SetDefault("quotas.per_request_token_limit", 8000)
 	v.SetDefault("quotas.light_input_char_limit", 500)
 	v.SetDefault("quotas.max_iterations", 3)

@@ -75,18 +75,16 @@ var Usage = {
       roleBD.style.display = 'none';
     }
     var hint = document.getElementById('usageHint');
+    // 额度仅作展示，不限制生成按钮（单机本地工具，用户明确要求不做额度限制）
     if (!this.canGenerate()) {
-      hint.textContent = '⚠ 今日额度已用完';
+      hint.textContent = '⚠ 今日额度已用完（仅展示，不限制生成）';
       hint.style.color = 'var(--danger)';
-      document.getElementById('btnGenerate').disabled = true;
     } else if ((cl && cp >= 80) || (tl && tp >= 80)) {
-      hint.textContent = '⚠ 额度即将用尽';
+      hint.textContent = '⚠ 额度即将用尽（仅展示）';
       hint.style.color = 'var(--warning)';
-      // 生成中禁用由 Composer.setGenerating 统一管理，这里不再干预（SSE.active 会卡死导致按钮黑）
-      document.getElementById('btnGenerate').disabled = false;
     } else {
       hint.textContent = '';
-      document.getElementById('btnGenerate').disabled = false;
     }
+    // 生成按钮禁用只由 Composer.setGenerating（生成中）管理，额度与 SSE 状态都不干预
   }
 };

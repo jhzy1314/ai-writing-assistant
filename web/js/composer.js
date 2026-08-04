@@ -359,10 +359,7 @@ var Composer = {
     if (Store.state.composer.runMode === 'light' && payload.selected_text && Array.from(payload.selected_text).length > 500) {
       UI.toast('选中文本超过 500 字，轻量模式可能不适合，建议切换为「智能协同」', 'warn');
     }
-    if (!Usage.canGenerate()) {
-      UI.toast('今日额度已用完，请明日再试或联系管理员调整限额', 'error');
-      return false;
-    }
+    // 额度仅作展示，不限制生成（单机本地工具，用户明确要求不做额度限制）
     return true;
   },
   onRewriteOutlineChange: function () {
