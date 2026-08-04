@@ -134,6 +134,7 @@ var Composer = {
     if (e) e.stopPropagation();
     var modes = [
       { v: 'auto', n: '智能协同（推荐）', d: '自动判断任务类型匹配创作模式：续写/润色/审稿等分别走最合适的流程，无需手动选择。' },
+      { v: 'free', n: '自由写作', d: '单 Agent 一口气写：只拼你选的文风样本/出场人物/前情摘要/本章事件，无规划无审校无重写——保留毛边感，最适合需要个人风格与情绪的核心章节。配合「文风参考」选你写得最好的章节效果最佳。' },
       { v: 'draft', n: '快速草稿', d: '跳过构思和审稿环节，由写作 Agent 直接产出初稿，速度最快，适合灵感记录。' },
       { v: 'orchestrated', n: '指派Agent模型', d: '为规划师/写作/审稿三个角色分别手动指定模型，跑完整协同流程，适合对质量要求高的用户。' },
       { v: 'manual', n: '手动自选模型', d: '跳过流水线，直接调用指定模型生成，所见即所得。' },
@@ -349,8 +350,20 @@ var Composer = {
       previous_summaries: summaries,
       skip_word_check: Store.state.composer.skipWordCheck,
       role_thinking: Store.state.composer.roleThinking || { thinker: true, worker: true, verifier: false, helper: false },
-      web_search: !!Store.state.composer.webSearch
+      web_search: !!Store.state.composer.webSearch,
+      style_chapter_ids: Store.state.composer.styleChapterId ? [Store.state.composer.styleChapterId] : [],
+      free_refs: Composer.collectFreeRefs()
     };
+  },
+  // 收集"本次写作参考"勾选（自由写作模式）
+  collectFreeRefs: function () {
+    var refs = [];
+    var map = { freeRefCharacter: 'character', freeRefStyle: 'style', freeRefSummary: 'summary', freeRefWorld: 'world', freeRefForeshadow: 'foreshadow', freeRefMaterial: 'material' };
+    Object.keys(map).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && el.checked) refs.push(map[id]);
+    });
+    return refs;
   },
   validate: function (payload) {
     if (!Store.state.currentProject) { UI.toast('请先选择或创建项目', 'warn'); return false; }

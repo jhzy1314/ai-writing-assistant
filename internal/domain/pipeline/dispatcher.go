@@ -109,6 +109,8 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 			finalText, execErr = d.runManual(ctx, req, bundle, emit)
 		case PipelineLight:
 			finalText, execErr = d.runLight(ctx, req, bundle, lightLimit, emit)
+		case PipelineFree:
+			finalText, execErr = d.runFree(ctx, req, bundle, emit)
 		case PipelineStrict:
 			finalText, execErr = d.runStrict(ctx, req, bundle, maxIter, emit)
 		case PipelineArt:
@@ -138,7 +140,8 @@ func (d *Dispatcher) Run(ctx context.Context, req GenerateRequest, ip string) <-
 		// 问题句 ≥3 时交 Worker 局部修改（只改问题句，不整段重写——整篇自动润色会磨掉梗/吐槽，
 		// 精准闭环更安全）。单段问题句 ≥5 时额外注明该段可整体重写。白名单：
 		// 引号内对话、第一人称转述体叙述不检测。
-		if finalText != "" {
+		// 自由写作模式（free）跳过：无审校无重写，保留毛边感。
+		if finalText != "" && pl != PipelineFree {
 			sentIssues := DetectSentenceIssues(finalText)
 			if len(sentIssues) >= 3 {
 				emit(ProgressEvent{Type: EventStage, Stage: fmt.Sprintf("检测到 %d 处解释性旁白，交创作者局部修改", len(sentIssues)), Role: string(llm.RoleWorker)})

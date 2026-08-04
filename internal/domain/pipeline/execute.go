@@ -509,6 +509,138 @@ func classifyReviewIssues(issues []string) (textIssues, plotIssues []string) {
 	return textIssues, plotIssues
 }
 
+// runFree 自由写作模式（单 Agent，2026-08-05 落地）：
+// 按分层方案拼装上下文（文风样本 few-shot → 出场人物 → 最近前情 → 本章核心事件），
+// 正面引导 prompt，无 Thinker 规划、无 Verifier 审校、无 AI 味闭环重写——一口气写完。
+// 场景：需要风格/情绪/人味的核心章节（多 Agent 会磨掉毛边；单 Agent 直出更自然）。
+func (d *Dispatcher) runFree(ctx context.Context, req GenerateRequest, bundle ContextBundle, emit func(ProgressEvent)) (string, error) {
+	emit(ProgressEvent{Type: EventStage, Stage: "自由写作 — Worker 一口气写（无规划·无审校）", Role: string(llm.RoleWorker)})
+	styleText := d.freeStyleText(ctx, req)
+	charsText := d.freeCharactersText(ctx, req, bundle)
+	recentText := d.freeRecentText(ctx, req)
+	userPrompt := buildFreeUserPrompt(req, bundle, styleText, charsText, recentText)
+	text, _, wModel, wDegraded, durMs, err := d.callRoleStream(ctx, llm.RoleWorker, PipelineFree, req.ProjectID, userPrompt, emitToken(emit, string(llm.RoleWorker)), req.RoleThinking)
+	if err != nil {
+		return "", err
+	}
+	if wDegraded {
+		emit(ProgressEvent{Type: EventWarning, Text: "创作模型异常，已降级到备用模型", Degraded: true})
+	}
+	emit(ProgressEvent{Type: EventStage, Stage: "自由写作完成", Role: string(llm.RoleWorker), Model: wModel, DurationMs: durMs})
+	return text, nil
+}
+
+// freeStyleText 文风样本：手动选定的章节（few-shot，最高权重）+ 素材库样本（FreeRefs 勾选 style 才拼）
+func (d *Dispatcher) freeStyleText(ctx context.Context, req GenerateRequest) string {
+	if len(req.StyleChapterIDs) == 0 && len(req.StyleSampleIDs) == 0 {
+		return ""
+	}
+	if len(req.FreeRefs) > 0 && !containsStr(req.FreeRefs, "style") {
+		return ""
+	}
+	var b strings.Builder
+	for _, chID := range req.StyleChapterIDs {
+		ch, err := d.store.GetChapter(ctx, chID)
+		if err != nil || ch == nil || strings.TrimSpace(ch.Content) == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString("（" + ch.Title + "节选）\n")
+		b.WriteString(truncateRunes(strings.TrimSpace(ch.Content), 900))
+	}
+	for _, sid := range req.StyleSampleIDs {
+		sm, err := d.store.GetStyleSample(ctx, sid)
+		if err != nil || sm == nil || strings.TrimSpace(sm.Content) == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString(truncateRunes(strings.TrimSpace(sm.Content), 600))
+	}
+	return b.String()
+}
+
+// freeCharactersText 出场人物卡：从需求/大纲/最近前情中匹配人名，每人压缩为 ~100 字核心标签
+// （FreeRefs 勾选 character 才拼；不勾则跳过）
+func (d *Dispatcher) freeCharactersText(ctx context.Context, req GenerateRequest, bundle ContextBundle) string {
+	if len(req.FreeRefs) > 0 && !containsStr(req.FreeRefs, "character") {
+		return ""
+	}
+	chars, err := d.store.ListCharacters(ctx, req.ProjectID)
+	if err != nil || len(chars) == 0 {
+		return ""
+	}
+	hay := req.UserDemand + " " + req.Outline + " " + req.SelectedText
+	if strings.TrimSpace(bundle.HistoryContent) != "" {
+		r := []rune(bundle.HistoryContent)
+		if len(r) > 2000 {
+			hay += " " + string(r[len(r)-2000:])
+		} else {
+			hay += " " + bundle.HistoryContent
+		}
+	}
+	var b strings.Builder
+	added := 0
+	for _, c := range chars {
+		if strings.TrimSpace(c.Name) == "" {
+			continue
+		}
+		if !strings.Contains(hay, c.Name) {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString("- " + c.Name + "：" + truncateRunes(strings.TrimSpace(c.Description), 100))
+		added++
+		if added >= 6 {
+			break
+		}
+	}
+	return b.String()
+}
+
+// freeRecentText 最近前情：上一章尾部原文（承接语感）+ 最近章节摘要（FreeRefs 勾选 summary 才拼）
+func (d *Dispatcher) freeRecentText(ctx context.Context, req GenerateRequest) string {
+	if len(req.FreeRefs) > 0 && !containsStr(req.FreeRefs, "summary") {
+		return ""
+	}
+	chs, err := d.store.ListChapters(ctx, req.ProjectID, "")
+	if err != nil || len(chs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	last := chs[len(chs)-1]
+	if last.ID != req.ChapterID && strings.TrimSpace(last.Content) != "" {
+		b.WriteString(truncateRunes(strings.TrimSpace(last.Content), 800))
+	}
+	sum := collectSynopses(chs)
+	if strings.TrimSpace(sum) != "" {
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		r := []rune(sum)
+		if len(r) > 500 {
+			sum = string(r[len(r)-500:])
+		}
+		b.WriteString(sum)
+	}
+	return b.String()
+}
+
+// containsStr 字符串切片包含判断
+func containsStr(s []string, v string) bool {
+	for _, x := range s {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
 // extractIssues 从 Verifier 输出中提取问题列表
 func (d *Dispatcher) workerWrite(ctx context.Context, req GenerateRequest, bundle ContextBundle, outline string, pl PipelineName, emit func(ProgressEvent)) (string, error) {
 	if needsSegmentation(req) {

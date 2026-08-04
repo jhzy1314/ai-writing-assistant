@@ -276,6 +276,8 @@ func resolvePipeline(req GenerateRequest, lightCharLimit int) PipelineName {
 		return PipelineLight
 	case ModeManual:
 		return PipelineManual
+	case ModeFree:
+		return PipelineFree
 	case ModeAuto:
 		// 自动判定补充：输入文本过短也走轻量
 		if req.SelectedText == "" && req.TargetWord > 0 && req.TargetWord < lightCharLimit && isLightDemand(req.UserDemand) {

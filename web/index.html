@@ -147,6 +147,7 @@ window.initTiptap = async function () {
         <select id="modeSelect" title="创作模式" onchange="Composer.onModeChange(this.value)">
           <optgroup label="常用">
             <option value="auto">智能协同（推荐）</option>
+            <option value="free">自由写作</option>
             <option value="draft">快速草稿</option>
             <option value="orchestrated">指派Agent模型</option>
             <option value="manual">手动自选模型</option>
@@ -364,6 +365,15 @@ window.initTiptap = async function () {
           <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="勾选：规划师读完你的大纲后补充细节再写；取消：完全按你填的大纲直接写（规划师不干预）">
             <input type="checkbox" id="rewriteOutlineChk" checked onchange="Composer.onRewriteOutlineChange()"> 🖊️ 完善大纲
           </label>
+          <span class="gen-opts-div" style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;border-top:1px dashed var(--border);padding-top:4px;margin-top:2px">
+            <span style="font-size:10px;color:var(--muted)">本次写作参考：</span>
+            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="只拼本章出场人物卡（自由写作模式）"><input type="checkbox" id="freeRefCharacter" checked> 人物卡</label>
+            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="文风参考章节+素材库（few-shot，自由写作模式）"><input type="checkbox" id="freeRefStyle" checked> 文风样本</label>
+            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="上一章尾部+最近摘要（自由写作模式）"><input type="checkbox" id="freeRefSummary" checked> 前情摘要</label>
+            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="世界观设定（自由写作模式）"><input type="checkbox" id="freeRefWorld"> 世界观</label>
+            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="未回收伏笔提醒（自由写作模式）"><input type="checkbox" id="freeRefForeshadow"> 伏笔</label>
+            <label style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:2px;cursor:pointer" title="素材库片段（自由写作模式）"><input type="checkbox" id="freeRefMaterial"> 素材库</label>
+          </span>
         </div>
       </div>
       <div id="ragPreview" class="rag-preview" style="display:none"></div>

@@ -16,6 +16,7 @@ const (
 	ModeArt          RunMode = "art"          // 文艺创作模式
 	ModeLight        RunMode = "light"        // 轻量化快速模式
 	ModeManual       RunMode = "manual"       // 手动模式，直接调用指定模型
+	ModeFree         RunMode = "free"         // 自由写作：单Agent分层上下文一口气写（无规划无审校）
 )
 
 // PipelineName 流水线名称
@@ -33,6 +34,7 @@ const (
 	PipelineArt      PipelineName = "art"      // 文艺创作模式
 	PipelineLight    PipelineName = "light"    // 轻量化快速模式
 	PipelineManual   PipelineName = "manual"   // 手动直调
+	PipelineFree     PipelineName = "free"     // 自由写作：单Agent分层上下文一口气写（无规划无审校无闭环）
 )
 
 // GenerateRequest 创作请求（POST /api/generate 请求体）
@@ -61,6 +63,8 @@ type GenerateRequest struct {
 	WebSearch         bool              `json:"web_search"`          // 用户手动开启：联网搜索辅助各 Agent
 	WebInfo           string            `json:"-"`                   // 后端填充：检索到的联网参考信息（已格式化）
 	StyleSampleIDs    []string          `json:"style_sample_ids"`    // 文风样本库样本 ID（本地知识库风格参考）
+	StyleChapterIDs   []string          `json:"style_chapter_ids"`   // 手动选定的文风参考章节 ID（few-shot：自己写的章节）
+	FreeRefs          []string          `json:"free_refs"`           // 自由写作模式：本次写作参考勾选项（character/style/summary/world/foreshadow/material）
 }
 
 // ContextBundle 注入到所有子任务的共享上下文（世界观/人物卡/前文/素材）
